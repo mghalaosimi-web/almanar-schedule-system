@@ -14,21 +14,7 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// Hajjah University configuration
-const hajjahCollegesConfig = [
-  {
-    name: "كلية الطب والعلوم الصحية",
-    slug: "medicine-health",
-    location: "Hajjah",
-    majors: ["الطب البشري", "الرعاية التنفسية", "الصيدلة", "التمريض", "القبالة", "المختبرات", "طب الطوارئ"]
-  },
-  {
-    name: "كلية العلوم التطبيقية",
-    slug: "applied-sciences",
-    location: "Hajjah",
-    majors: ["علوم الحاسوب", "الذكاء الاصطناعي", "تقنية المعلومات IT", "الأمن السيبراني", "الاتصالات والشبكات", "الكيمياء الصناعية", "الجيولوجيا والتعدين", "ميكروبيولوجي"]
-  }
-];
+
 
 // Al-Manar University College configuration (strictly 6 majors)
 const almanarDeptsData = [
@@ -996,208 +982,6 @@ async function main() {
   console.log(`Seeded ${schedulesToCreate.length} schedules for Al-Manar.`);
 
 
-  // Seeding Hajjah University Colleges & details
-  console.log('Creating Hajjah University Colleges, Departments, and Majors...');
-  const hajjahUniversity = await prisma.university.create({
-    data: {
-      name: "جامعة حجة",
-      slug: "hajjah-university",
-      logoUrl: "/hajjah-logo.png",
-      themeColor: "#1e3a8a",
-      governorateId: govMap["حجة"].id
-    }
-  });
-
-  const createdHajjahColleges = [];
-  const hajjahMajorsList = [];
-  for (const config of hajjahCollegesConfig) {
-    const college = await prisma.college.create({
-      data: {
-        name: config.name,
-        slug: config.slug,
-        location: config.location,
-        universityId: hajjahUniversity.id
-      }
-    });
-    createdHajjahColleges.push(college);
-
-    const dept = await prisma.department.create({
-      data: {
-        name: college.name,
-        collegeId: college.id
-      }
-    });
-
-    for (const majorName of config.majors) {
-      const major = await prisma.major.create({
-        data: {
-          name: majorName,
-          departmentId: dept.id
-        }
-      });
-      hajjahMajorsList.push({ ...major, collegeId: college.id });
-    }
-  }
-
-  const hajjahAppliedCollege = createdHajjahColleges.find(c => c.slug === 'applied-sciences') || createdHajjahColleges[0];
-
-  // Hajjah Groups (general list for compatibility)
-  const hajjahGroupsList = [];
-  const hajjahGroupNames = ['مجموعة أ (نظري)', 'مجموعة ب (عملي 1)', 'مجموعة ج (عملي 2)'];
-  for (const gName of hajjahGroupNames) {
-    const grp = await prisma.group.create({ data: { name: gName, collegeId: hajjahAppliedCollege.id } });
-    hajjahGroupsList.push(grp);
-  }
-
-  // Hajjah Rooms
-  const hajjahRoomsData = [
-    { name: 'قاعة 1', capacity: 45 },
-    { name: 'قاعة 2', capacity: 45 },
-    { name: 'مختبر الحاسوب 1', capacity: 30 }
-  ];
-  const hajjahRooms = [];
-  for (const rData of hajjahRoomsData) {
-    const rm = await prisma.room.create({
-      data: { name: rData.name, capacity: rData.capacity, collegeId: hajjahAppliedCollege.id }
-    });
-    hajjahRooms.push(rm);
-  }
-
-  // Hajjah Lecturers
-  const hajjahLecturerNames = ['أ. افنان الشرفي', 'د. عبد الرزاق الأهدل', 'أ. سبأ زمام'];
-  const hajjahLecturersMap = {};
-  for (let idx = 0; idx < hajjahLecturerNames.length; idx++) {
-    const name = hajjahLecturerNames[idx];
-    const lecturer = await prisma.lecturer.create({
-      data: {
-        name,
-        email: `lecturer.hajjah.${idx + 1}@manar.edu`,
-        password: lecturerPasswordHash,
-        phone: `+9677800000${idx + 1}`,
-        collegeId: hajjahAppliedCollege.id
-      }
-    });
-    hajjahLecturersMap[name] = lecturer;
-  }
-
-  // Hajjah Subjects
-  const hajjahSubjects = [
-    { name: 'تصميم مواقع الويب', code: 'H-IT-WEB', type: 'THEORY' },
-    { name: 'البرمجة المرئية', code: 'H-IT-VISUAL', type: 'THEORY' }
-  ];
-  const hajjahSubjectsMap = {};
-  for (const sub of hajjahSubjects) {
-    const s = await prisma.subject.create({
-      data: { name: sub.name, code: sub.code, type: sub.type, collegeId: hajjahAppliedCollege.id }
-    });
-    hajjahSubjectsMap[sub.name] = s;
-  }
-
-  // Hajjah Schedules
-  const daysOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-  const todayDayName = daysOfWeek[new Date().getDay()];
-  const hajjahSchedules = [
-    { subjectName: 'تصميم مواقع الويب', lecturer: 'أ. افنان الشرفي', roomName: 'قاعة 1', day: todayDayName, startTime: '08:00', endTime: '10:00', groupName: 'مجموعة أ (نظري)' }
-  ];
-  for (const item of hajjahSchedules) {
-    const room = hajjahRooms.find(r => r.name === item.roomName);
-    const subject = hajjahSubjectsMap[item.subjectName];
-    const lecturer = hajjahLecturersMap[item.lecturer];
-    const group = hajjahGroupsList.find(g => g.name === item.groupName);
-    if (room && subject && group) {
-      await prisma.schedule.create({
-        data: {
-          subjectId: subject.id,
-          roomId: room.id,
-          lecturerName: item.lecturer,
-          lecturerId: lecturer ? lecturer.id : null,
-          groupId: group.id,
-          dayOfWeek: item.day,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          collegeId: hajjahAppliedCollege.id
-        }
-      });
-    }
-  }
-
-
-  // Seeding Health Institute (المعهد الصحي)
-  console.log('Creating Health Institute (المعهد الصحي) University & College...');
-  const healthUniversity = await prisma.university.create({
-    data: {
-      name: "المعهد الصحي",
-      slug: "health-institute",
-      logoUrl: "/health-logo.png",
-      themeColor: "#0ea5e9",
-      governorateId: govMap["حجة"].id
-    }
-  });
-
-  const healthCollege = await prisma.college.create({
-    data: {
-      name: "المعهد الصحي",
-      slug: "health-main",
-      location: "Hajjah",
-      universityId: healthUniversity.id
-    }
-  });
-
-  const healthDept = await prisma.department.create({
-    data: {
-      name: "المعهد الصحي",
-      collegeId: healthCollege.id
-    }
-  });
-
-  const healthMajors = ["صيدلة", "تمريض", "مساعد طبيب", "مختبرات", "قبالة"];
-  const healthMajorsList = [];
-  for (const mName of healthMajors) {
-    const major = await prisma.major.create({
-      data: {
-        name: mName,
-        departmentId: healthDept.id
-      }
-    });
-    healthMajorsList.push(major);
-  }
-
-  console.log('Creating Health Institute Groups for each Major and Level (Level 1 to 3)...');
-  const healthGroupSuffixes = ['مجموعة أ (نظري)', 'مجموعة ب (عملي 1)', 'مجموعة ج (عملي 2)'];
-  for (const major of healthMajorsList) {
-    for (const lvl of levels.slice(0, 3)) { // Only Level 1, Level 2, Level 3
-      for (const suffix of healthGroupSuffixes) {
-        await prisma.group.create({
-          data: {
-            name: suffix,
-            majorId: major.id,
-            levelId: lvl.id,
-            collegeId: healthCollege.id
-          }
-        });
-      }
-    }
-  }
-
-  // Health Institute Rooms
-  console.log('Creating Health Institute Rooms...');
-  const healthRoomsData = [
-    { name: 'معمل الصيدلة', capacity: 30 },
-    { name: 'معمل المختبرات', capacity: 30 },
-    { name: 'قاعة 1 (صحي)', capacity: 50 },
-    { name: 'قاعة 2 (صحي)', capacity: 50 }
-  ];
-  for (const rm of healthRoomsData) {
-    await prisma.room.create({
-      data: {
-        name: rm.name,
-        capacity: rm.capacity,
-        collegeId: healthCollege.id
-      }
-    });
-  }
-
-
   // Create SUPER_ADMIN Account
   console.log('Creating SUPER_ADMIN user...');
   const superAdminPasswordHash = await bcrypt.hash('708090', 10);
@@ -1217,31 +1001,11 @@ async function main() {
   
   await prisma.admin.create({
     data: {
-      name: 'Applied Sciences Admin',
-      email: 'admin.applied@manar.edu',
-      password: adminPasswordHash,
-      role: 'COLLEGE_ADMIN',
-      collegeId: hajjahAppliedCollege.id
-    }
-  });
-
-  await prisma.admin.create({
-    data: {
       name: 'Al-Manar Admin',
       email: 'admin.manar@manar.edu',
       password: adminPasswordHash,
       role: 'COLLEGE_ADMIN',
       collegeId: almanarCollege.id
-    }
-  });
-
-  await prisma.admin.create({
-    data: {
-      name: 'Health Institute Admin',
-      email: 'admin.health@manar.edu',
-      password: adminPasswordHash,
-      role: 'COLLEGE_ADMIN',
-      collegeId: healthCollege.id
     }
   });
 
