@@ -787,9 +787,9 @@ const almanarSchedulesData = [
 ];
 
 async function main() {
-  // Check if database already has data to prevent wiping existing data
-  const universityCount = await prisma.university.count().catch(() => 0);
-  if (universityCount > 0) {
+  // Check if database already has data (majors) to prevent wiping existing data
+  const majorCount = await prisma.major.count().catch(() => 0);
+  if (majorCount > 0) {
     console.log('Database is already seeded and contains data. Skipping seeding to preserve existing records.');
     return;
   }
