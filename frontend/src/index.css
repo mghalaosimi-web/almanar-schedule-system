@@ -1,0 +1,692 @@
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+   MANAR UNIVERSITY — GRAND PREMIUM PORTAL
+   Design System: Pure Black × Neon Lime (#deff9a)
+   Font: Urbanist
+   font-family can be dynamically customized via var(--font-family)
+═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Core Palette */
+  --bg-primary:   #000000;
+  --bg-card:      rgba(10, 10, 10, 0.92);
+  --bg-elevated:  rgba(16, 16, 16, 0.95);
+  --border-color: rgba(var(--primary-color-rgb, 222, 255, 154), 0.07);
+  --border-hover: rgba(var(--primary-color-rgb, 222, 255, 154), 0.20);
+
+  /* Text */
+  --text-primary:   #f0f0f0;
+  --text-secondary: #555555;
+  --text-muted:     #333333;
+
+  /* Neon Accent — Lime (#deff9a) */
+  --accent:         #deff9a;
+  --accent-dim:     rgba(var(--primary-color-rgb, 222, 255, 154), 0.12);
+  --accent-glow:    rgba(var(--primary-color-rgb, 222, 255, 154), 0.25);
+  --accent-2:       #a3ff70;
+
+  /* Theme-aware accent (used by ThemeSwitcher component) */
+  --primary-color-rgb:   222, 255, 154;   /* neon lime */
+  --primary-hover-rgb:   163, 255, 112;   /* accent-2 */
+  --secondary-color-rgb: 100, 220, 255;   /* cyan complement */
+
+  --glow-lime:    rgba(var(--primary-color-rgb, 222, 255, 154), 0.10);
+  --glow-emerald: rgba(100, 220, 255, 0.08);
+
+  /* Fonts */
+  --font-family: 'Urbanist', 'Cairo', sans-serif;
+}
+
+/* Light mode keeps same structure but softens blacks */
+:root.light {
+  --bg-primary:   #fcfbf7;
+  --bg-card:      #ffffff;
+  --bg-elevated:  #fdfcf7;
+  --border-color: rgba(184, 134, 11, 0.4);
+  --border-hover: rgba(184, 134, 11, 0.85);
+  --text-primary:   #1c1a14;
+  --text-secondary: #5c5545;
+  --text-muted:     #8c8575;
+  --accent:         #b8860b;
+  --accent-dim:     rgba(218, 165, 32, 0.12);
+  --accent-glow:    rgba(218, 165, 32, 0.35);
+  --glow-lime:    rgba(218, 165, 32, 0.12);
+  --glow-emerald: rgba(218, 165, 32, 0.10);
+}
+
+/* ── Theme variants (for ThemeSwitcher) ──────────────────────── */
+:root.theme-purple {
+  --accent:             #e879f9;
+  --accent-dim:         rgba(232, 121, 249, 0.12);
+  --accent-glow:        rgba(232, 121, 249, 0.25);
+  --primary-color-rgb:  232, 121, 249;
+  --primary-hover-rgb:  244, 167, 255;
+  --glow-lime:          rgba(232, 121, 249, 0.10);
+}
+:root.theme-blue {
+  --accent:             #60c4ff;
+  --accent-dim:         rgba(96, 196, 255, 0.12);
+  --accent-glow:        rgba(96, 196, 255, 0.25);
+  --primary-color-rgb:  96, 196, 255;
+  --primary-hover-rgb:  130, 210, 255;
+  --glow-lime:          rgba(96, 196, 255, 0.10);
+}
+:root.theme-amber {
+  --accent:             #ffd666;
+  --accent-dim:         rgba(255, 214, 102, 0.12);
+  --accent-glow:        rgba(255, 214, 102, 0.25);
+  --primary-color-rgb:  255, 214, 102;
+  --primary-hover-rgb:  255, 230, 140;
+  --glow-lime:          rgba(255, 214, 102, 0.10);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BASE RESETS
+══════════════════════════════════════════════════════════════ */
+
+html {
+  scroll-behavior: smooth;
+  transition: background-color 0.4s ease, color 0.4s ease;
+  /* PWA Phase 4: Prevent pull-to-refresh & bounce scroll on iOS/Android */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  font-family: var(--font-family), system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv05', 'cv10';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+  /* PWA Phase 4: Prevent pull-to-refresh & rubber-band scroll (critical for PWA) */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  /* Prevent tap callouts and selection on UI chrome */
+  -webkit-tap-highlight-color: transparent;
+}
+
+input, button, select, textarea {
+  font-family: var(--font-family), system-ui, -apple-system, sans-serif !important;
+}
+
+/* PWA utility: apply to any scrollable container that should not trigger pull-to-refresh */
+.pwa-no-overscroll {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+══════════════════════════════════════════════════════════════ */
+
+/* Glassmorphism card */
+.frosted-panel {
+  background-color: var(--bg-card);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 24px 60px -16px rgba(0,0,0,0.70);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Glassmorphism Header */
+.glass-header {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.3s ease;
+}
+
+/* Neon accent glow */
+.neon-glow {
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 60px rgba(var(--primary-color-rgb, 222, 255, 154), 0.05);
+}
+
+/* Command center metric card */
+.command-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-top: 2px solid var(--accent);
+  border-radius: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+.command-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 40px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+/* Accent button */
+.btn-neon {
+  background: var(--accent);
+  color: #000;
+  font-weight: 800;
+  font-family: 'Urbanist', sans-serif;
+  border-radius: 8px;
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.btn-neon:hover:not(:disabled) {
+  box-shadow: 0 0 24px var(--accent-glow);
+  transform: translateY(-1px);
+}
+.btn-neon:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Ghost button */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-family: 'Urbanist', sans-serif;
+  border-radius: 8px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Premium input field */
+.cmd-input {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+.cmd-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(222,255,154,0.10);
+}
+.cmd-input::placeholder { color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes glowPulse {
+  0%,100% { opacity: 0.5; transform: scale(1) translate(0,0); }
+  40%     { opacity: 0.8; transform: scale(1.18) translate(20px,-40px); }
+  70%     { opacity: 0.4; transform: scale(0.92) translate(-15px,25px); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes neonBlink {
+  0%,100% { text-shadow: 0 0 12px var(--accent), 0 0 40px var(--accent-glow); }
+  50%     { text-shadow: none; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes text-glitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(-1px, -1px); }
+  60% { transform: translate(1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+}
+@keyframes glow-expand {
+  0%, 100% { box-shadow: 0 0 12px var(--accent-glow), 0 0 40px rgba(var(--primary-color-rgb, 222, 255, 154), 0.02); }
+  50% { box-shadow: 0 0 24px var(--accent-glow), 0 0 80px rgba(var(--primary-color-rgb, 222, 255, 154), 0.12); }
+}
+
+.ambient-orb {
+  animation: glowPulse 18s infinite ease-in-out;
+  will-change: transform, opacity;
+}
+.animate-slide-up { animation: slideUp 0.55s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-fade-in  { animation: fadeIn  0.45s ease both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(222,255,154,0.12) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+.animate-text-glitch {
+  animation: text-glitch 0.4s steps(2, start) infinite;
+}
+.animate-glow-expand {
+  animation: glow-expand 2s infinite ease-in-out;
+}
+
+/* Fluid spacing and container sizing */
+.premium-container {
+  padding: clamp(1rem, 4vw, 2.5rem);
+}
+
+/* Touch targets for buttons and inputs */
+.btn-neon, .btn-ghost, .cmd-input {
+  min-height: clamp(52px, 7vh, 58px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cmd-input {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   PRINT STYLES
+══════════════════════════════════════════════════════════════ */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  header, nav, aside, button, .no-print { display: none !important; }
+  .print-area {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+  .print-area * { color: #000 !important; border-color: #d1d5db !important; }
+  .print-card { page-break-inside: avoid; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LIGHT MODE RESETS & GLOBAL CLASS OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+:root.light {
+  /* Forces text-white, text-gray-100, text-slate-100 to be readable dark colors in light mode */
+  .text-white,
+  .text-white\/90,
+  .text-white\/80,
+  .text-white\/75,
+  .text-white\/70,
+  .text-white\/60,
+  .text-white\/50,
+  .text-white\/40,
+  .text-white\/30,
+  .text-white\/20,
+  .text-white\/10,
+  .text-gray-100,
+  .text-slate-100,
+  .text-zinc-100,
+  .text-neutral-100 {
+    color: var(--text-primary) !important;
+  }
+
+  .text-slate-200,
+  .text-gray-200,
+  .text-zinc-200,
+  .text-neutral-200,
+  .text-slate-300,
+  .text-slate-300\/90,
+  .text-slate-300\/80,
+  .text-slate-300\/50,
+  .text-gray-300,
+  .text-zinc-300,
+  .text-neutral-300 {
+    color: var(--text-primary) !important;
+  }
+
+  .text-slate-400,
+  .text-slate-400\/90,
+  .text-slate-400\/80,
+  .text-slate-400\/50,
+  .text-gray-400,
+  .text-zinc-400,
+  .text-neutral-400,
+  .text-slate-500,
+  .text-gray-500,
+  .text-zinc-500,
+  .text-neutral-500 {
+    color: var(--text-secondary) !important;
+  }
+
+  .text-slate-600,
+  .text-gray-600,
+  .text-zinc-600,
+  .text-neutral-600,
+  .text-gray-650 {
+    color: var(--text-muted) !important;
+  }
+
+  /* Make sure hover overrides work */
+  .hover\:text-white:hover,
+  .hover\:text-slate-200:hover,
+  .hover\:text-gray-200:hover {
+    color: var(--accent) !important;
+  }
+
+  /* Override dark backgrounds with warm white/light paper */
+  .bg-black,
+  .bg-slate-900,
+  .bg-slate-950,
+  .bg-gray-900,
+  .bg-slate-800,
+  .bg-slate-850,
+  .bg-zinc-900,
+  .bg-zinc-950,
+  .bg-neutral-900,
+  .bg-neutral-950 {
+    background-color: var(--bg-card) !important;
+  }
+
+  .bg-gray-955 {
+    background-color: var(--bg-card) !important;
+  }
+
+  .bg-gray-950 {
+    background-color: var(--bg-primary) !important;
+  }
+
+  /* Soft translucent containers and card panels - made solid white in light mode */
+  .bg-white\/2,
+  .bg-white\/3,
+  .bg-white\/4,
+  .bg-white\/5,
+  .bg-white\/8,
+  .bg-white\/10,
+  .bg-white\/20,
+  .bg-white\/30,
+  .bg-white\/\[0\.02\],
+  .bg-white\/\[0\.015\],
+  .bg-white\/\[0\.01\],
+  .bg-black\/5,
+  .bg-black\/10,
+  .bg-black\/20,
+  .bg-black\/30,
+  .bg-black\/40,
+  .bg-gray-900\/20,
+  .bg-gray-900\/30,
+  .bg-gray-900\/60,
+  .bg-gray-955\/50,
+  .bg-gray-955\/60 {
+    background-color: var(--bg-card) !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Hover background overrides */
+  .hover\:bg-white\/5:hover,
+  .hover\:bg-white\/10:hover,
+  .hover\:bg-white\/8:hover,
+  .hover\:bg-white\/20:hover,
+  .hover\:bg-black\/10:hover,
+  .hover\:bg-black\/20:hover,
+  .hover\:bg-gray-900\/40:hover,
+  .hover\:bg-gray-955:hover {
+    background-color: rgba(184, 134, 11, 0.08) !important;
+  }
+
+  /* Border color overrides — enforce premium golden/bronze borders */
+  .border-white\/5,
+  .border-white\/8,
+  .border-white\/10,
+  .border-white\/15,
+  .border-white\/20,
+  .border-white\/30,
+  .border-slate-800,
+  .border-slate-850,
+  .border-slate-700,
+  .border-neutral-800,
+  .border-zinc-800,
+  .border-gray-800,
+  .border-gray-700 {
+    border-color: var(--border-color) !important;
+  }
+
+  /* Hover border overrides */
+  .hover\:border-white\/10:hover,
+  .hover\:border-white\/15:hover,
+  .hover\:border-white\/20:hover,
+  .hover\:border-white\/40:hover,
+  .hover\:border-slate-700:hover,
+  .hover\:border-slate-650:hover,
+  .hover\:border-\[var\(--accent\)\]\/45:hover,
+  .group-hover\:border-white\/20:hover {
+    border-color: var(--border-hover) !important;
+  }
+
+  /* Timetable status/lecture card enhancements */
+  .text-blue-200,
+  .text-blue-300,
+  .text-blue-400 {
+    color: #1e3a8a !important; /* Deep readable blue */
+  }
+
+  .text-emerald-200,
+  .text-emerald-300,
+  .text-emerald-400 {
+    color: #064e3b !important; /* Deep readable green */
+  }
+
+  .text-amber-200,
+  .text-amber-300,
+  .text-amber-400 {
+    color: #78350f !important; /* Deep readable amber/brown */
+  }
+
+  .border-blue-500\/10 {
+    border-color: rgba(30, 58, 138, 0.25) !important;
+  }
+
+  .border-emerald-500\/10 {
+    border-color: rgba(6, 78, 59, 0.25) !important;
+  }
+
+  /* Active/Glow shadows */
+  .shadow-2xl,
+  .shadow-xl,
+  .shadow-lg {
+    box-shadow: 0 10px 30px -10px rgba(184, 134, 11, 0.15) !important;
+  }
+
+  /* Table styling enhancements for absolute clarity and golden accents */
+  table {
+    border: 1px solid var(--border-color) !important;
+    border-collapse: collapse !important;
+    width: 100%;
+    background-color: var(--bg-card) !important;
+  }
+
+  th {
+    background-color: rgba(212, 175, 55, 0.08) !important; /* Soft gold-tinted headers */
+    color: #8b6508 !important; /* Elegant dark gold/brown header text */
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3) !important;
+    font-weight: 800 !important;
+    padding: 12px 16px !important;
+  }
+
+  td {
+    border-bottom: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    padding: 12px 16px !important;
+  }
+
+  tr:hover {
+    background-color: rgba(212, 175, 55, 0.04) !important; /* Row hover golden highlight */
+  }
+
+  /* Modal overlay backdrop blur styling */
+  .bg-black\/70 {
+    background-color: rgba(28, 26, 20, 0.4) !important;
+  }
+
+  /* Buttons & badges */
+  .btn-ghost {
+    background: transparent !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent) !important;
+    color: #ffffff !important;
+    background-color: var(--accent) !important;
+  }
+
+  .btn-neon {
+    background: var(--accent) !important;
+    color: #ffffff !important; /* High contrast on golden accent button */
+  }
+
+  .btn-neon:hover {
+    box-shadow: 0 0 16px var(--accent-glow) !important;
+  }
+
+  /* Additional widgets and chart fixes */
+  .bg-gray-955\/60,
+  .bg-gray-955\/50 {
+    background-color: rgba(212, 175, 55, 0.05) !important;
+  }
+
+  .bg-gray-950.rounded-full {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  svg circle[stroke="rgba(255,255,255,0.03)"] {
+    stroke: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .frosted-panel {
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.05) inset, 0 16px 36px -12px rgba(184, 134, 11, 0.15) !important;
+  }
+
+  .cmd-input {
+    background: #ffffff !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .cmd-input:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.20) !important;
+  }
+
+  .cmd-input::placeholder {
+    color: var(--text-muted) !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THEME PRESERVATION HELPER CLASSES (Forced Light/Dark styling)
+   ══════════════════════════════════════════════════════════════ */
+.text-white-force {
+  color: #ffffff !important;
+}
+
+.text-emerald-100-force {
+  color: #d1fae5 !important;
+}
+
+.text-emerald-200-force {
+  color: #a7f3d0 !important;
+}
+
+.text-emerald-300-force {
+  color: #6ee7b7 !important;
+}
+
+.text-emerald-450-force {
+  color: #10b981 !important;
+}
+
+.text-emerald-400-force {
+  color: #34d399 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THEME UNIFICATION OVERRIDES (Yemeni Arabic Feedback Remediation)
+   Maps all hardcoded Tailwind utility colors (cyan, violet, emerald, purple)
+   to dynamic CSS theme variables so that everything unifies under the active theme.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Unify all hardcoded cyan elements under the active theme accent */
+.text-cyan-400, .text-cyan-500, .text-cyan-500\/80, .text-cyan-400-force {
+  color: var(--accent) !important;
+}
+.bg-cyan-500, .bg-cyan-400, .bg-cyan-500\/10, .bg-cyan-400\/5, .bg-cyan-500\/5, .bg-cyan-500\/20 {
+  background-color: var(--accent) !important;
+}
+.bg-cyan-500\/10, .bg-cyan-500\/20 {
+  background-color: var(--accent-dim) !important;
+}
+.bg-cyan-500\/5, .bg-cyan-400\/5 {
+  background-color: rgba(var(--primary-color-rgb), 0.05) !important;
+}
+.border-cyan-400, .border-cyan-500, .border-cyan-500\/20, .border-cyan-500\/10, .border-cyan-400\/40, .border-cyan-500\/30 {
+  border-color: var(--border-color) !important;
+}
+.border-cyan-500\/20, .border-cyan-500\/30, .border-cyan-400\/40, .border-cyan-400 {
+  border-color: var(--accent-glow) !important;
+}
+
+/* Hover and focus states */
+.hover\:border-cyan-400:hover, .hover\:border-cyan-500\/10:hover, .focus\:border-cyan-400:focus, .peer-checked\:border-cyan-400:checked ~ *, .hover\:text-cyan-400:hover {
+  border-color: var(--accent) !important;
+}
+.hover\:text-cyan-400:hover {
+  color: var(--accent) !important;
+}
+.hover\:bg-cyan-400:hover, .hover\:bg-cyan-500:hover {
+  background-color: var(--accent) !important;
+  opacity: 0.9 !important;
+}
+.group-hover\:bg-cyan-500:hover {
+  background-color: var(--accent) !important;
+}
+
+/* Shadow and glow overrides */
+.shadow-\[0_0_20px_rgba\(34\,211\,238\,0\.15\)\] {
+  box-shadow: 0 0 20px var(--accent-glow) !important;
+}
+.hover\:shadow-\[0_0_15px_rgba\(6\,182\,212\,0\.25\)\]:hover {
+  box-shadow: 0 0 15px var(--accent-glow) !important;
+}
+.hover\:shadow-\[0_4px_20px_rgba\(34\,211\,238\,0\.08\)\]:hover {
+  box-shadow: 0 4px 20px var(--accent-dim) !important;
+}
+.via-cyan-500\/40 {
+  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent) !important;
+}
+
+/* Unify secondary accents (violet, purple, emerald) under the main theme */
+.text-violet-400, .text-purple-400, .text-emerald-400 {
+  color: var(--accent) !important;
+}
+.border-violet-500\/20, .border-purple-500\/20, .border-purple-500\/30, .border-emerald-500\/20 {
+  border-color: var(--accent-glow) !important;
+}
+.bg-violet-500\/10, .bg-purple-500\/10, .bg-emerald-500\/10 {
+  background-color: var(--accent-dim) !important;
+}
+.bg-gradient-to-r.from-cyan-500.to-violet-500 {
+  background: linear-gradient(90deg, var(--accent), var(--accent-dim)) !important;
+}
+
+

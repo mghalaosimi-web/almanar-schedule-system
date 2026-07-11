@@ -1,0 +1,11 @@
+{
+  "debugMode": false,
+  "maintenanceMode": false,
+  "verboseLogging": false,
+  "disableAttendance": false,
+  "disableExams": false,
+  "disableLibrary": false,
+  "disableMap": false,
+  "disableSchedules": false,
+  "deactivatedColleges": []
+}

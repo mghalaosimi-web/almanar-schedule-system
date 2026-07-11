@@ -1,0 +1,39 @@
+{
+  "short_name": "بوابة الطالب",
+  "name": "بوابة الطالب الجامعي",
+  "description": "بوابة الطالب الجامعي لمتابعة الجداول والمحاضرات والإشعارات الفورية",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/almanar-logo-new.png",
+      "type": "image/png",
+      "sizes": "256x256",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#030712",
+  "theme_color": "#84cc16",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "screenshots": [
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ]
+}

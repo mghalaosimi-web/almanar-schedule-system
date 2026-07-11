@@ -1,0 +1,6 @@
+{
+  "appId": "com.mghal.manarschedule",
+  "appName": "Manar Schedule",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

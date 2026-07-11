@@ -1,0 +1,493 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SubjectType {
+  THEORY
+  PRACTICAL
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+enum OverrideType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Department {
+  id        Int     @id @default(autoincrement())
+  name      String
+  collegeId Int
+  // onDelete: Cascade — departments are purged when their parent college is deleted
+  college   College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  majors    Major[]
+
+  @@index([collegeId])
+}
+
+model Major {
+  id           Int        @id @default(autoincrement())
+  name         String
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id])
+  students     Student[]
+  groups       Group[]
+
+  @@index([departmentId])
+}
+
+model Level {
+  id       Int       @id @default(autoincrement())
+  name     String
+  students Student[]
+  groups   Group[]
+}
+
+model Group {
+  id               Int               @id @default(autoincrement())
+  name             String
+  majorId          Int?
+  major            Major?            @relation(fields: [majorId], references: [id])
+  levelId          Int?
+  level            Level?            @relation(fields: [levelId], references: [id])
+  students         Student[]
+  schedules        Schedule[]
+  notificationLogs NotificationLog[]
+  examSchedules    ExamSchedule[]
+  resources        GroupResource[]
+  exchangePosts    ExchangePost[]
+  collegeId        Int
+  college          College           @relation(fields: [collegeId], references: [id])
+
+  @@index([majorId])
+  @@index([levelId])
+  @@index([collegeId])
+}
+
+model Student {
+  id               Int                @id @default(autoincrement())
+  name             String
+  email            String             @unique
+  idNumber         String             @unique
+  idPhotoUrl       String?
+  phone            String             @unique
+  isEmailVerified  Boolean            @default(true)
+  isPhoneVerified  Boolean            @default(false)
+  isRepresentative Boolean            @default(false)
+  password         String?
+  googleId         String?            @unique
+  collegeId        Int
+  college          College            @relation(fields: [collegeId], references: [id])
+  majorId          Int
+  major            Major              @relation(fields: [majorId], references: [id])
+  levelId          Int
+  level            Level              @relation(fields: [levelId], references: [id])
+  groupId          Int?
+  group            Group?             @relation(fields: [groupId], references: [id])
+  notificationLogs   NotificationLog[]
+  verificationCodes  VerificationCode[]
+  pushSubscriptions  PushSubscription[]
+  attendanceRecords  AttendanceRecord[]
+  attendances        Attendance[]
+  seatAllocations    SeatAllocation[]
+  exchangePosts      ExchangePost[]
+  exchangeComments   ExchangeComment[]
+  feedbacks          Feedback[]
+  createdAt          DateTime           @default(now())
+
+  @@index([collegeId])
+  @@index([majorId])
+  @@index([levelId])
+  @@index([groupId])
+}
+
+model Subject {
+  id        Int         @id @default(autoincrement())
+  name      String
+  code      String      @unique
+  type      SubjectType
+  schedules Schedule[]
+  examSchedules ExamSchedule[]
+  collegeId Int
+  college   College     @relation(fields: [collegeId], references: [id])
+
+  @@index([collegeId])
+}
+
+model Room {
+  id                 Int                @id @default(autoincrement())
+  name               String             @unique
+  capacity           Int
+  schedules          Schedule[]
+  overrides          ScheduleOverride[]
+  rescheduleRequests RescheduleRequest[]
+  examSchedules      ExamSchedule[]
+  collegeId          Int
+  college            College            @relation(fields: [collegeId], references: [id])
+
+  @@index([collegeId])
+}
+
+model Lecturer {
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  email              String              @unique
+  password           String
+  phone              String?
+  schedules          Schedule[]
+  rescheduleRequests RescheduleRequest[]
+  pushSubscriptions  PushSubscription[]
+  createdAt          DateTime            @default(now())
+  collegeId          Int
+  college            College             @relation(fields: [collegeId], references: [id])
+
+  @@index([collegeId])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model RescheduleRequest {
+  id           Int           @id @default(autoincrement())
+  scheduleId   Int
+  // onDelete: Cascade — reschedule requests are cleaned up when the parent schedule is deleted
+  schedule     Schedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  lecturerId   Int
+  lecturer     Lecturer      @relation(fields: [lecturerId], references: [id])
+  requestType  String        // 'CANCEL' or 'RESCHEDULE'
+  newDayOfWeek DayOfWeek?
+  newStartTime String?
+  newEndTime   String?
+  newRoomId    Int?
+  newRoom      Room?         @relation(fields: [newRoomId], references: [id])
+  reason       String?
+  status       RequestStatus @default(PENDING)
+  adminNotes   String?
+  createdAt    DateTime      @default(now())
+
+  @@index([scheduleId])
+  @@index([lecturerId])
+}
+
+model Schedule {
+  id                 Int                @id @default(autoincrement())
+  subjectId          Int
+  subject            Subject            @relation(fields: [subjectId], references: [id])
+  roomId             Int
+  room               Room               @relation(fields: [roomId], references: [id])
+  lecturerName       String
+  lecturerId         Int?
+  lecturer           Lecturer?          @relation(fields: [lecturerId], references: [id])
+  groupId            Int
+  group              Group              @relation(fields: [groupId], references: [id])
+  dayOfWeek          DayOfWeek
+  startTime          String
+  endTime            String
+  overrides          ScheduleOverride[]
+  rescheduleRequests RescheduleRequest[]
+  attendanceRecords  AttendanceRecord[]
+  attendances        Attendance[]
+  collegeId          Int
+  college            College            @relation(fields: [collegeId], references: [id])
+
+  @@index([groupId])
+  @@index([collegeId])
+  @@index([lecturerId])
+  @@index([dayOfWeek])
+}
+
+model ScheduleOverride {
+  id           Int          @id @default(autoincrement())
+  scheduleId   Int
+  // onDelete: Cascade — overrides are purged when their parent schedule is deleted
+  schedule     Schedule     @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  newStartTime String?
+  newEndTime   String?
+  newRoomId    Int?
+  newRoom      Room?        @relation(fields: [newRoomId], references: [id])
+  date         DateTime
+  overrideType OverrideType
+
+  @@index([scheduleId])
+  @@index([date])
+}
+
+model NotificationLog {
+  id        Int                @id @default(autoincrement())
+  studentId Int?
+  student   Student?           @relation(fields: [studentId], references: [id])
+  groupId   Int?
+  group     Group?             @relation(fields: [groupId], references: [id])
+  message   String
+  sentTime  DateTime           @default(now())
+  status    NotificationStatus
+
+  @@index([studentId])
+  @@index([groupId])
+  @@index([sentTime])
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  UNI_ADMIN
+  COLLEGE_ADMIN
+}
+
+model Admin {
+  id                Int                @id @default(autoincrement())
+  name              String
+  email             String             @unique
+  password          String
+  role              AdminRole          @default(SUPER_ADMIN)
+  pushSubscriptions PushSubscription[]
+  collegeId         Int?
+  college           College?           @relation(fields: [collegeId], references: [id])
+  universityId      Int?
+  university        University?        @relation(fields: [universityId], references: [id])
+
+  @@index([collegeId])
+  @@index([universityId])
+}
+
+enum VerificationType {
+  EMAIL
+  PHONE
+}
+
+model VerificationCode {
+  id        Int              @id @default(autoincrement())
+  studentId Int
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  code      String
+  type      VerificationType
+  expiresAt DateTime
+
+  @@index([studentId])
+}
+
+model PushSubscription {
+  id         Int       @id @default(autoincrement())
+  studentId  Int?
+  student    Student?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  adminId    Int?
+  admin      Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  lecturerId Int?
+  lecturer   Lecturer? @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime  @default(now())
+
+  @@index([studentId])
+  @@index([adminId])
+  @@index([lecturerId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+model AttendanceRecord {
+  id         Int              @id @default(autoincrement())
+  studentId  Int
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  scheduleId Int
+  schedule   Schedule         @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  date       DateTime
+  status     AttendanceStatus
+  scannedAt  DateTime         @default(now())
+
+  @@unique([studentId, scheduleId, date])
+  // Performance: index for lecturer attendance report queries (filter by schedule + date range)
+  @@index([scheduleId, date])
+}
+
+model ExamSchedule {
+  id              Int              @id @default(autoincrement())
+  subjectId       Int
+  subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  roomId          Int
+  room            Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  groupId         Int
+  group           Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  date            DateTime
+  startTime       String           // e.g. "09:00"
+  endTime         String           // e.g. "11:00"
+  seatAllocations SeatAllocation[]
+  collegeId       Int
+  college         College          @relation(fields: [collegeId], references: [id])
+
+  @@index([groupId])
+  @@index([collegeId])
+  @@index([date])
+}
+
+model SeatAllocation {
+  id             Int          @id @default(autoincrement())
+  studentId      Int
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examScheduleId Int
+  examSchedule   ExamSchedule @relation(fields: [examScheduleId], references: [id], onDelete: Cascade)
+  seatNumber     String       // e.g. "Seat 1", "Seat 2"
+  
+  @@unique([studentId, examScheduleId])
+  @@unique([examScheduleId, seatNumber])
+}
+
+model Governorate {
+  id           String       @id @default(uuid())
+  name         String       @unique
+  universities University[]
+}
+
+model University {
+  id            Int           @id @default(autoincrement())
+  name          String
+  slug          String        @unique
+  logoUrl       String?
+  themeColor    String?
+  colleges      College[]
+  governorateId String?
+  governorate   Governorate?  @relation(fields: [governorateId], references: [id])
+  admins        Admin[]
+  tenantConfig  TenantConfig?
+}
+
+model College {
+  id            Int            @id @default(autoincrement())
+  name          String
+  slug          String         @unique
+  location      String?
+  universityId  Int
+  university    University     @relation(fields: [universityId], references: [id])
+  departments   Department[]
+  students      Student[]
+  admins        Admin[]
+  lecturers     Lecturer[]
+  rooms         Room[]
+  subjects      Subject[]
+  groups        Group[]
+  schedules     Schedule[]
+  examSchedules ExamSchedule[]
+  tenantConfig  TenantConfig?
+
+  @@index([universityId])
+}
+
+model Attendance {
+  id           String   @id @default(uuid())
+  date         DateTime @default(now())
+  status       String   // "PRESENT", "ABSENT", "EXCUSED"
+  studentId    Int
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  scheduleId   Int
+  schedule     Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  recordedById Int      // ID of the representative who took attendance
+
+  // Performance indexes: speed up per-student and per-schedule attendance queries
+  @@index([studentId])
+  @@index([scheduleId, date])
+}
+
+model GroupResource {
+  id           String   @id @default(uuid())
+  title        String
+  url          String
+  groupId      Int
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  postedById   Int
+  createdAt    DateTime @default(now())
+
+  @@index([groupId, createdAt])
+}
+
+model TenantConfig {
+  id           Int         @id @default(autoincrement())
+  universityId Int?        @unique
+  university   University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  collegeId    Int?        @unique
+  college      College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  
+  // Customization & Branding
+  themeColor   String?     // Hex color
+  logoUrl      String?     // Custom logo url
+  customDomain String?     // Custom subdomain/domain
+  
+  // Feature Flags
+  enabledFeatures Json     @default("{}") // JSON config: {"qrAttendance": true, etc.}
+  
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum PostCategory {
+  QUESTION
+  RESOURCE
+  HELP
+  GENERAL
+}
+
+model ExchangePost {
+  id        String            @id @default(uuid())
+  title     String
+  content   String
+  category  PostCategory      @default(GENERAL)
+  groupId   Int
+  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentId Int
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  comments  ExchangeComment[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([groupId])
+  @@index([studentId])
+}
+
+model ExchangeComment {
+  id        String       @id @default(uuid())
+  postId    String
+  post      ExchangePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  studentId Int
+  student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime     @default(now())
+
+  @@index([postId])
+  @@index([studentId])
+}
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  message   String
+  category  String?
+  rating    Int?
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+}
+

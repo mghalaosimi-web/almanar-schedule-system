@@ -1,0 +1,822 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
+import { API_URL } from './config';
+
+export default function RepresentativeDashboard() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+
+  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'broadcasts', 'resources', 'rescheduling'
+  const [loading, setLoading] = useState(true);
+
+  // Group Stats
+  const [stats, setStats] = useState({
+    totalClassmates: 0,
+    totalResources: 0,
+    attendanceRate: 100,
+    classmateStats: []
+  });
+
+  // Class & Classroom data
+  const [schedules, setSchedules] = useState([]);
+  const [classmates, setClassmates] = useState([]);
+  const [rooms, setRooms] = useState([]);
+
+  // Tab 1: Attendance state
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [attendanceSheet, setAttendanceSheet] = useState({});
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Tab 2: Broadcasts state
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
+  // Tab 3: Resources state
+  const [resources, setResources] = useState([]);
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [addingResource, setAddingResource] = useState(false);
+
+  // Tab 4: Rescheduling state
+  const [rescheduleScheduleId, setRescheduleScheduleId] = useState('');
+  const [rescheduleType, setRescheduleType] = useState('RESCHEDULE'); // 'RESCHEDULE' or 'CANCEL'
+  const [newDayOfWeek, setNewDayOfWeek] = useState('SUNDAY');
+  const [newStartTime, setNewStartTime] = useState('');
+  const [newEndTime, setNewEndTime] = useState('');
+  const [newRoomId, setNewRoomId] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [submittingReschedule, setSubmittingReschedule] = useState(false);
+  const [rescheduleHistory, setRescheduleHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const token = localStorage.getItem('manar_token');
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const tabs = [
+    { id: 'attendance', label: isAr ? '📝 التحضير اليومي' : 'Attendance' },
+    { id: 'broadcasts', label: isAr ? '📢 تعميمات الدفعة' : 'Group Broadcasts' },
+    { id: 'resources', label: isAr ? '🔗 المراجع والمستندات' : 'Shared Resources' },
+    { id: 'rescheduling', label: isAr ? '🗓️ تعديل الحصص' : 'Reschedule Requests' }
+  ];
+
+  /* ── Fetch Dashboard Stats ──────────────────────────────────── */
+  const fetchStats = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/rep/dashboard/stats`, { headers });
+      if (res.data?.success) {
+        setStats(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+  };
+
+  /* ── Fetch Rescheduling History ──────────────────────────────── */
+  const fetchRescheduleHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const res = await axios.get(`${API_URL}/api/rep/reschedule/history`, { headers });
+      if (res.data?.success) {
+        setRescheduleHistory(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch reschedule history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const [schedsRes, classmatesRes, roomsRes, resourcesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/rep/schedules`, { headers }),
+        axios.get(`${API_URL}/api/rep/classmates`, { headers }),
+        axios.get(`${API_URL}/api/rooms`, { headers }).catch(() => ({ data: { success: true, data: [] } })),
+        axios.get(`${API_URL}/api/rep/resources`, { headers }).catch(() => ({ data: { success: true, data: [] } }))
+      ]);
+
+      if (schedsRes.data?.success) {
+        setSchedules(schedsRes.data.data);
+        if (schedsRes.data.data.length > 0) {
+          setSelectedScheduleId(schedsRes.data.data[0].id.toString());
+          setRescheduleScheduleId(schedsRes.data.data[0].id.toString());
+        }
+      }
+
+      if (classmatesRes.data?.success) {
+        setClassmates(classmatesRes.data.data);
+      }
+
+      if (roomsRes.data?.success) {
+        setRooms(roomsRes.data.data);
+      }
+
+      if (resourcesRes.data?.success) {
+        setResources(resourcesRes.data.data);
+      }
+
+      // Also grab dynamic stats
+      await fetchStats();
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل تحميل البيانات التمهيدية' : 'Failed to load initial dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  /* ── Load Attendance sheet for selected schedule & date ───────── */
+  const fetchAttendanceSheet = async (scheduleId, date) => {
+    if (!scheduleId) return;
+    try {
+      const res = await axios.get(`${API_URL}/api/rep/attendance`, {
+        params: { scheduleId, date },
+        headers
+      });
+      if (res.data?.success) {
+        const records = res.data.data;
+        const initialSheet = {};
+        classmates.forEach(student => {
+          initialSheet[student.id] = 'PRESENT';
+        });
+        records.forEach(r => {
+          initialSheet[r.studentId] = r.status;
+        });
+        setAttendanceSheet(initialSheet);
+      }
+    } catch (err) {
+      console.error('Failed to load attendance:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (classmates.length > 0 && selectedScheduleId) {
+      fetchAttendanceSheet(selectedScheduleId, selectedDate);
+    }
+  }, [selectedScheduleId, selectedDate, classmates]);
+
+  useEffect(() => {
+    if (activeTab === 'rescheduling') {
+      fetchRescheduleHistory();
+    }
+  }, [activeTab]);
+
+  /* ── Quick Fill Helpers ───────────────────────────────────────── */
+  const handleMarkAllPresent = () => {
+    const updated = { ...attendanceSheet };
+    classmates.forEach(c => {
+      updated[c.id] = 'PRESENT';
+    });
+    setAttendanceSheet(updated);
+    toast.success(isAr ? 'تم تحديد جميع الطلاب كحاضرين' : 'All students marked as Present');
+  };
+
+  const handleResetSheet = () => {
+    const updated = { ...attendanceSheet };
+    classmates.forEach(c => {
+      updated[c.id] = 'PRESENT';
+    });
+    setAttendanceSheet(updated);
+    toast(isAr ? 'تمت إعادة تعيين الورقة لحالتها الافتراضية' : 'Attendance sheet reset to default');
+  };
+
+  /* ── Export Current Sheet to CSV ─────────────────────────────── */
+  const handleExportCSV = () => {
+    if (!selectedScheduleId) return;
+    const activeSchedule = schedules.find(s => s.id.toString() === selectedScheduleId);
+    const subjectName = activeSchedule?.subject?.name || 'Class';
+    
+    // Header
+    const csvRows = [];
+    csvRows.push([
+      isAr ? 'الرقم الأكاديمي' : 'ID Number',
+      isAr ? 'اسم الطالب' : 'Student Name',
+      isAr ? 'الحالة' : 'Attendance Status',
+      isAr ? 'التاريخ' : 'Date'
+    ]);
+    
+    classmates.forEach(c => {
+      const status = attendanceSheet[c.id] || 'PRESENT';
+      let statusStr = status;
+      if (isAr) {
+        statusStr = status === 'PRESENT' ? 'حاضر' : status === 'ABSENT' ? 'غائب' : 'عذر مقبول';
+      }
+      csvRows.push([c.idNumber, c.name, statusStr, selectedDate]);
+    });
+    
+    // UTF-8 BOM representation to force Microsoft Excel to parse Arabic content correctly
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' 
+      + csvRows.map(e => e.map(val => `"${val}"`).join(',')).join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Attendance_${subjectName.replace(/\s+/g, '_')}_${selectedDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  /* ── Save Attendance ─────────────────────────────────────────── */
+  const handleSaveAttendance = async (e) => {
+    e.preventDefault();
+    if (!selectedScheduleId) {
+      toast.error(isAr ? 'الرجاء اختيار الحصة أولاً' : 'Please select a class first');
+      return;
+    }
+    setSavingAttendance(true);
+    try {
+      const records = Object.keys(attendanceSheet).map(studentId => ({
+        studentId: parseInt(studentId),
+        status: attendanceSheet[studentId]
+      }));
+
+      const res = await axios.post(`${API_URL}/api/rep/attendance`, {
+        scheduleId: parseInt(selectedScheduleId),
+        date: selectedDate,
+        records
+      }, { headers });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم حفظ وإرسال الإشعارات للطلاب بنجاح!' : 'Attendance saved & notifications dispatched!');
+        // Refresh stats
+        fetchStats();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل حفظ التحضير' : 'Failed to save attendance'));
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
+  /* ── Broadcast Message ───────────────────────────────────────── */
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastMessage.trim()) {
+      toast.error(isAr ? 'الرجاء كتابة نص الإعلان' : 'Please write your announcement first');
+      return;
+    }
+    setSendingBroadcast(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/rep/broadcast`, {
+        message: broadcastMessage
+      }, { headers });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم بث الإعلان وإشعار الطلاب بنجاح' : 'Announcement broadcasted successfully');
+        setBroadcastMessage('');
+        fetchStats();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل إرسال التعميم' : 'Failed to send broadcast'));
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  /* ── Add Group Resource ──────────────────────────────────────── */
+  const handleAddResource = async (e) => {
+    e.preventDefault();
+    if (!resourceTitle.trim() || !resourceUrl.trim()) {
+      toast.error(isAr ? 'الرجاء تعبئة جميع الحقول' : 'Please fill all fields');
+      return;
+    }
+    setAddingResource(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/rep/resources`, {
+        title: resourceTitle,
+        url: resourceUrl
+      }, { headers });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تمت إضافة المرجع بنجاح' : 'Resource added successfully');
+        setResourceTitle('');
+        setResourceUrl('');
+        const resList = await axios.get(`${API_URL}/api/rep/resources`, { headers });
+        if (resList.data?.success) setResources(resList.data.data);
+        fetchStats();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل إضافة المرجع' : 'Failed to add resource'));
+    } finally {
+      setAddingResource(false);
+    }
+  };
+
+  /* ── Submit Reschedule Request ─────────────────────────────── */
+  const handleRescheduleRequest = async (e) => {
+    e.preventDefault();
+    if (!rescheduleScheduleId) {
+      toast.error(isAr ? 'الرجاء اختيار الحصة' : 'Please select a class');
+      return;
+    }
+    setSubmittingReschedule(true);
+    try {
+      const payload = {
+        scheduleId: parseInt(rescheduleScheduleId),
+        requestType: rescheduleType,
+        reason: rescheduleReason,
+        newDayOfWeek: rescheduleType === 'RESCHEDULE' ? newDayOfWeek : null,
+        newStartTime: rescheduleType === 'RESCHEDULE' ? newStartTime : null,
+        newEndTime: rescheduleType === 'RESCHEDULE' ? newEndTime : null,
+        newRoomId: (rescheduleType === 'RESCHEDULE' && newRoomId) ? parseInt(newRoomId) : null
+      };
+
+      const res = await axios.post(`${API_URL}/api/rep/reschedule`, payload, { headers });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم إرسال طلب التعديل بنجاح' : 'Reschedule request submitted successfully');
+        setRescheduleReason('');
+        setNewStartTime('');
+        setNewEndTime('');
+        setNewRoomId('');
+        fetchRescheduleHistory();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل إرسال طلب التعديل' : 'Failed to submit reschedule request'));
+    } finally {
+      setSubmittingReschedule(false);
+    }
+  };
+
+  // Filter classmate list dynamically based on search bar query
+  const filteredClassmates = classmates.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.idNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="h-10 w-10 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45 }}
+      dir={isAr ? 'rtl' : 'ltr'}
+      className="w-full max-w-4xl mx-auto space-y-8 text-white p-2"
+      style={{ fontFamily: "'Urbanist', 'Inter', sans-serif" }}
+    >
+      {/* ── Dashboard Header ─────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(to right, var(--accent), var(--accent-2, var(--accent)))' }}>
+            {isAr ? 'لوحة المندوب الشاملة' : 'Representative Dashboard'}
+          </h2>
+          <p className="text-xs text-white/50 mt-1">
+            {isAr ? 'إدارة شؤون مجموعتك، حضور الطلاب، مراجع الشعبة وتنسيق المواعيد.' : 'Manage group telemetry, classmate attendances, shared resources, and class times.'}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Stats Widget Banner ─────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="frosted-panel rounded-2xl p-5 border border-white/5 bg-white/2 flex flex-col justify-center">
+          <p className="text-[9px] font-black uppercase text-white/40 tracking-wider mb-1">{isAr ? 'إجمالي الطلاب' : 'Group Size'}</p>
+          <h4 className="text-2xl font-black text-white font-mono">{stats.totalClassmates}</h4>
+        </div>
+        <div className="frosted-panel rounded-2xl p-5 border border-white/5 bg-white/2 flex flex-col justify-center">
+          <p className="text-[9px] font-black uppercase text-white/40 tracking-wider mb-1">{isAr ? 'معدل الحضور العام' : 'Attendance Rate'}</p>
+          <h4 className="text-2xl font-black text-[var(--accent)] font-mono">{stats.attendanceRate}%</h4>
+        </div>
+        <div className="frosted-panel rounded-2xl p-5 border border-white/5 bg-white/2 flex flex-col justify-center">
+          <p className="text-[9px] font-black uppercase text-white/40 tracking-wider mb-1">{isAr ? 'المراجع المشاركة' : 'Shared Files'}</p>
+          <h4 className="text-2xl font-black text-blue-400 font-mono">{stats.totalResources}</h4>
+        </div>
+      </div>
+
+      {/* ── Tab Selector pills ──────────────────────────────────── */}
+      <div className="flex gap-2 overflow-x-auto pb-2 border-b border-white/5">
+        {tabs.map(tab => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-2.5 rounded-full text-xs font-black tracking-wider transition-all duration-300 border whitespace-nowrap ${
+                active
+                  ? 'bg-[var(--accent)] text-slate-950 border-[var(--accent)] shadow-lg'
+                  : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Tab Container ───────────────────────────────────────── */}
+      <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+          >
+            {/* Tab 1: Attendance */}
+            {activeTab === 'attendance' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="w-full md:w-auto space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-white/40">
+                      {isAr ? 'اختر الحصة الدراسية' : 'Select Lecture'}
+                    </label>
+                    <select
+                      value={selectedScheduleId}
+                      onChange={e => setSelectedScheduleId(e.target.value)}
+                      className="cmd-input w-full md:w-72 cursor-pointer font-bold"
+                    >
+                      <option value="" disabled>{isAr ? 'اختر المحاضرة...' : 'Select lecture...'}</option>
+                      {schedules.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.subject?.name} ({isAr ? ({SUNDAY:'الأحد',MONDAY:'الاثنين',TUESDAY:'الثلاثاء',WEDNESDAY:'الأربعاء',THURSDAY:'الخميس',FRIDAY:'الجمعة',SATURDAY:'السبت'}[s.dayOfWeek]) : s.dayOfWeek} · {s.startTime})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-full md:w-auto space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-white/40">
+                      {isAr ? 'تاريخ الحضور' : 'Date'}
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={e => setSelectedDate(e.target.value)}
+                      className="cmd-input w-full md:w-48 font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Filter and quick actions */}
+                <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-white/2 p-4 rounded-2xl border border-white/5">
+                  <input
+                    type="text"
+                    placeholder={isAr ? 'البحث بالاسم أو الرقم الأكاديمي...' : 'Search student name or ID...'}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="cmd-input w-full sm:w-64 text-xs"
+                  />
+                  <div className="flex gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={handleMarkAllPresent}
+                      className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold transition-all"
+                    >
+                      ✓ {isAr ? 'الجميع حضور' : 'All Present'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetSheet}
+                      className="px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 rounded-xl text-xs font-bold transition-all"
+                    >
+                      ↺ {isAr ? 'إعادة تعيين' : 'Reset'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportCSV}
+                      className="px-3 py-2 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 rounded-xl text-xs font-bold transition-all"
+                    >
+                      📥 {isAr ? 'تصدير ورقة التحضير' : 'Export CSV'}
+                    </button>
+                  </div>
+                </div>
+
+                {filteredClassmates.length === 0 ? (
+                  <div className="text-center py-12 text-white/40 text-xs font-bold font-mono">
+                    {isAr ? 'لا يوجد زملاء دراسة يطابقون خيارات البحث.' : 'No classmates match your filters.'}
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveAttendance} className="space-y-4">
+                    <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                      {filteredClassmates.map(student => {
+                        const currentStatus = attendanceSheet[student.id] || 'PRESENT';
+                        
+                        // Find dynamic stats from stats hook
+                        const studentStats = stats.classmateStats?.find(cs => cs.id === student.id);
+                        const individualRate = studentStats ? studentStats.attendanceRate : 100;
+
+                        return (
+                          <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white/2 border border-white/5 rounded-2xl gap-3 hover:border-white/10 transition-all">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-white truncate">{student.name}</p>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black font-mono ${
+                                  individualRate >= 85 ? 'bg-emerald-500/10 text-emerald-400' :
+                                  individualRate >= 65 ? 'bg-yellow-500/10 text-yellow-400' :
+                                  'bg-red-500/10 text-red-400'
+                                }`}>
+                                  {individualRate}% {isAr ? 'حضور' : 'Rate'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-white/40 font-mono mt-1">{student.idNumber}</p>
+                            </div>
+                            <div className="flex gap-1">
+                              {[
+                                { status: 'PRESENT', label: isAr ? 'حاضر' : 'Present', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+                                { status: 'ABSENT', label: isAr ? 'غائب' : 'Absent', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+                                { status: 'EXCUSED', label: isAr ? 'بعذر' : 'Excused', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
+                              ].map(opt => {
+                                const selected = currentStatus === opt.status;
+                                return (
+                                  <button
+                                    key={opt.status}
+                                    type="button"
+                                    onClick={() => setAttendanceSheet({ ...attendanceSheet, [student.id]: opt.status })}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                      selected
+                                        ? opt.color + ' border-current scale-105 shadow-md'
+                                        : 'bg-white/3 border-transparent text-slate-400 hover:bg-white/5'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button type="submit" disabled={savingAttendance} className="btn-neon w-full py-3.5 mt-2">
+                      {savingAttendance ? (
+                        <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                      ) : (isAr ? 'حفظ وإرسال ورقة التحضير' : 'Save Attendance Sheet')}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Tab 2: Broadcast announcements */}
+            {activeTab === 'broadcasts' && (
+              <form onSubmit={handleSendBroadcast} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                    {isAr ? 'نص التعميم / إرسال تنبيه منبثق' : 'Broadcast Message'}
+                  </label>
+                  <textarea
+                    required
+                    value={broadcastMessage}
+                    onChange={e => setBroadcastMessage(e.target.value)}
+                    className="cmd-input w-full h-36 p-4 text-sm font-semibold"
+                    placeholder={isAr ? 'مثال: السلام عليكم زملائي الكرام، تم تأجيل محاضرة الغد إلى الساعة العاشرة صباحاً بناءً على طلب الأستاذ.' : 'Type announcement for classmates...'}
+                  />
+                </div>
+                <button type="submit" disabled={sendingBroadcast} className="btn-neon w-full py-3.5">
+                  {sendingBroadcast ? (
+                    <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                  ) : (isAr ? 'بث الإعلان وإرسال إشعار فوري للجميع' : 'Broadcast Announcement') }
+                </button>
+              </form>
+            )}
+
+            {/* Tab 3: Group Resources */}
+            {activeTab === 'resources' && (
+              <div className="space-y-6">
+                <form onSubmit={handleAddResource} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                        {isAr ? 'عنوان الملف / المرجع الدراسي' : 'Resource Title'}
+                      </label>
+                      <input
+                        type="text" required value={resourceTitle} onChange={(e) => setResourceTitle(e.target.value)}
+                        className="cmd-input w-full" placeholder={isAr ? 'مثال: ملخص الدرس الأول شبكات' : 'e.g., Lecture 1 Notes'}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                        {isAr ? 'رابط الملف (على Google Drive, Telegram إلخ)' : 'Resource URL Link'}
+                      </label>
+                      <input
+                        type="url" required value={resourceUrl} onChange={(e) => setResourceUrl(e.target.value)}
+                        className="cmd-input w-full font-mono" placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" disabled={addingResource} className="btn-neon w-full py-3">
+                    {addingResource ? (
+                      <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                    ) : (isAr ? 'نشر الملف ومشاركته مع الدفعة' : 'Share File link') }
+                  </button>
+                </form>
+
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  <h4 className="text-sm font-black text-white">{isAr ? 'الملفات والمراجع النشطة' : 'Shared References'}</h4>
+                  {resources.length === 0 ? (
+                    <p className="text-xs text-white/40 font-semibold font-mono">{isAr ? 'لا يوجد مستندات مشاركة حالياً.' : 'No shared references yet.'}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resources.map(res => (
+                        <div key={res.id} className="flex justify-between items-center p-3 bg-white/2 border border-white/5 rounded-xl hover:border-emerald-500/20 transition-all">
+                          <div className="min-w-0 pr-4">
+                            <p className="text-xs font-bold text-white truncate">{res.title}</p>
+                            <p className="text-[9px] text-white/30 font-mono mt-0.5 truncate">{res.url}</p>
+                          </div>
+                          <a
+                            href={res.url} target="_blank" rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-bold transition-all shrink-0"
+                          >
+                            {isAr ? 'فتح المرجع ↗' : 'Open Link ↗'}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 4: Rescheduling Requests */}
+            {activeTab === 'rescheduling' && (
+              <div className="space-y-8">
+                <form onSubmit={handleRescheduleRequest} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                        {isAr ? 'اختر الحصة المراد تعديلها' : 'Select Class to Modify'}
+                      </label>
+                      <select
+                        value={rescheduleScheduleId}
+                        onChange={e => setRescheduleScheduleId(e.target.value)}
+                        className="cmd-input w-full cursor-pointer font-bold"
+                      >
+                        <option value="" disabled>{isAr ? 'اختر الحصة...' : 'Select class...'}</option>
+                        {schedules.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.subject?.name} ({isAr ? ({SUNDAY:'الأحد',MONDAY:'الاثنين',TUESDAY:'الثلاثاء',WEDNESDAY:'الأربعاء',THURSDAY:'الخميس',FRIDAY:'الجمعة',SATURDAY:'السبت'}[s.dayOfWeek]) : s.dayOfWeek} · {s.startTime})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                        {isAr ? 'نوع التعديل المقترح' : 'Proposed Type'}
+                      </label>
+                      <select
+                        value={rescheduleType}
+                        onChange={e => setRescheduleType(e.target.value)}
+                        className="cmd-input w-full cursor-pointer font-bold"
+                      >
+                        <option value="RESCHEDULE">{isAr ? 'إعادة جدولة لموعد آخر' : 'Reschedule Class'}</option>
+                        <option value="CANCEL">{isAr ? 'إلغاء المحاضرة بالكامل' : 'Cancel Class'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {rescheduleType === 'RESCHEDULE' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white/2 border border-white/5 rounded-2xl">
+                      <div>
+                        <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                          {isAr ? 'اليوم البديل المقترح' : 'Suggested Day'}
+                        </label>
+                        <select
+                          value={newDayOfWeek}
+                          onChange={e => setNewDayOfWeek(e.target.value)}
+                          className="cmd-input w-full cursor-pointer font-bold"
+                        >
+                          {['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'].map(day => (
+                            <option key={day} value={day}>
+                              {isAr ? ({SUNDAY:'الأحد',MONDAY:'الاثنين',TUESDAY:'الثلاثاء',WEDNESDAY:'الأربعاء',THURSDAY:'الخميس',FRIDAY:'الجمعة',SATURDAY:'السبت'}[day]) : day}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                          {isAr ? 'القاعة البديلة المقترحة (اختياري)' : 'Suggested Room (Optional)'}
+                        </label>
+                        <select
+                          value={newRoomId}
+                          onChange={e => setNewRoomId(e.target.value)}
+                          className="cmd-input w-full cursor-pointer font-bold"
+                        >
+                          <option value="">{isAr ? '-- اختر قاعة --' : '-- Select Room --'}</option>
+                          {rooms.map(r => (
+                            <option key={r.id} value={r.id}>{r.name} ({isAr ? 'سعة' : 'cap'}: {r.capacity})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                          {isAr ? 'وقت البدء الجديد' : 'New Start Time'}
+                        </label>
+                        <input
+                          type="time" required value={newStartTime} onChange={e => setNewStartTime(e.target.value)}
+                          className="cmd-input w-full font-semibold" dir="ltr"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                          {isAr ? 'وقت الانتهاء الجديد' : 'New End Time'}
+                        </label>
+                        <input
+                          type="time" required value={newEndTime} onChange={e => setNewEndTime(e.target.value)}
+                          className="cmd-input w-full font-semibold" dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                      {isAr ? 'توضيح سبب التعديل للإدارة' : 'Reason for adjustment'}
+                    </label>
+                    <textarea
+                      required
+                      value={rescheduleReason}
+                      onChange={e => setRescheduleReason(e.target.value)}
+                      className="cmd-input w-full h-24 p-3 text-sm font-semibold"
+                      placeholder={isAr ? 'مثال: تزامن مع موعد اختبار آخر، أو لعدم توفر المدرس في الموعد الأصلي.' : 'Why is this change needed...'}
+                    />
+                  </div>
+
+                  <button type="submit" disabled={submittingReschedule} className="btn-neon w-full py-3.5">
+                    {submittingReschedule ? (
+                      <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                    ) : (isAr ? 'إرسال طلب التعديل إلى إدارة الكلية' : 'Submit Adjustment Request') }
+                  </button>
+                </form>
+
+                {/* Reschedule request history list */}
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  <h4 className="text-sm font-black text-white">📋 {isAr ? 'طلبات التعديل السابقة وحالتها' : 'Adjustment Requests History'}</h4>
+                  {historyLoading && rescheduleHistory.length === 0 ? (
+                    <div className="flex justify-center py-6">
+                      <span className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : rescheduleHistory.length === 0 ? (
+                    <p className="text-xs text-white/40 font-semibold font-mono">{isAr ? 'لا يوجد طلبات سابقة لشعبتك.' : 'No rescheduling request history found.'}</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {rescheduleHistory.map(req => (
+                        <div key={req.id} className="p-4 bg-white/2 border border-white/5 rounded-2xl text-xs space-y-3">
+                          <div className="flex justify-between items-start flex-wrap gap-2">
+                            <div>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                req.requestType === 'CANCEL' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'
+                              }`}>
+                                {req.requestType}
+                              </span>
+                              <h5 className="font-extrabold text-white mt-1.5">{req.schedule?.subject?.name || 'Class'}</h5>
+                              <p className="text-[10px] text-white/40 font-mono mt-0.5">{isAr ? 'المدرس:' : 'Lecturer:'} {req.lecturer?.name || '—'}</p>
+                            </div>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                              req.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/15' :
+                              req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' :
+                              'bg-rose-500/10 text-rose-400 border border-rose-500/15'
+                            }`}>
+                              {req.status === 'PENDING' ? (isAr ? 'معلق' : 'Pending') :
+                               req.status === 'APPROVED' ? (isAr ? 'مقبول' : 'Approved') : (isAr ? 'مرفوض' : 'Rejected')}
+                            </span>
+                          </div>
+
+                          {req.requestType === 'RESCHEDULE' && (
+                            <div className="p-2.5 bg-black/40 rounded-xl font-mono text-[10px] space-y-1 text-white/70">
+                              <p>🗓️ {isAr ? 'الموعد الجديد:' : 'Proposed Slot:'} {isAr ? ({SUNDAY:'الأحد',MONDAY:'الاثنين',TUESDAY:'الثلاثاء',WEDNESDAY:'الأربعاء',THURSDAY:'الخميس',FRIDAY:'الجمعة',SATURDAY:'السبت'}[req.newDayOfWeek]) : req.newDayOfWeek} · {req.newStartTime} - {req.newEndTime}</p>
+                              {req.newRoom && <p>🏫 {isAr ? 'القاعة المقترحة:' : 'Proposed Room:'} {req.newRoom.name}</p>}
+                            </div>
+                          )}
+
+                          <div className="text-[11px] text-white/60 space-y-1 leading-relaxed">
+                            <p><span className="font-bold text-white/80">{isAr ? 'السبب:' : 'Reason:'}</span> {req.reason || '—'}</p>
+                            {req.adminNotes && (
+                              <p className="text-amber-300 font-bold bg-amber-500/5 p-2 rounded-lg border border-amber-500/10 mt-2">
+                                💬 {isAr ? 'ملاحظات الإدارة:' : 'Admin Notes:'} {req.adminNotes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}

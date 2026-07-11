@@ -1,0 +1,288 @@
+const express = require('express');
+const { prisma } = require('../db');
+const { verifyToken } = require('../middleware/auth');
+
+const router = express.Router();
+
+// 1. Fetch all posts in the student's group
+router.get('/posts', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied. Student account required.' });
+    }
+
+    // Always fetch fresh group details to avoid stale token states
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student || !student.groupId) {
+      return res.status(400).json({ success: false, error: 'You are not assigned to any group yet.' });
+    }
+
+    const posts = await prisma.exchangePost.findMany({
+      where: { groupId: student.groupId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            idPhotoUrl: true,
+            isRepresentative: true
+          }
+        },
+        _count: {
+          select: { comments: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json({ success: true, data: posts });
+  } catch (error) {
+    console.error('[API] Error fetching exchange posts:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch exchange posts' });
+  }
+});
+
+// 2. Create a new post in the student's group
+router.post('/posts', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied. Student account required.' });
+    }
+
+    const { title, content, category } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ success: false, error: 'Title and content are required' });
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student || !student.groupId) {
+      return res.status(400).json({ success: false, error: 'You must belong to a group to post.' });
+    }
+
+    // Verify category matches enum
+    const allowedCategories = ['QUESTION', 'RESOURCE', 'HELP', 'GENERAL'];
+    const postCategory = allowedCategories.includes(category) ? category : 'GENERAL';
+
+    const post = await prisma.exchangePost.create({
+      data: {
+        title: title.trim(),
+        content: content.trim(),
+        category: postCategory,
+        groupId: student.groupId,
+        studentId: student.id
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            idPhotoUrl: true,
+            isRepresentative: true
+          }
+        },
+        _count: {
+          select: { comments: true }
+        }
+      }
+    });
+
+    res.status(201).json({ success: true, data: post });
+  } catch (error) {
+    console.error('[API] Error creating exchange post:', error);
+    res.status(500).json({ success: false, error: 'Failed to create exchange post' });
+  }
+});
+
+// 3. Get detailed single post with comments
+router.get('/posts/:postId', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const { postId } = req.params;
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student || !student.groupId) {
+      return res.status(400).json({ success: false, error: 'Invalid group context.' });
+    }
+
+    const post = await prisma.exchangePost.findUnique({
+      where: { id: postId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            idPhotoUrl: true,
+            isRepresentative: true
+          }
+        },
+        comments: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                idPhotoUrl: true,
+                isRepresentative: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found.' });
+    }
+
+    // Ensure the student belongs to the group of this post
+    if (post.groupId !== student.groupId) {
+      return res.status(403).json({ success: false, error: 'Forbidden. This post belongs to another group.' });
+    }
+
+    res.status(200).json({ success: true, data: post });
+  } catch (error) {
+    console.error('[API] Error fetching single post:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch post details' });
+  }
+});
+
+// 4. Comment/reply on a post
+router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const { postId } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, error: 'Comment content cannot be empty.' });
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student || !student.groupId) {
+      return res.status(400).json({ success: false, error: 'Invalid group context.' });
+    }
+
+    const post = await prisma.exchangePost.findUnique({
+      where: { id: postId }
+    });
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found.' });
+    }
+
+    // Ensure the student belongs to the group of the target post
+    if (post.groupId !== student.groupId) {
+      return res.status(403).json({ success: false, error: 'Forbidden. Sibling groups cannot interact.' });
+    }
+
+    const comment = await prisma.exchangeComment.create({
+      data: {
+        content: content.trim(),
+        postId,
+        studentId: student.id
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            idPhotoUrl: true,
+            isRepresentative: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({ success: true, data: comment });
+  } catch (error) {
+    console.error('[API] Error posting exchange comment:', error);
+    res.status(500).json({ success: false, error: 'Failed to post comment' });
+  }
+});
+
+// 5. Delete post (only author student can delete)
+router.delete('/posts/:postId', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const { postId } = req.params;
+
+    const post = await prisma.exchangePost.findUnique({
+      where: { id: postId }
+    });
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found.' });
+    }
+
+    // Author authorization check
+    if (post.studentId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Access denied. You can only delete your own posts.' });
+    }
+
+    await prisma.exchangePost.delete({
+      where: { id: postId }
+    });
+
+    res.status(200).json({ success: true, message: 'Post deleted successfully.' });
+  } catch (error) {
+    console.error('[API] Error deleting post:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete post' });
+  }
+});
+
+// 6. Delete comment (only author student can delete)
+router.delete('/comments/:commentId', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const { commentId } = req.params;
+
+    const comment = await prisma.exchangeComment.findUnique({
+      where: { id: commentId }
+    });
+
+    if (!comment) {
+      return res.status(404).json({ success: false, error: 'Comment not found.' });
+    }
+
+    // Author authorization check
+    if (comment.studentId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Access denied. You can only delete your own comments.' });
+    }
+
+    await prisma.exchangeComment.delete({
+      where: { id: commentId }
+    });
+
+    res.status(200).json({ success: true, message: 'Comment deleted successfully.' });
+  } catch (error) {
+    console.error('[API] Error deleting comment:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete comment' });
+  }
+});
+
+module.exports = router;

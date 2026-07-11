@@ -1,0 +1,109 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
+import Logo from './Logo';
+import ThemeSwitcher from './ThemeSwitcher';
+import DevSignature from './DevSignature';
+
+export default function Welcome() {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+
+  const selectedUniversityLogoRaw = localStorage.getItem('selectedUniversityLogo');
+  const selectedUniversitySlug = localStorage.getItem('selectedUniversitySlug') || 'almanar-college';
+  const selectedUniversityLogo = selectedUniversitySlug === 'hajjah-university' ? '/hajjah-logo-new.png' :
+                                 selectedUniversitySlug === 'almanar-college' ? '/almanar-logo.png' : selectedUniversityLogoRaw;
+
+  return (
+    <div dir={i18n.language === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center p-6 relative pt-24 pb-20 overflow-x-hidden transition-colors duration-300">
+      
+      {/* Background ambient glowing circles */}
+      <div className="absolute top-1/4 left-1/4 h-[350px] w-[350px] bg-[var(--accent)] opacity-10 rounded-full blur-[90px] -z-10 animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 h-[350px] w-[350px] bg-[var(--accent)] opacity-10 rounded-full blur-[90px] -z-10 animate-pulse" />
+
+      {/* Global Institution Header */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--bg-card)] backdrop-blur-lg border-b border-[var(--border-color)] shadow-sm z-40 flex items-center justify-between px-6 transition-all duration-300">
+        <div className="flex items-center gap-3">
+          <Logo size="sm" customLogoUrl={selectedUniversityLogo} />
+          <span className="text-lg md:text-xl font-extrabold tracking-wide text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(to right, var(--accent), var(--accent-2, var(--accent)))' }}>
+            بوابة الطالب الجامعي
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <ThemeSwitcher />
+          <button
+            onClick={() => i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
+            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold text-gray-300 transition-all duration-200"
+          >
+            {i18n.language === 'ar' ? 'English' : 'العربية'}
+          </button>
+        </div>
+      </header>
+ 
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-8 md:p-10 shadow-2xl text-center space-y-8 transition-all duration-300"
+      >
+        
+        {/* Logo Icon */}
+        <div className="flex justify-center">
+          <Logo size="xl" customLogoUrl={selectedUniversityLogo} />
+        </div>
+ 
+        {/* Branding header */}
+        <div className="space-y-3">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight leading-tight">
+            {t('welcome.title')}
+          </h2>
+          <p className="text-xs md:text-sm text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
+            {t('welcome.subtitle')}
+          </p>
+        </div>
+ 
+        {/* Action Options */}
+        <div className="space-y-4 pt-2">
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full h-[56px] min-h-[56px] px-4 text-black font-extrabold rounded-xl transition duration-300 flex items-center justify-center gap-3 text-xs md:text-sm shadow-lg hover:opacity-90"
+            style={{
+              backgroundImage: 'linear-gradient(to right, var(--accent), var(--accent-2, var(--accent)))',
+              boxShadow: '0 10px 15px -3px var(--accent-glow)'
+            }}
+          >
+            <span>{t('welcome.studentPortal')}</span>
+          </button>
+ 
+          <button
+            onClick={() => navigate('/login', { state: { defaultTab: 'admin' } })}
+            className="w-full h-[56px] min-h-[56px] px-4 bg-gray-955/60 hover:bg-gray-955 text-[var(--accent)] hover:text-[var(--accent)] font-extrabold rounded-xl border border-white/10 hover:border-[var(--accent)]/45 transition duration-300 flex items-center justify-center gap-3 text-xs md:text-sm"
+          >
+            <span>{t('welcome.adminPortal')}</span>
+          </button>
+        </div>
+ 
+        <p className="text-[11px] text-gray-500 max-w-xs mx-auto leading-relaxed">
+          {t('welcome.tagline')}
+        </p>
+ 
+        {/* Micro status info */}
+        <div className="border-t border-white/5 pt-4 flex justify-between items-center text-[10px] text-gray-650 font-mono">
+          <span>v1.2.0 (Phase 8)</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full animate-ping inline-block" style={{ backgroundColor: 'var(--accent)' }} />
+            {i18n.language === 'ar' ? 'متصل وحي' : 'Live Sync Active'}
+          </span>
+        </div>
+
+      </motion.div>
+
+      {/* Developer footer signature */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+        <DevSignature centered={true} />
+      </div>
+
+    </div>
+  );
+}
