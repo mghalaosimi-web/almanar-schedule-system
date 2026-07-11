@@ -40,8 +40,9 @@ IndexedDB/
 *.lev
 the-real-index
 MANIFEST-*
-LOG*
-LOCK*
+LOG
+LOG.old
+LOCK
 
 # OS Files
 .DS_Store
