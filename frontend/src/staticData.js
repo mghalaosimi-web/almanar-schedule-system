@@ -38,6 +38,7 @@ export const staticData = {
           { id: 3, name: "مجموعة ج (عملي 2)" }
         ]
       }
+    ],
   }
 };
 
