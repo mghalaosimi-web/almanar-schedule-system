@@ -1090,7 +1090,7 @@ function AppLayout() {
     <div style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}>
       {renderImpersonationBanner()}
       <Routes>
-        <Route path="/"               element={<PublicLandingWizard />} />
+        <Route path="/"               element={<Navigate to="/c/almanar-college" replace />} />
         <Route path="/u/:uniSlug"     element={<PublicLandingWizard />} />
         <Route path="/c/:collegeSlug" element={<PublicLandingWizard />} />
         <Route path="/login"          element={<Login />} />
@@ -1100,7 +1100,7 @@ function AppLayout() {
         <Route path="/instructions"   element={<Instructions />} />
         <Route path="/link-google"    element={<GoogleLinkInterceptor />} />
         <Route path="/license-suspended" element={<LicenseSuspended />} />
-        <Route path="*"               element={<Navigate to="/" replace />} />
+        <Route path="*"               element={<Navigate to="/c/almanar-college" replace />} />
       </Routes>
     </div>
   );
