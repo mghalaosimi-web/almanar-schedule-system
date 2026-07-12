@@ -35,7 +35,25 @@ try {
   process.exit(1);
 }
 
-// 3. Construct VITE_API_URL if needed
+// 3. Run database migrations
+console.log('[BUILD] Running database migrations...');
+try {
+  execSync('cd backend && npx prisma migrate deploy', { stdio: 'inherit' });
+  console.log('[BUILD] Database migrations applied successfully.');
+} catch (error) {
+  console.warn('[BUILD] Migration warning (non-fatal):', error.message);
+}
+
+// 4. Seed database with initial data (safe: seed script skips if data exists)
+console.log('[BUILD] Running database seed...');
+try {
+  execSync('node backend/prisma/seed.js', { stdio: 'inherit' });
+  console.log('[BUILD] Database seed completed.');
+} catch (error) {
+  console.warn('[BUILD] Seed warning (non-fatal):', error.message);
+}
+
+// 5. Construct VITE_API_URL if needed
 if (!process.env.VITE_API_URL) {
   if (process.env.RENDER_EXTERNAL_URL) {
     process.env.VITE_API_URL = `${process.env.RENDER_EXTERNAL_URL}/api`;
