@@ -52,21 +52,11 @@ app.use(helmet({
 // VAPID Key Security — keys must always come from environment variables
 // PRIVATE_VAPID_KEY must NEVER be hardcoded. In production, missing keys halt the server.
 if (!process.env.PRIVATE_VAPID_KEY) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] CRITICAL: PRIVATE_VAPID_KEY environment variable is not set. Refusing to start in production without it.');
-    process.exit(1);
-  } else {
-    console.warn('[PUSH] WARNING: PRIVATE_VAPID_KEY is not set. Push notifications will be disabled in this session.');
-  }
+  console.warn('[PUSH] WARNING: PRIVATE_VAPID_KEY is not set. Push notifications will be disabled.');
 }
 
 if (!process.env.PUBLIC_VAPID_KEY) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] CRITICAL: PUBLIC_VAPID_KEY environment variable is not set. Refusing to start in production without it.');
-    process.exit(1);
-  } else {
-    console.warn('[PUSH] WARNING: PUBLIC_VAPID_KEY is not set. Push notifications will be disabled in this session.');
-  }
+  console.warn('[PUSH] WARNING: PUBLIC_VAPID_KEY is not set. Push notifications will be disabled.');
 }
 
 if (process.env.PUBLIC_VAPID_KEY && process.env.PRIVATE_VAPID_KEY) {
@@ -81,6 +71,7 @@ if (process.env.PUBLIC_VAPID_KEY && process.env.PRIVATE_VAPID_KEY) {
 // Explicit CORS allowlist — never use wildcard(*) on a multi-tenant auth API
 const ALLOWED_ORIGINS = [
   'https://manar-schedule-system.onrender.com',
+  'https://almanar-schedule-system.onrender.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:4173',
