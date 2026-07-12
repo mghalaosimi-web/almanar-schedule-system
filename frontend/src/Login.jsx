@@ -643,23 +643,17 @@ export default function Login() {
 
               {/* Bottom links inside card */}
               <div className="mt-8 pt-6 border-t border-white/10 text-center">
-                {activeTab === 'STUDENT' ? (
-                  <p className="text-xs text-white/50">
-                    {isAr ? 'لا تملك حساباً؟ ' : "Don't have an account? "}
-                    <button
-                      type="button"
-                      onClick={() => navigate('/register')}
-                      className="font-black underline underline-offset-4 hover:text-white transition-colors"
-                      style={{ color: 'var(--accent)' }}
-                    >
-                      {isAr ? 'سجّل حساباً جديداً' : 'Register now'}
-                    </button>
-                  </p>
-                ) : (
-                  <p className="text-[11px] italic text-white/40 leading-relaxed">
-                    {isAr ? '💡 حسابات الكادر يتم تهيئتها وإدارتها عبر شؤون الطلاب.' : '💡 Faculty profiles are managed by the academic administration.'}
-                  </p>
-                )}
+                <p className="text-xs text-white/50">
+                  {isAr ? 'لا تملك حساباً؟ ' : "Don't have an account? "}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="font-black underline underline-offset-4 hover:text-white transition-colors"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {isAr ? 'سجّل حساباً جديداً' : 'Register now'}
+                  </button>
+                </p>
               </div>
 
             </motion.div>
