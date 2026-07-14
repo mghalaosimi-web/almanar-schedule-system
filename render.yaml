@@ -3,7 +3,7 @@ services:
     name: manar-schedule-backend
     runtime: node
     plan: starter
-    buildCommand: npm install --include=dev && node backend/prisma/seed.js && npm run build:frontend
+    buildCommand: npm install && npm run build
     startCommand: node backend/src/server.js
     envVars:
       - key: NODE_ENV
