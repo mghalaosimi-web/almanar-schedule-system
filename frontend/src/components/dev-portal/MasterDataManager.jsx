@@ -17,6 +17,7 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
   const [colleges, setColleges] = useState([]);
   const [majors, setMajors] = useState([]);
   const [levels, setLevels] = useState([]);
+  const [groups, setGroups] = useState([]);
 
   const tabs = [
     { id: 'STUDENTS', labelAr: 'الطلاب 👨‍🎓', labelEn: 'Students' },
@@ -67,6 +68,11 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (levRes.data?.success) setLevels(levRes.data.data || []);
+
+      const grpRes = await axios.get(`${API_URL}/api/groups`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (grpRes.data?.success) setGroups(grpRes.data.data || []);
     } catch (err) {
       console.warn('Helpers fetch error:', err.message);
     }
@@ -89,6 +95,7 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
         academicId: item.academicId,
         majorId: item.majorId,
         levelId: item.levelId,
+        groupId: item.groupId,
         collegeId: item.collegeId
       });
     } else if (activeTab === 'LECTURERS') {
@@ -257,9 +264,14 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
             ) : (
               filteredData.map(item => (
                 <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/10 text-xs text-slate-300">
-                  <td className="py-4 text-right md:text-left">
+                  <td className="py-4 text-right md:text-left font-sans">
                     <div className="font-bold text-white">{item.name}</div>
                     {item.email && <div className="text-[10px] text-slate-500 font-mono mt-0.5">{item.email}</div>}
+                    {activeTab === 'STUDENTS' && (
+                      <div className="text-[9px] text-[var(--accent)] font-bold mt-1">
+                        {item.major?.name || '-'} · {item.level?.name || '-'} {item.group ? `· ${isAr ? 'الشعبة' : 'Group'}: ${item.group.name}` : ''}
+                      </div>
+                    )}
                     {item.capacity && <div className="text-[10px] text-slate-400 font-mono mt-0.5">{isAr ? `السعة: ${item.capacity}` : `Capacity: ${item.capacity}`}</div>}
                   </td>
                   <td className="py-4 font-mono text-[10px] text-slate-400">
@@ -340,7 +352,10 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                     >
                       <option value="">-- Choose Major --</option>
-                      {majors.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      {majors
+                        .filter(m => !formData.collegeId || m.collegeId === formData.collegeId)
+                        .map(m => <option key={m.id} value={m.id}>{m.name}</option>)
+                      }
                     </select>
                   </div>
                   <div>
@@ -355,6 +370,32 @@ export default function MasterDataManager({ API_URL, token, isAr }) {
                       {levels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{isAr ? 'الشعبة' : 'Group (Class)'}</label>
+                    <select
+                      value={formData.groupId || ''}
+                      onChange={(e) => setFormData({ ...formData, groupId: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    >
+                      <option value="">-- None / Select Group --</option>
+                      {groups
+                        .filter(g => !formData.collegeId || g.collegeId === formData.collegeId)
+                        .map(g => <option key={g.id} value={g.id}>{g.name}</option>)
+                      }
+                    </select>
+                  </div>
+                  {!editId && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{isAr ? 'كلمة المرور' : 'Password'}</label>
+                      <input
+                        type="password"
+                        placeholder="Default: 12345678"
+                        value={formData.password || ''}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                      />
+                    </div>
+                  )}
                 </>
               )}
 

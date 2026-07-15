@@ -3244,6 +3244,10 @@ router.get('/admin/dev/branch-tree', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
     }
     const universityId = req.query.universityId ? parseInt(req.query.universityId) : undefined;
+    const systemSettings = require('../services/systemSettings');
+    const suspendedGroups = systemSettings.get('suspendedGroups') || [];
+    const maintenanceGroups = systemSettings.get('maintenanceGroups') || [];
+    const maintenanceColleges = systemSettings.get('maintenanceColleges') || [];
 
     const universities = await prisma.university.findMany({
       where: universityId ? { id: universityId } : {},
@@ -3274,14 +3278,15 @@ router.get('/admin/dev/branch-tree', verifyToken, async (req, res) => {
         name: col.name,
         type: 'college',
         studentCount: col._count.students,
+        maintenance: maintenanceColleges.includes(col.id),
         children: col.groups.map(grp => ({
           id: grp.id,
           name: grp.name,
           type: 'group',
           studentCount: grp._count.students,
           children: [],
-          suspended: false,
-          maintenance: false,
+          suspended: suspendedGroups.includes(grp.id),
+          maintenance: maintenanceGroups.includes(grp.id),
         }))
       }))
     }));
@@ -4004,7 +4009,7 @@ router.post('/admin/students', verifyToken, async (req, res) => {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
-    const { id, name, email, academicId, majorId, levelId, collegeId, password } = req.body;
+    const { id, name, email, academicId, majorId, levelId, collegeId, groupId, password } = req.body;
 
     let targetCollegeId = collegeId ? parseInt(collegeId) : undefined;
     if (req.user.role !== 'SUPER_ADMIN') {
@@ -4021,6 +4026,7 @@ router.post('/admin/students', verifyToken, async (req, res) => {
           idNumber: academicId,
           majorId: majorId ? parseInt(majorId) : null,
           levelId: levelId ? parseInt(levelId) : null,
+          groupId: groupId ? parseInt(groupId) : null,
           collegeId: targetCollegeId
         }
       });
@@ -4037,6 +4043,7 @@ router.post('/admin/students', verifyToken, async (req, res) => {
           password: hashedPassword,
           majorId: majorId ? parseInt(majorId) : null,
           levelId: levelId ? parseInt(levelId) : null,
+          groupId: groupId ? parseInt(groupId) : null,
           collegeId: targetCollegeId,
           isEmailVerified: true
         }
@@ -4064,6 +4071,38 @@ router.delete('/admin/students/:id', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Delete admin student error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete student: ' + error.message });
+  }
+});
+
+// 3.5 GET /api/admin/colleges - Get all colleges (scoped)
+router.get('/admin/colleges', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { role, collegeId, universityId } = req.user;
+    let whereClause = {};
+
+    if (role === 'COLLEGE_ADMIN') {
+      whereClause.id = parseInt(collegeId);
+    } else if (role === 'UNI_ADMIN') {
+      whereClause.universityId = parseInt(universityId);
+    } else if (role === 'SUPER_ADMIN') {
+      const qUniversityId = req.query.universityId;
+      if (qUniversityId) {
+        whereClause.universityId = parseInt(qUniversityId);
+      }
+    }
+
+    const colleges = await prisma.college.findMany({
+      where: whereClause,
+      include: { university: true },
+      orderBy: { name: 'asc' }
+    });
+    res.status(200).json({ success: true, data: colleges });
+  } catch (error) {
+    console.error('[API] Get admin colleges error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch colleges: ' + error.message });
   }
 });
 

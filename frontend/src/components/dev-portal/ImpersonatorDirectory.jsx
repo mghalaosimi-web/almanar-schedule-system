@@ -49,7 +49,7 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
       );
       if (res.data?.success) {
         toast.success(isAr ? `جاري الانتقال لمحاكاة حساب: ${user.name}` : `Simulating account: ${user.name}`);
-        onImpersonate(res.data.token, user);
+        onImpersonate(res.data.token, res.data.user || user);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || (isAr ? 'فشل محاكاة الحساب' : 'Impersonation failed'));

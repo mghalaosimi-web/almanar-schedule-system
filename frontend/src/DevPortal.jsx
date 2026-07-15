@@ -147,17 +147,35 @@ export default function DevPortal() {
     localStorage.setItem('manar_super_admin_token', token);
     localStorage.setItem('manar_super_admin_user', localStorage.getItem('manar_user'));
     localStorage.setItem('manar_token', impersonateToken);
-    localStorage.setItem('manar_user', JSON.stringify({
-      id: targetUser.id, name: targetUser.name,
-      email: targetUser.email, role: targetUser.type
-    }));
-    if (targetUser.type === 'STUDENT') {
+    
+    // Construct full user object matching standard login user object
+    const role = targetUser.role || targetUser.type || 'STUDENT';
+    const userToSave = {
+      id: targetUser.id,
+      name: targetUser.name,
+      email: targetUser.email,
+      role: role,
+      googleId: targetUser.googleId || 'impersonated',
+      groupId: targetUser.groupId,
+      collegeId: targetUser.collegeId,
+      universityId: targetUser.universityId,
+      collegeName: targetUser.collegeName,
+      universityName: targetUser.universityName,
+      universityLogo: targetUser.universityLogo,
+      themeColor: targetUser.themeColor
+    };
+    
+    localStorage.setItem('manar_user', JSON.stringify(userToSave));
+    
+    if (role === 'STUDENT') {
       localStorage.setItem('student_profile', JSON.stringify({
-        name: targetUser.name, email: targetUser.email,
-        department: targetUser.groupName || '', groupId: targetUser.groupId
+        name: targetUser.name,
+        email: targetUser.email,
+        department: targetUser.groupName || targetUser.major?.name || '',
+        groupId: targetUser.groupId
       }));
       window.location.href = '/student/home';
-    } else if (targetUser.type === 'LECTURER') {
+    } else if (role === 'LECTURER') {
       window.location.href = '/lecturer/home';
     } else {
       window.location.href = '/admin/overview';
