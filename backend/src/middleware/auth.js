@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
     return res.status(401).json({ success: false, error: 'No token provided' });
@@ -15,6 +15,21 @@ function verifyToken(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     
+    // Check Force Logout / Revoked Session
+    if (decoded.sessionId) {
+      try {
+        const { prisma } = require('../db');
+        const session = await prisma.sessionLog.findUnique({
+          where: { id: decoded.sessionId }
+        });
+        if (!session || session.isRevoked || session.logoutTime) {
+          return res.status(401).json({ success: false, error: 'SESSION_REVOKED', message: 'Your session has been terminated by administrator.' });
+        }
+      } catch (dbErr) {
+        console.warn('[verifyToken] Session check warning:', dbErr.message);
+      }
+    }
+
     // Check if college is deactivated (exclude SUPER_ADMIN)
     if (decoded.role !== 'SUPER_ADMIN' && decoded.collegeId) {
       const systemSettings = require('../services/systemSettings');
@@ -23,19 +38,20 @@ function verifyToken(req, res, next) {
         return res.status(403).json({ success: false, error: 'LICENSE_REVOKED' });
       }
     }
-
-    // Enforce Google SSO at Backend Level
+    // Enforce Google SSO at Backend Level if requireGoogleLink setting is enabled
     if (decoded.role === 'STUDENT' && !decoded.googleId) {
-      const isStudentRoute = req.originalUrl.startsWith('/api/student') || 
-                            req.originalUrl.startsWith('/api/rep') || 
-                            req.originalUrl.startsWith('/api/exchange') ||
-                            req.originalUrl.startsWith('/api/attendance');
-      if (isStudentRoute) {
-        return res.status(403).json({ success: false, error: 'GOOGLE_LINK_REQUIRED' });
+      const systemSettings = require('../services/systemSettings');
+      const enforceGoogle = systemSettings.get('requireGoogleLink') !== false;
+      if (enforceGoogle) {
+        const isStudentRoute = req.originalUrl.startsWith('/api/student') || 
+                              req.originalUrl.startsWith('/api/rep') || 
+                              req.originalUrl.startsWith('/api/exchange') ||
+                              req.originalUrl.startsWith('/api/attendance');
+        if (isStudentRoute) {
+          return res.status(403).json({ success: false, error: 'GOOGLE_LINK_REQUIRED' });
+        }
       }
-    }
-
-    // Session tracking activity
+    }    // Session tracking activity
     try {
       const { keepAlive } = require('../services/sessionTracker');
       keepAlive(decoded);
@@ -46,6 +62,7 @@ function verifyToken(req, res, next) {
     return res.status(403).json({ success: false, error: 'Invalid or expired token' });
   }
 }
+
 
 function verifyAdmin(req, res, next) {
   if (!req.user) {
@@ -58,4 +75,22 @@ function verifyAdmin(req, res, next) {
   next();
 }
 
-module.exports = { verifyToken, verifyAdmin };
+async function isSuperAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, error: 'Forbidden: Super Admin access required' });
+  }
+  try {
+    const { prisma } = require('../db');
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.user.id }
+    });
+    if (!admin || admin.email !== 'developer@mghal.com') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Restricted to developer only' });
+    }
+    next();
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Authorization verification failed' });
+  }
+}
+
+module.exports = { verifyToken, verifyAdmin, isSuperAdmin };

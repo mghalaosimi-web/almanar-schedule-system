@@ -28,13 +28,14 @@ export default function GoogleLinkInterceptor() {
     }
   }
 
-  // Redirect if not logged in, or if already linked
+  // Redirect if not logged in, or if already linked, or if impersonating
   useEffect(() => {
     if (!token || !user) {
       navigate('/login', { replace: true });
       return;
     }
-    if (user.role === 'STUDENT' && user.googleId) {
+    const isImpersonating = !!localStorage.getItem('manar_super_admin_token');
+    if (isImpersonating || (user.role === 'STUDENT' && user.googleId)) {
       navigate('/student/home', { replace: true });
     }
   }, [token, user, navigate]);
@@ -54,7 +55,10 @@ export default function GoogleLinkInterceptor() {
       const idToken = credentialResponse.credential;
       const res = await axios.post(
         `${API_URL}/api/auth/link-google`,
-        { idToken },
+        { 
+          email: user?.email,
+          credential: idToken
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

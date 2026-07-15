@@ -27,7 +27,11 @@ const publicRouter = require('./routes/public');
 const representativeRouter = require('./routes/representative');
 const exchangeRouter = require('./routes/exchange');
 const databaseRouter = require('./routes/database');
+
 const { activityLogger } = require('./middleware/activityLogger');
+const { requestLoggerMiddleware } = require('./middleware/requestLogger');
+const { firewallMiddleware } = require('./middleware/firewall');
+const { tenantDbMiddleware } = require('./middleware/tenantDb');
 
 const app = express();
 
@@ -46,7 +50,12 @@ app.use(helmet({
     }
   },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  hsts: process.env.NODE_ENV === 'production' ? {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  } : false
 }));
 
 // VAPID Key Security — keys must always come from environment variables
@@ -81,13 +90,32 @@ const ALLOWED_ORIGINS = [
     : [])
 ];
 
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  
+  // Allow localhost/127.0.0.1 on any port in development/local environments
+  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  
+  // Allow local network IP addresses (e.g. 192.168.x.x) for local testing
+  if (/^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin)) return true;
+  
+  // Allow Capacitor custom schemes
+  if (origin.startsWith('capacitor://')) return true;
+  if (origin.startsWith('chrome-extension://')) return true;
+  
+  return false;
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Capacitor native)
-    if (!origin) return callback(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    console.warn('[CORS] Blocked origin:', origin);
-    callback(new Error('Not allowed by CORS'));
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      console.warn('[CORS] Blocked origin:', origin);
+      callback(null, false); // Block securely without throwing/crashing Express with a 500 error
+    }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -96,7 +124,10 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(tenantDbMiddleware);
+app.use(firewallMiddleware);
 app.use(activityLogger);
+app.use(requestLoggerMiddleware);
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
@@ -113,7 +144,102 @@ app.use('/api/rep', representativeRouter);
 app.use('/api/exchange', exchangeRouter);
 app.use('/api', databaseRouter);
 
-// NOTE: Database schema checks and startup migrations are handled via standard Prisma migrations (npx prisma migrate deploy) to avoid schema conflicts.
+// Self-healing database check & migrations
+async function runStartupMigrations() {
+  try {
+    console.log('[DATABASE] Running self-healing schema checks...');
+    
+    // Create enums if they don't exist
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AdminRole') THEN
+          CREATE TYPE "AdminRole" AS ENUM ('ADMIN', 'SUPER_ADMIN');
+        END IF;
+      END$$;
+    `).catch(() => { });
+
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'VerificationType') THEN
+          CREATE TYPE "VerificationType" AS ENUM ('EMAIL', 'PHONE');
+        END IF;
+      END$$;
+    `).catch(() => { });
+
+    // Create VerificationCode table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "VerificationCode" (
+        "id" SERIAL PRIMARY KEY,
+        "studentId" INTEGER NOT NULL,
+        "code" TEXT NOT NULL,
+        "type" "VerificationType" NOT NULL,
+        "expiresAt" TIMESTAMP NOT NULL
+      );
+    `).catch(() => { });
+
+    // Create BlockedIP table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BlockedIP" (
+        "id" SERIAL PRIMARY KEY,
+        "ip" TEXT UNIQUE NOT NULL,
+        "reason" TEXT,
+        "blockedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `).catch(() => { });
+
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "BlockedIP_ip_idx" ON "BlockedIP"("ip");').catch(() => { });
+
+    // Ensure all dynamic columns exist
+    await prisma.$executeRawUnsafe('ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "role" "AdminRole" DEFAULT \'ADMIN\';').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "idNumber" TEXT;').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "idPhotoUrl" TEXT;').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "phone" TEXT;').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "isEmailVerified" BOOLEAN DEFAULT false;').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "isPhoneVerified" BOOLEAN DEFAULT false;').catch(() => { });
+    await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "password" TEXT;').catch(() => { });
+
+    console.log('[DATABASE] Table schema fields migrated successfully.');
+
+    // Check & add foreign key constraint if it doesn't exist
+    const fkeyCheck = await prisma.$queryRawUnsafe(`
+      SELECT conname FROM pg_constraint WHERE conname = 'VerificationCode_studentId_fkey'
+    `);
+    if (fkeyCheck.length === 0) {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "VerificationCode" 
+        ADD CONSTRAINT "VerificationCode_studentId_fkey" 
+        FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE
+      `).catch(() => { });
+    }
+
+    // Check & add unique constraints
+    const idNumCheck = await prisma.$queryRawUnsafe(`
+      SELECT conname 
+      FROM pg_constraint 
+      WHERE conname = 'Student_idNumber_key' OR conname = 'Student_idNumber_unique'
+    `);
+    if (idNumCheck.length === 0) {
+      console.log('[DATABASE] Adding unique constraint on Student.idNumber...');
+      await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD CONSTRAINT "Student_idNumber_key" UNIQUE ("idNumber")').catch(() => { });
+    }
+
+    const phoneCheck = await prisma.$queryRawUnsafe(`
+      SELECT conname 
+      FROM pg_constraint 
+      WHERE conname = 'Student_phone_key' OR conname = 'Student_phone_unique'
+    `);
+    if (phoneCheck.length === 0) {
+      console.log('[DATABASE] Adding unique constraint on Student.phone...');
+      await prisma.$executeRawUnsafe('ALTER TABLE "Student" ADD CONSTRAINT "Student_phone_key" UNIQUE ("phone")').catch(() => { });
+    }
+
+    console.log('[DATABASE] All database constraints checked/applied.');
+  } catch (err) {
+    console.warn('[DATABASE] Startup migration issue:', err.message);
+  }
+}
 
 // Database startup, migrations, seeding, and port binding sequencing
 async function boot() {
@@ -121,6 +247,9 @@ async function boot() {
     console.log('[DATABASE] Connecting to PostgreSQL via Prisma Client...');
     await prisma.$connect();
     console.log('[DATABASE] Connected to PostgreSQL via Prisma Client.');
+
+    // Commented out to prevent database lock contention across multi-tenant instances on boot
+    // await runStartupMigrations();
 
     // Check if seeding is needed (e.g. if university table is empty)
     try {
@@ -138,10 +267,30 @@ async function boot() {
     initializeCronJobs();
 
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log('Smart Notification Engine (Cron) is initialized.');
     });
+
+    // ── Graceful Shutdown ────────────────────────────────────────────────
+    const shutdown = async (signal) => {
+      console.log(`\n[SERVER] ${signal} received. Starting graceful shutdown...`);
+      server.close(async () => {
+        console.log('[SERVER] HTTP server closed.');
+        await prisma.$disconnect();
+        console.log('[DATABASE] Prisma client disconnected cleanly.');
+        process.exit(0);
+      });
+      // Force shutdown after 10 seconds
+      setTimeout(() => {
+        console.error('[SERVER] Forced shutdown after timeout.');
+        process.exit(1);
+      }, 10000);
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
+    // ────────────────────────────────────────────────────────────────────
+
   } catch (err) {
     console.error('[DATABASE] Critical database connection error:', err.message);
     process.exit(1);
@@ -177,6 +326,26 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   console.error('[SERVER ERROR]', err);
 
+  // Trigger self-healing patcher asynchronously for 500 Internal Server Errors
+  const status = err.status || 500;
+  if (status === 500) {
+    const isDbError = err.message && (
+      err.message.includes('Connection') ||
+      err.message.includes('timeout') ||
+      err.message.includes('pool') ||
+      err.message.includes('Prisma') ||
+      err.message.includes('pg-pool')
+    );
+    if (!isDbError) {
+      try {
+        const patcherService = require('./services/patcherService');
+        patcherService.handleServerError(err, req);
+      } catch (e) {
+        console.error('[PatcherService] Failed to run handleServerError:', e);
+      }
+    }
+  }
+
   // Catch ENOENT (File Not Found) errors for missing static assets
   if (err.code === 'ENOENT') {
     return res.status(404).json({
@@ -186,9 +355,10 @@ app.use((err, req, res, next) => {
   }
 
   if (req.originalUrl && req.originalUrl.startsWith('/api/')) {
+    const isProduction = process.env.NODE_ENV === 'production';
     return res.status(err.status || 500).json({
       success: false,
-      error: err.message || 'Internal Server Error'
+      error: isProduction ? 'Internal Server Error' : (err.message || 'Internal Server Error')
     });
   }
 

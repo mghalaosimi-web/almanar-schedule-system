@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
 const { prisma } = require('../db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, isSuperAdmin } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification } = require('../services/notifications');
 
 // استيراد الخدمات المفككة لإدارة منطق العمليات الإدارية الثقيلة
@@ -605,10 +605,61 @@ router.get('/students', verifyToken, async (req, res) => {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
-    const { collegeId } = req.query;
+    const { collegeId, page, limit, searchQuery, majorId, levelId, groupId, showUnverifiedOnly } = req.query;
     let whereClause = getModelScope(req, 'Student');
     if (req.user.role === 'SUPER_ADMIN' && collegeId) {
       whereClause = { ...whereClause, collegeId: parseInt(collegeId) };
+    }
+
+    if (searchQuery) {
+      whereClause.OR = [
+        { name: { contains: searchQuery, mode: 'insensitive' } },
+        { email: { contains: searchQuery, mode: 'insensitive' } },
+        { idNumber: { contains: searchQuery, mode: 'insensitive' } }
+      ];
+    }
+    if (majorId && majorId !== 'ALL') {
+      whereClause.majorId = parseInt(majorId);
+    }
+    if (levelId && levelId !== 'ALL') {
+      whereClause.levelId = parseInt(levelId);
+    }
+    if (groupId && groupId !== 'ALL') {
+      whereClause.groupId = parseInt(groupId);
+    }
+    if (showUnverifiedOnly === 'true') {
+      whereClause.OR = [
+        { isEmailVerified: false },
+        { isPhoneVerified: false }
+      ];
+    }
+
+    if (page && limit) {
+      const p = parseInt(page) || 1;
+      const l = parseInt(limit) || 15;
+      const skip = (p - 1) * l;
+
+      const [students, totalCount] = await Promise.all([
+        prisma.student.findMany({
+          where: whereClause,
+          include: {
+            major: { include: { department: true } },
+            level: true,
+            group: true
+          },
+          orderBy: { name: 'asc' },
+          skip,
+          take: l
+        }),
+        prisma.student.count({ where: whereClause })
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        data: students,
+        totalCount,
+        hasMore: skip + students.length < totalCount
+      });
     }
 
     const students = await prisma.student.findMany({
@@ -1812,8 +1863,16 @@ router.get('/admin/dev/tree', verifyToken, async (req, res) => {
     const governorates = await prisma.governorate.findMany({
       include: {
         universities: {
+          orderBy: [
+            { sortIndex: 'asc' },
+            { name: 'asc' }
+          ],
           include: {
             colleges: {
+              orderBy: [
+                { sortIndex: 'asc' },
+                { name: 'asc' }
+              ],
               include: {
                 departments: {
                   include: {
@@ -1870,19 +1929,20 @@ router.post('/admin/dev/university', verifyToken, async (req, res) => {
     if (req.user.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
     }
-    const { id, name, slug, themeColor, logoUrl, governorateId } = req.body;
+    const { id, name, slug, themeColor, logoUrl, governorateId, sortIndex } = req.body;
     if (!name || !slug) {
       return res.status(400).json({ success: false, error: 'Name and slug are required' });
     }
+    const parsedSortIndex = sortIndex !== undefined ? parseInt(sortIndex) : undefined;
     let uni;
     if (id) {
       uni = await prisma.university.update({
         where: { id: parseInt(id) },
-        data: { name, slug, themeColor, logoUrl, governorateId }
+        data: { name, slug, themeColor, logoUrl, governorateId, sortIndex: parsedSortIndex }
       });
     } else {
       uni = await prisma.university.create({
-        data: { name, slug, themeColor, logoUrl, governorateId }
+        data: { name, slug, themeColor, logoUrl, governorateId, sortIndex: parsedSortIndex || 0 }
       });
     }
     res.status(200).json({ success: true, data: uni });
@@ -1898,19 +1958,20 @@ router.post('/admin/dev/college', verifyToken, async (req, res) => {
     if (req.user.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
     }
-    const { id, name, slug, location, universityId } = req.body;
+    const { id, name, slug, location, universityId, sortIndex } = req.body;
     if (!name || !slug || !universityId) {
       return res.status(400).json({ success: false, error: 'Name, slug, and universityId are required' });
     }
+    const parsedSortIndex = sortIndex !== undefined ? parseInt(sortIndex) : undefined;
     let college;
     if (id) {
       college = await prisma.college.update({
         where: { id: parseInt(id) },
-        data: { name, slug, location, universityId: parseInt(universityId) }
+        data: { name, slug, location, universityId: parseInt(universityId), sortIndex: parsedSortIndex }
       });
     } else {
       college = await prisma.college.create({
-        data: { name, slug, location, universityId: parseInt(universityId) }
+        data: { name, slug, location, universityId: parseInt(universityId), sortIndex: parsedSortIndex || 0 }
       });
     }
     res.status(200).json({ success: true, data: college });
@@ -2114,15 +2175,6 @@ router.delete('/admin/dev/major/:id', verifyToken, async (req, res) => {
 // ── NEW DEV PORTAL TELEMETRY & SYSTEM CONTROL ─────────────────────────
 
 // 1. GET /api/admin/dev/dashboard-telemetry
-/**
- * مسار جلب بيانات أداء وتتبع النظام الفنية المتقدمة للوحة تحكم المطورين.
- * 
- * البيانات الواردة:
- * - التوثيق: Bearer Token (رتبة SUPER_ADMIN حصرياً).
- * البيانات الصادرة (Response):
- * - success: true
- * - data: مؤشرات استهلاك الذاكرة والمعالج وزمن استجابة قاعدة البيانات وقائمة المستخدمين النشطين.
- */
 router.get('/admin/dev/dashboard-telemetry', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'SUPER_ADMIN') {
@@ -2151,11 +2203,45 @@ router.post('/admin/dev/toggle-setting', verifyToken, async (req, res) => {
     const { key, value } = req.body;
     const systemSettings = require('../services/systemSettings');
 
-    if (!['debugMode', 'maintenanceMode', 'verboseLogging', 'disableAttendance', 'disableExams', 'disableLibrary', 'disableMap', 'disableSchedules'].includes(key)) {
+    const validKeys = [
+      'debugMode', 'maintenanceMode', 'verboseLogging',
+      'disableAttendance', 'disableExams', 'disableLibrary',
+      'disableMap', 'disableSchedules', 'academicYear',
+      'currentSemester', 'allowStudentProfileEdit', 'requireGoogleLink',
+      'otpExpiryMinutes', 'enforceCaptcha',
+      'otaThemeColor', 'otaWarningBanner', 'otaHiddenButtons'
+    ];
+
+    if (!validKeys.includes(key)) {
       return res.status(400).json({ success: false, error: 'Invalid setting key' });
     }
 
-    systemSettings.set(key, !!value);
+    if (key === 'otpExpiryMinutes') {
+      systemSettings.set(key, parseInt(value) || 5);
+    } else if (['academicYear', 'currentSemester', 'otaThemeColor', 'otaWarningBanner'].includes(key)) {
+      systemSettings.set(key, value === 'null' || value === '' ? null : String(value));
+    } else if (key === 'otaHiddenButtons') {
+      let val = value;
+      if (typeof value === 'string') {
+        try {
+          val = JSON.parse(value);
+        } catch {
+          val = value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+      systemSettings.set(key, Array.isArray(val) ? val : []);
+    } else {
+      systemSettings.set(key, !!value);
+    }
+
+    // Broadcast SSE to all clients about setting update
+    const { broadcastSSE } = require('../services/notifications');
+    broadcastSSE('SYSTEM_SETTINGS_UPDATE', { settings: systemSettings.getAll() });
+
+    // Log to AuditLog
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog('UPDATE_SETTING', 'SystemSetting', null, req.user.email, clientIp, { key, value });
 
     res.status(200).json({
       success: true,
@@ -2175,22 +2261,31 @@ router.post('/admin/dev/actions/clear-test-data', verifyToken, async (req, res) 
       return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
     }
 
-    console.log('[DEV ACTIONS] Purging test student data...');
-    
-    // Purge student-dependent tables first
-    await prisma.attendanceRecord.deleteMany({});
-    await prisma.attendance.deleteMany({});
-    await prisma.seatAllocation.deleteMany({});
-    await prisma.verificationCode.deleteMany({});
-    await prisma.pushSubscription.deleteMany({});
-    await prisma.notificationLog.deleteMany({});
-    await prisma.student.deleteMany({});
+    const { confirmText } = req.body;
+    if (confirmText !== 'CONFIRM PURGE') {
+      return res.status(400).json({ success: false, error: 'Must type CONFIRM PURGE to clear test data' });
+    }
 
-    console.log('[DEV ACTIONS] Test student data purged successfully.');
+    console.log('[DEV ACTIONS] Purging transactional test data...');
+    
+    // Purge transactional tables
+    await prisma.$transaction([
+      prisma.attendanceRecord.deleteMany({}),
+      prisma.attendance.deleteMany({}),
+      prisma.seatAllocation.deleteMany({}),
+      prisma.verificationCode.deleteMany({}),
+      prisma.pushSubscription.deleteMany({}),
+      prisma.notificationLog.deleteMany({}),
+      prisma.auditLog.deleteMany({}),
+      prisma.sessionLog.deleteMany({}),
+      prisma.student.deleteMany({})
+    ]);
+
+    console.log('[DEV ACTIONS] Test transactional data purged successfully.');
 
     res.status(200).json({
       success: true,
-      message: 'All student accounts and related transactional data have been purged successfully.'
+      message: 'All student accounts and related transactional data (Attendance, VerificationCodes, Notifications, Audit/Session logs) have been purged successfully.'
     });
   } catch (error) {
     console.error('[API] Clear test data error:', error);
@@ -2229,6 +2324,411 @@ router.post('/admin/dev/actions/trigger-seed', verifyToken, async (req, res) => 
   }
 });
 
+// 5. GET /api/admin/dev/sessions
+router.get('/admin/dev/sessions', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? String(req.query.search).trim() : '';
+    const role = req.query.role || '';
+    const status = req.query.status || '';
+    const collegeId = req.query.collegeId ? parseInt(req.query.collegeId) : null;
+    const universityId = req.query.universityId ? parseInt(req.query.universityId) : null;
+
+    let emailFilter = null;
+    if (collegeId || universityId) {
+      // Find all user emails associated with this tenant context to filter sessions
+      const studentEmails = await prisma.student.findMany({
+        where: collegeId ? { collegeId } : { college: { universityId } },
+        select: { email: true }
+      });
+      const lecturerEmails = await prisma.lecturer.findMany({
+        where: collegeId ? { collegeId } : { college: { universityId } },
+        select: { email: true }
+      });
+      const adminEmails = await prisma.admin.findMany({
+        where: collegeId ? { collegeId } : { universityId },
+        select: { email: true }
+      });
+      emailFilter = [
+        ...studentEmails.map(s => s.email),
+        ...lecturerEmails.map(l => l.email),
+        ...adminEmails.map(a => a.email)
+      ];
+    }
+
+    const andConditions = [];
+
+    // Search query
+    if (search) {
+      andConditions.push({
+        OR: [
+          { userEmail: { contains: search, mode: 'insensitive' } },
+          { role: { contains: search, mode: 'insensitive' } },
+          { ipAddress: { contains: search, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    // Role filter
+    if (role && role !== 'ALL') {
+      andConditions.push({ role });
+    }
+
+    // Status filter
+    if (status && status !== 'ALL') {
+      if (status === 'ACTIVE') {
+        andConditions.push({ logoutTime: null, isRevoked: false });
+      } else if (status === 'REVOKED') {
+        andConditions.push({ isRevoked: true });
+      } else if (status === 'ENDED') {
+        andConditions.push({ logoutTime: { not: null } });
+      }
+    }
+
+    // Tenant email filter
+    if (emailFilter) {
+      andConditions.push({ userEmail: { in: emailFilter } });
+    }
+
+    const where = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    const [sessions, total] = await Promise.all([
+      prisma.sessionLog.findMany({
+        where,
+        orderBy: { loginTime: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.sessionLog.count({ where })
+    ]);
+
+    res.status(200).json({ success: true, data: sessions, total, page, limit });
+  } catch (error) {
+    console.error('[API] Fetch sessions error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch sessions: ' + error.message });
+  }
+});
+
+// 6. POST /api/admin/dev/sessions/revoke
+router.post('/admin/dev/sessions/revoke', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'Session ID is required' });
+    }
+
+    const session = await prisma.sessionLog.update({
+      where: { id: parseInt(sessionId) },
+      data: { isRevoked: true, logoutTime: new Date() }
+    });
+
+    // Log in audit log
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog('FORCE_LOGOUT', 'SessionLog', parseInt(sessionId), req.user.email, clientIp, { sessionUser: session.userEmail });
+
+    res.status(200).json({ success: true, message: 'Session revoked successfully.', data: session });
+  } catch (error) {
+    console.error('[API] Revoke session error:', error);
+    res.status(500).json({ success: false, error: 'Failed to revoke session: ' + error.message });
+  }
+});
+
+// 7. GET /api/admin/dev/audit-logs
+router.get('/admin/dev/audit-logs', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const page         = parseInt(req.query.page)  || 1;
+    const limit        = parseInt(req.query.limit) || 50;
+    const skip         = (page - 1) * limit;
+    const search       = req.query.search ? String(req.query.search).trim() : '';
+    const action       = req.query.action ? String(req.query.action).trim() : '';
+
+    const where = {};
+    if (search) {
+      where.OR = [
+        { userEmail:  { contains: search, mode: 'insensitive' } },
+        { action:     { contains: search, mode: 'insensitive' } },
+        { entityType: { contains: search, mode: 'insensitive' } },
+        { ipAddress:  { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    if (action) {
+      where.action = { contains: action, mode: 'insensitive' };
+    }
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.auditLog.count({ where })
+    ]);
+
+    res.status(200).json({ success: true, data: logs, total, page, limit });
+  } catch (error) {
+    console.error('[API] Fetch audit logs error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch audit logs: ' + error.message });
+  }
+});
+
+// 8. GET /api/admin/dev/notifications
+router.get('/admin/dev/notifications', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+      prisma.notificationLog.findMany({
+        orderBy: { sentTime: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          student: { select: { name: true, email: true } },
+          group: { select: { name: true } }
+        }
+      }),
+      prisma.notificationLog.count()
+    ]);
+
+    res.status(200).json({ success: true, data: logs, total, page, limit });
+  } catch (error) {
+    console.error('[API] Fetch notifications logs error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch notification logs: ' + error.message });
+  }
+});
+
+// 9. POST /api/admin/dev/notifications
+router.post('/admin/dev/notifications', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { groupId, collegeId, universityId, studentId, message } = req.body;
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Message body is required' });
+    }
+
+    const { broadcastSSE } = require('../services/notifications');
+    const { recordAuditLog } = require('../services/sessionTracker');
+    
+    let targetCount = 0;
+    let targetStudents = [];
+
+    if (studentId) {
+      const student = await prisma.student.findUnique({ where: { id: parseInt(studentId) } });
+      if (student) targetStudents.push(student);
+    } else if (groupId) {
+      targetStudents = await prisma.student.findMany({ where: { groupId: parseInt(groupId) } });
+    } else if (collegeId) {
+      targetStudents = await prisma.student.findMany({ where: { collegeId: parseInt(collegeId) } });
+    } else if (universityId) {
+      targetStudents = await prisma.student.findMany({
+        where: { college: { universityId: parseInt(universityId) } }
+      });
+    } else {
+      targetStudents = await prisma.student.findMany();
+    }
+
+    const { sendStudentPushNotification } = require('../services/notifications');
+    
+    for (const student of targetStudents) {
+      try {
+        await prisma.notificationLog.create({
+          data: {
+            studentId: student.id,
+            groupId: student.groupId,
+            message,
+            status: 'SENT'
+          }
+        });
+        
+        broadcastSSE('NEW_NOTIFICATION', { studentId: student.id, message });
+        
+        await sendStudentPushNotification(student.id, {
+          title: 'تنبيه إداري عاجل 📢',
+          body: message,
+          url: '/student/home'
+        });
+        
+        targetCount++;
+      } catch (err) {
+        console.error(`Failed to send alert to student ${student.id}:`, err.message);
+      }
+    }
+
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog('BROADCAST_ALERT', 'NotificationLog', null, req.user.email, clientIp, {
+      message,
+      targetStudentsCount: targetStudents.length,
+      sentSuccessfully: targetCount
+    });
+
+    res.status(200).json({ success: true, message: `Alert dispatched successfully to ${targetCount} students.` });
+  } catch (error) {
+    console.error('[API] Broadcast alert error:', error);
+    res.status(500).json({ success: false, error: 'Failed to deploy alert: ' + error.message });
+  }
+});
+
+// 10. GET /api/admin/levels
+router.get('/admin/levels', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req.user)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const levels = await prisma.level.findMany({
+      orderBy: { name: 'asc' }
+    });
+    res.status(200).json({ success: true, data: levels });
+  } catch (error) {
+    console.error('[API] Get levels error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch levels: ' + error.message });
+  }
+});
+
+// 11. POST /api/admin/levels
+router.post('/admin/levels', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { id, name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Level name is required' });
+    }
+
+    let level;
+    if (id) {
+      level = await prisma.level.update({
+        where: { id: parseInt(id) },
+        data: { name }
+      });
+    } else {
+      level = await prisma.level.create({
+        data: { name }
+      });
+    }
+
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog(id ? 'UPDATE_LEVEL' : 'CREATE_LEVEL', 'Level', level.id, req.user.email, clientIp, { levelName: name });
+
+    res.status(200).json({ success: true, data: level });
+  } catch (error) {
+    console.error('[API] Save level error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save level: ' + error.message });
+  }
+});
+
+// 12. DELETE /api/admin/levels/:id
+router.delete('/admin/levels/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const id = parseInt(req.params.id);
+    const existing = await prisma.level.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Level not found' });
+    }
+    
+    await prisma.level.delete({ where: { id } });
+
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog('DELETE_LEVEL', 'Level', id, req.user.email, clientIp, { levelName: existing.name });
+
+    res.status(200).json({ success: true, message: 'Level deleted successfully' });
+  } catch (error) {
+    console.error('[API] Delete level error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete level: ' + error.message });
+  }
+});
+
+// 13. POST /api/admin/subjects
+router.post('/admin/subjects', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req.user)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { id, name, code, type, collegeId } = req.body;
+    if (!name || !code || !type || !collegeId) {
+      return res.status(400).json({ success: false, error: 'Name, code, type, and collegeId are required' });
+    }
+
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (parseInt(collegeId) !== req.user.collegeId) {
+        return res.status(403).json({ success: false, error: 'Unauthorized to modify this college' });
+      }
+    }
+
+    let subject;
+    if (id) {
+      subject = await prisma.subject.update({
+        where: { id: parseInt(id) },
+        data: { name, code, type, collegeId: parseInt(collegeId) }
+      });
+    } else {
+      subject = await prisma.subject.create({
+        data: { name, code, type, collegeId: parseInt(collegeId) }
+      });
+    }
+
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog(id ? 'UPDATE_SUBJECT' : 'CREATE_SUBJECT', 'Subject', subject.id, req.user.email, clientIp, { subjectName: name });
+
+    res.status(200).json({ success: true, data: subject });
+  } catch (error) {
+    console.error('[API] Save subject error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save subject: ' + error.message });
+  }
+});
+
+// 14. DELETE /api/admin/subjects/:id
+router.delete('/admin/subjects/:id', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req.user)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const id = parseInt(req.params.id);
+    const existing = await prisma.subject.findFirst({
+      where: { id, ...getModelScope(req.user, 'Subject') }
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Subject not found or unauthorized' });
+    }
+
+    await prisma.subject.delete({ where: { id } });
+
+    const { recordAuditLog } = require('../services/sessionTracker');
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await recordAuditLog('DELETE_SUBJECT', 'Subject', id, req.user.email, clientIp, { subjectName: existing.name });
+
+    res.status(200).json({ success: true, message: 'Subject deleted successfully' });
+  } catch (error) {
+    console.error('[API] Delete subject error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete subject: ' + error.message });
+  }
+});
+
 // ── NEW TENANT CONFIGS APIs ──────────────────────────────────────────
 
 // 5. GET /api/admin/dev/tenant-configs
@@ -2250,7 +2750,10 @@ router.get('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { universities, colleges }
+      data: {
+        universities,
+        colleges
+      }
     });
   } catch (error) {
     console.error('[API] Get tenant configs error:', error);
@@ -2259,13 +2762,16 @@ router.get('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
 });
 
 // 6. POST /api/admin/dev/tenant-configs
-router.post('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
+async function saveTenantConfigFn(req, res) {
   try {
     if (req.user.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
     }
 
-    const { id, universityId, collegeId, themeColor, logoUrl, customDomain, enabledFeatures } = req.body;
+    let { id, universityId, collegeId, themeColor, logoUrl, customDomain, databaseUrl, enabledFeatures } = req.body;
+
+    if (req.params.uniId) universityId = req.params.uniId;
+    if (req.params.collegeId) collegeId = req.params.collegeId;
 
     let config;
     if (id) {
@@ -2275,11 +2781,14 @@ router.post('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
           themeColor,
           logoUrl,
           customDomain,
+          databaseUrl,
           enabledFeatures: enabledFeatures || {}
         }
       });
     } else {
-      const whereClause = universityId ? { universityId: parseInt(universityId) } : { collegeId: parseInt(collegeId) };
+      const uId = universityId ? parseInt(universityId) : null;
+      const cId = collegeId ? parseInt(collegeId) : null;
+      const whereClause = uId ? { universityId: uId } : { collegeId: cId };
       const existing = await prisma.tenantConfig.findFirst({ where: whereClause });
 
       if (existing) {
@@ -2289,19 +2798,37 @@ router.post('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
             themeColor,
             logoUrl,
             customDomain,
+            databaseUrl,
             enabledFeatures: enabledFeatures || {}
           }
         });
       } else {
         config = await prisma.tenantConfig.create({
           data: {
-            universityId: universityId ? parseInt(universityId) : null,
-            collegeId: collegeId ? parseInt(collegeId) : null,
+            universityId: uId,
+            collegeId: cId,
             themeColor,
             logoUrl,
             customDomain,
+            databaseUrl,
             enabledFeatures: enabledFeatures || {}
           }
+        });
+      }
+    }
+
+    // Update sortIndex on the University/College if specified
+    if (req.body.sortIndex !== undefined) {
+      const parsedSortIndex = parseInt(req.body.sortIndex) || 0;
+      if (universityId) {
+        await prisma.university.update({
+          where: { id: parseInt(universityId) },
+          data: { sortIndex: parsedSortIndex }
+        });
+      } else if (collegeId) {
+        await prisma.college.update({
+          where: { id: parseInt(collegeId) },
+          data: { sortIndex: parsedSortIndex }
         });
       }
     }
@@ -2311,7 +2838,12 @@ router.post('/admin/dev/tenant-configs', verifyToken, async (req, res) => {
     console.error('[API] Save tenant config error:', error);
     res.status(500).json({ success: false, error: 'Failed to save tenant configuration: ' + error.message });
   }
-});
+}
+
+router.post('/admin/dev/tenant-configs', verifyToken, saveTenantConfigFn);
+router.post('/admin/dev/tenant-configs/universities/:uniId', verifyToken, saveTenantConfigFn);
+router.post('/admin/dev/tenant-configs/colleges/:collegeId', verifyToken, saveTenantConfigFn);
+
 
 // ── NEW: Subject & Doctor (Lecturer) Creation and Management Endpoints ──
 
@@ -2537,15 +3069,21 @@ router.post('/broadcasts/major', verifyToken, async (req, res) => {
     const groupIds = [...new Set(students.map(s => s.groupId).filter(Boolean))];
 
     // Log the notification for each group
-    for (const gid of groupIds) {
-      await prisma.notificationLog.create({
-        data: {
-          groupId: gid,
-          message: message,
-          status: 'SENT'
-        }
+    const logData = groupIds.map(gid => ({
+      groupId: gid,
+      message: message,
+      status: 'SENT'
+    }));
+
+    if (logData.length > 0) {
+      await prisma.notificationLog.createMany({
+        data: logData,
+        skipDuplicates: true
       });
-      // Broadcast live via SSE
+    }
+
+    // Broadcast live via SSE
+    for (const gid of groupIds) {
       broadcastSSE('BROADCAST_MESSAGE', { groupId: gid, message });
     }
 
@@ -2694,5 +3232,1128 @@ router.post('/dev/toggle-license', verifyToken, async (req, res) => {
   }
 });
 
+// NOTE: audit-logs is defined above (merged with action/tenantFilter support)
+// The following Phase 1 & 2 God-Mode routes (branch-tree, branch actions, kill-switch,
+// login-activity-chart, backup, notifications mark-read) are defined further below.
+
+
+// GET Deep Branch Tree (University → College → Group)
+router.get('/admin/dev/branch-tree', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+    const universityId = req.query.universityId ? parseInt(req.query.universityId) : undefined;
+
+    const universities = await prisma.university.findMany({
+      where: universityId ? { id: universityId } : {},
+      include: {
+        colleges: {
+          include: {
+            groups: {
+              select: {
+                id: true, name: true,
+                _count: { select: { students: true } }
+              }
+            },
+            _count: { select: { students: true, groups: true } }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    // Transform into tree structure
+    const tree = universities.map(uni => ({
+      id: uni.id,
+      name: uni.name,
+      type: 'university',
+      collegeCount: uni.colleges.length,
+      children: uni.colleges.map(col => ({
+        id: col.id,
+        name: col.name,
+        type: 'college',
+        studentCount: col._count.students,
+        children: col.groups.map(grp => ({
+          id: grp.id,
+          name: grp.name,
+          type: 'group',
+          studentCount: grp._count.students,
+          children: [],
+          suspended: false,
+          maintenance: false,
+        }))
+      }))
+    }));
+
+    res.json({ success: true, data: tree });
+  } catch (error) {
+    console.error('[API] Branch tree error:', error);
+    res.status(500).json({ success: false, error: 'Failed to build branch tree' });
+  }
+});
+
+// POST Branch Action (suspend/maintenance for group or college)
+router.post('/admin/dev/branch/:type/:id/:action', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+    const { type, id, action } = req.params;
+    const entityId = parseInt(id);
+    const { suspended, maintenance } = req.body;
+
+    const systemSettings = require('../services/systemSettings');
+
+    if (type === 'group') {
+      const key = action === 'suspend' ? 'suspendedGroups' : 'maintenanceGroups';
+      let list = systemSettings.get(key) || [];
+      if (suspended || maintenance) {
+        if (!list.includes(entityId)) list.push(entityId);
+      } else {
+        list = list.filter(i => i !== entityId);
+      }
+      systemSettings.set(key, list);
+
+      // Kick all sessions in this group via SSE
+      broadcastSSE('BRANCH_ACTION', { type, id: entityId, action, suspended, maintenance });
+    } else if (type === 'college') {
+      const key = 'maintenanceColleges';
+      let list = systemSettings.get(key) || [];
+      if (maintenance) {
+        if (!list.includes(entityId)) list.push(entityId);
+      } else {
+        list = list.filter(i => i !== entityId);
+      }
+      systemSettings.set(key, list);
+      broadcastSSE('BRANCH_ACTION', { type, id: entityId, action, maintenance });
+    }
+
+    // Write audit log
+    await prisma.auditLog.create({
+      data: {
+        action: `BRANCH_${action.toUpperCase()}`,
+        entityType: type.toUpperCase(),
+        entityId,
+        userEmail: req.user.email,
+        ipAddress: req.ip || 'unknown',
+        details: req.body,
+      }
+    });
+
+    res.json({ success: true, message: `Branch ${action} applied to ${type} #${entityId}` });
+  } catch (error) {
+    console.error('[API] Branch action error:', error);
+    res.status(500).json({ success: false, error: 'Failed to apply branch action' });
+  }
+});
+
+// POST Global Kill Switch — Emergency system shutdown
+router.post('/admin/dev/actions/global-kill-switch', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+    const { confirm } = req.body;
+    if (!confirm) {
+      return res.status(400).json({ success: false, error: 'Confirmation required' });
+    }
+
+    const systemSettings = require('../services/systemSettings');
+
+    // Activate maintenance mode (global)
+    systemSettings.set('maintenanceMode', true);
+
+    // Broadcast to all connected SSE clients to force logout
+    broadcastSSE('GLOBAL_KILL_SWITCH', {
+      messageAr: 'النظام في وضع الصيانة الطارئة. سيتم إعادة الاتصال قريباً.',
+      messageEn: 'System is in emergency maintenance mode. Please reconnect shortly.',
+      timestamp: new Date().toISOString()
+    });
+
+    // Log the kill switch action
+    await prisma.auditLog.create({
+      data: {
+        action: 'GLOBAL_KILL_SWITCH',
+        entityType: 'SYSTEM',
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: req.ip || 'unknown',
+        details: { reason: 'Emergency kill switch activated', timestamp: new Date() },
+      }
+    });
+
+    console.warn(`[⚠️ KILL SWITCH] Activated by ${req.user.email} at ${new Date().toISOString()}`);
+
+    res.json({
+      success: true,
+      message: 'Global kill switch activated. All API routes are now in maintenance mode.',
+    });
+  } catch (error) {
+    console.error('[API] Kill switch error:', error);
+    res.status(500).json({ success: false, error: 'Kill switch failed: ' + error.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GOD-MODE PHASE 2 ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET Login Activity Chart — 24-hour hourly breakdown of logins and logouts
+router.get('/admin/dev/login-activity-chart', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+
+    const now   = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0); // Midnight today
+
+    // Fetch today's sessions
+    const sessions = await prisma.sessionLog.findMany({
+      where: { loginTime: { gte: start } },
+      select: { loginTime: true, logoutTime: true },
+    });
+
+    // Bucket by hour (0-23)
+    const hourly = Array.from({ length: 24 }, (_, i) => ({ hour: i, logins: 0, logouts: 0 }));
+    for (const s of sessions) {
+      const loginHour  = new Date(s.loginTime).getHours();
+      hourly[loginHour].logins += 1;
+      if (s.logoutTime) {
+        const logoutHour = new Date(s.logoutTime).getHours();
+        hourly[logoutHour].logouts += 1;
+      }
+    }
+
+    res.json({ success: true, data: hourly });
+  } catch (error) {
+    console.error('[API] Login activity chart error:', error);
+    res.status(500).json({ success: false, error: 'Failed to build chart data' });
+  }
+});
+
+// GET Backup — Dynamic entity backup endpoint
+router.get('/admin/dev/backup/:entity', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+    const { entity } = req.params;
+
+    const backupMap = {
+      students:      () => prisma.student.findMany({ select: { id: true, name: true, email: true, idNumber: true, phone: true, collegeId: true, majorId: true, levelId: true, groupId: true, createdAt: true } }),
+      lecturers:     () => prisma.lecturer.findMany({ select: { id: true, name: true, email: true, phone: true, collegeId: true, createdAt: true } }),
+      schedules:     () => prisma.schedule.findMany({ include: { subject: true, room: true, group: true } }),
+      groups:        () => prisma.group.findMany({ include: { major: true, level: true, college: true } }),
+      rooms:         () => prisma.room.findMany({ include: { college: true } }),
+      subjects:      () => prisma.subject.findMany({ include: { college: true } }),
+      notifications: () => prisma.notificationLog.findMany({ orderBy: { sentTime: 'desc' }, take: 5000 }),
+      auditLogs:     () => prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 10000 }),
+      sessionLogs:   () => prisma.sessionLog.findMany({ orderBy: { loginTime: 'desc' }, take: 10000 }),
+      universities:  () => prisma.university.findMany({ include: { colleges: true } }),
+      tenantConfigs: () => prisma.tenantConfig.findMany({}),
+      examSchedules: () => prisma.examSchedule.findMany({ include: { subject: true, room: true, group: true } }),
+    };
+
+    const fetcher = backupMap[entity];
+    if (!fetcher) {
+      return res.status(400).json({ success: false, error: `Unknown backup entity: ${entity}` });
+    }
+
+    // Log this backup action
+    await prisma.auditLog.create({
+      data: {
+        action: 'BACKUP_EXPORT',
+        entityType: entity.toUpperCase(),
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: req.ip || 'unknown',
+        details: { entity, timestamp: new Date() },
+      }
+    });
+
+    const data = await fetcher();
+    res.json({ success: true, data, count: data.length });
+  } catch (error) {
+    console.error('[API] Backup error:', error);
+    res.status(500).json({ success: false, error: 'Backup failed: ' + error.message });
+  }
+});
+
+// POST Mark Notification as Read (Student webhook / Admin manual)
+router.post('/admin/dev/notifications/:id/mark-read', verifyToken, async (req, res) => {
+  try {
+    const id  = parseInt(req.params.id);
+    const { readAt, deliveredAt } = req.body;
+    const updated = await prisma.notificationLog.update({
+      where: { id },
+      data: {
+        readAt:      readAt      ? new Date(readAt)      : (new Date()),
+        deliveredAt: deliveredAt ? new Date(deliveredAt) : undefined,
+      }
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('[API] Mark notification read error:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notification' });
+  }
+});
+
+// GET Device Stats (OS & Browser breakdown + latest device logins)
+router.get('/admin/dev/device-stats', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+
+    const osGroup = await prisma.sessionLog.groupBy({
+      by: ['deviceOs'],
+      _count: { _all: true },
+      where: { status: 'SUCCESS' }
+    });
+
+    const browserGroup = await prisma.sessionLog.groupBy({
+      by: ['browser'],
+      _count: { _all: true },
+      where: { status: 'SUCCESS' }
+    });
+
+    const latestSessions = await prisma.sessionLog.findMany({
+      take: 20,
+      orderBy: { loginTime: 'desc' },
+      select: {
+        id: true,
+        userEmail: true,
+        role: true,
+        loginTime: true,
+        ipAddress: true,
+        deviceOs: true,
+        browser: true,
+        appVersion: true,
+        devicePlatform: true
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        os: osGroup.map(g => ({ name: g.deviceOs || 'Web/Desktop', count: g._count._all })),
+        browser: browserGroup.map(g => ({ name: g.browser || 'Unknown', count: g._count._all })),
+        sessions: latestSessions
+      }
+    });
+  } catch (error) {
+    console.error('[API] Device stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch device stats' });
+  }
+});
+
+// POST Execute SQL query (SELECT/WITH READ-ONLY Terminal)
+router.post('/admin/dev/sql-query', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+    const { query } = req.body;
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'SQL query content is required' });
+    }
+
+    const sql = query.trim();
+
+    // Read-only whitelist check
+    if (!/^(select|with)\s/i.test(sql)) {
+      return res.status(400).json({ success: false, error: 'SQL terminal is strictly READ-ONLY. Only SELECT or WITH queries are permitted.' });
+    }
+
+    // Blacklist dangerous actions
+    if (/\b(update|delete|drop|alter|truncate|insert|create|grant|revoke)\b/i.test(sql)) {
+      return res.status(400).json({ success: false, error: 'Dangerous keyword detected. Only READ-ONLY operations are allowed.' });
+    }
+
+    // Log in audit log
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await prisma.auditLog.create({
+      data: {
+        action: 'SQL_EXECUTE',
+        entityType: 'DATABASE',
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: clientIp,
+        details: { query: sql }
+      }
+    });
+
+    const resultPromise = prisma.$queryRawUnsafe(sql);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Query execution timeout (10s)')), 10000));
+
+    const result = await Promise.race([resultPromise, timeoutPromise]);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[API] SQL execute error:', error);
+    res.status(500).json({ success: false, error: 'SQL execution failed: ' + error.message });
+  }
+});
+
+// GET AI Operational Insights
+router.get('/admin/dev/ai-insights', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+
+    const insights = await prisma.insightLog.findMany({
+      take: 12,
+      orderBy: { generatedAt: 'desc' }
+    });
+
+    res.json({ success: true, data: insights });
+  } catch (error) {
+    console.error('[API] Fetch AI insights error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load operational insights' });
+  }
+});
+
+// POST Trigger AI Insights Generation
+router.post('/admin/dev/ai-insights/generate', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+    }
+
+    const { generateOperationalInsights } = require('../services/aiInsights');
+    const insights = await generateOperationalInsights();
+
+    res.json({ success: true, message: 'AI insights generated and stored successfully.', data: insights });
+  } catch (error) {
+    console.error('[API] Trigger AI insights generation error:', error);
+    res.status(500).json({ success: false, error: 'AI Insights generation failed: ' + error.message });
+  }
+});
+
+// GET Live API Requests Stream (SSE)
+router.get('/admin/dev/request-stream', verifyToken, (req, res) => {
+  if (req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+  }
+  const { registerAdminSse } = require('../middleware/requestLogger');
+  registerAdminSse(req, res);
+});
+
+// GET Recent API Requests (Static log cache)
+router.get('/admin/dev/recent-requests', verifyToken, (req, res) => {
+  if (req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, error: 'SUPER_ADMIN required' });
+  }
+  const { getRecentRequests } = require('../middleware/requestLogger');
+  res.json({ success: true, data: getRecentRequests() });
+});
+
+// ==========================================
+// AI SELF-HEALING PATCHER ENDPOINTS
+// ==========================================
+const patcherService = require('../services/patcherService');
+
+// GET all patches
+router.get('/admin/dev/patches', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const patches = patcherService.getPatches();
+    res.status(200).json({ success: true, data: patches });
+  } catch (error) {
+    console.error('[API] Get patches error:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve patches: ' + error.message });
+  }
+});
+
+// POST Approve & Merge Patch
+router.post('/admin/dev/patches/:id/approve', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { id } = req.params;
+    const patch = patcherService.approvePatch(id);
+    
+    // Log the approval action
+    await prisma.auditLog.create({
+      data: {
+        action: 'APPROVE_PATCH',
+        entityType: 'FILE',
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1',
+        details: { patchId: id, filePath: patch.filePath, resolvedAt: patch.resolvedAt }
+      }
+    });
+
+    res.status(200).json({ success: true, message: 'Patch approved and applied successfully', data: patch });
+  } catch (error) {
+    console.error('[API] Approve patch error:', error);
+    res.status(500).json({ success: false, error: 'Failed to approve patch: ' + error.message });
+  }
+});
+
+// POST Dismiss Patch
+router.post('/admin/dev/patches/:id/dismiss', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { id } = req.params;
+    const patch = patcherService.dismissPatch(id);
+    
+    // Log the dismiss action
+    await prisma.auditLog.create({
+      data: {
+        action: 'DISMISS_PATCH',
+        entityType: 'FILE',
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1',
+        details: { patchId: id, filePath: patch.filePath }
+      }
+    });
+
+    res.status(200).json({ success: true, message: 'Patch dismissed successfully', data: patch });
+  } catch (error) {
+    console.error('[API] Dismiss patch error:', error);
+    res.status(500).json({ success: false, error: 'Failed to dismiss patch: ' + error.message });
+  }
+});
+
+// POST Trigger test server error
+router.post('/admin/dev/patches/trigger-test-error', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    // Throw an error explicitly to test
+    throw new Error('TEST_ERROR: Simulating a critical 500 error to verify AI self-healing patch generation.');
+  } catch (error) {
+    console.error('[API] Trigger test error endpoint catch:', error.message);
+    throw error;
+  }
+});
+
+// ── FIREWALL MANAGEMENT ENDPOINTS ──
+
+// GET all blocked IPs
+router.get('/admin/dev/firewall/blocked', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const list = await prisma.blockedIP.findMany({ orderBy: { blockedAt: 'desc' } });
+    res.status(200).json({ success: true, data: list });
+  } catch (error) {
+    console.error('[API] Fetch blocked IPs error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch firewall logs' });
+  }
+});
+
+// POST block an IP
+router.post('/admin/dev/firewall/block', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { ip, reason } = req.body;
+    if (!ip) {
+      return res.status(400).json({ success: false, error: 'IP address is required' });
+    }
+
+    const cleanIp = ip.trim();
+    // Save to DB
+    const entry = await prisma.blockedIP.upsert({
+      where: { ip: cleanIp },
+      update: { reason },
+      create: { ip: cleanIp, reason }
+    });
+
+    // Update in-memory cache
+    const { addBlockedIpToCache } = require('../middleware/firewall');
+    addBlockedIpToCache(cleanIp);
+
+    // Audit log
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await prisma.auditLog.create({
+      data: {
+        action: 'BLOCK_IP',
+        entityType: 'BlockedIP',
+        entityId: entry.id,
+        userEmail: req.user.email,
+        ipAddress: clientIp,
+        details: { blockedIp: cleanIp, reason }
+      }
+    });
+
+    res.status(200).json({ success: true, message: `IP ${cleanIp} has been blocked.`, data: entry });
+  } catch (error) {
+    console.error('[API] Block IP error:', error);
+    res.status(500).json({ success: false, error: 'Failed to block IP' });
+  }
+});
+
+// POST unblock an IP
+router.post('/admin/dev/firewall/unblock', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const { ip } = req.body;
+    if (!ip) {
+      return res.status(400).json({ success: false, error: 'IP address is required' });
+    }
+
+    const cleanIp = ip.trim();
+    // Delete from DB
+    await prisma.blockedIP.deleteMany({ where: { ip: cleanIp } });
+
+    // Update cache
+    const { removeBlockedIpFromCache } = require('../middleware/firewall');
+    removeBlockedIpFromCache(cleanIp);
+
+    // Audit log
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    await prisma.auditLog.create({
+      data: {
+        action: 'UNBLOCK_IP',
+        entityType: 'BlockedIP',
+        entityId: null,
+        userEmail: req.user.email,
+        ipAddress: clientIp,
+        details: { unblockedIp: cleanIp }
+      }
+    });
+
+    res.status(200).json({ success: true, message: `IP ${cleanIp} has been unblocked.` });
+  } catch (error) {
+    console.error('[API] Unblock IP error:', error);
+    res.status(500).json({ success: false, error: 'Failed to unblock IP' });
+  }
+});
+
+// ── TIME TRAVEL / ROLLBACK ENGINE ──
+
+// POST Rollback change via AuditLog ID
+router.post('/admin/dev/audit-logs/rollback/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Requires SUPER_ADMIN privileges' });
+    }
+    const auditLogId = parseInt(req.params.id);
+    const log = await prisma.auditLog.findUnique({ where: { id: auditLogId } });
+    if (!log) {
+      return res.status(404).json({ success: false, error: 'Audit log not found' });
+    }
+
+    const { action, entityType, entityId, details } = log;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+    // Verify entityType is supported
+    const supportedTypes = ['Schedule', 'Room', 'Lecturer', 'Subject', 'Student', 'Group', 'VerificationCode'];
+    if (!supportedTypes.includes(entityType)) {
+      return res.status(400).json({ success: false, error: `Rollback not supported for entity type: ${entityType}` });
+    }
+
+    const modelName = entityType.charAt(0).toLowerCase() + entityType.slice(1);
+
+    if (action.startsWith('CREATE_') || action === 'CREATE') {
+      // Rollback CREATE -> DELETE
+      if (entityId) {
+        await prisma[modelName].delete({ where: { id: entityId } });
+      }
+    } else if (action.startsWith('UPDATE_') || action === 'UPDATE') {
+      // Rollback UPDATE -> Restore previous values
+      const prevState = details?.previousState || details?.oldValues || details?.before || details;
+      if (entityId && prevState && Object.keys(prevState).length > 0) {
+        const dataToRestore = { ...prevState };
+        delete dataToRestore.id;
+        delete dataToRestore.createdAt;
+        delete dataToRestore.updatedAt;
+
+        await prisma[modelName].update({
+          where: { id: entityId },
+          data: dataToRestore
+        });
+      } else {
+        return res.status(400).json({ success: false, error: 'Cannot rollback UPDATE: previous state missing in audit log details' });
+      }
+    } else if (action.startsWith('DELETE_') || action === 'DELETE') {
+      // Rollback DELETE -> Recreate
+      const deletedState = details?.deletedState || details?.oldValues || details?.before || details;
+      if (deletedState && Object.keys(deletedState).length > 0) {
+        const dataToRestore = { ...deletedState };
+        await prisma[modelName].create({
+          data: dataToRestore
+        });
+      } else {
+        return res.status(400).json({ success: false, error: 'Cannot rollback DELETE: deleted state missing in audit log details' });
+      }
+    } else {
+      return res.status(400).json({ success: false, error: `Unsupported rollback action type: ${action}` });
+    }
+
+    // Log the rollback action itself to the AuditLog
+    await prisma.auditLog.create({
+      data: {
+        action: 'ROLLBACK_ACTION',
+        entityType: 'AuditLog',
+        entityId: auditLogId,
+        userEmail: req.user.email,
+        ipAddress: clientIp,
+        details: { rolledBackAction: action, rolledBackEntity: entityType, rolledBackId: entityId }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully rolled back action ${action} on ${entityType} (ID: ${entityId}).`
+    });
+  } catch (error) {
+    console.error('[API] Rollback error:', error);
+    res.status(500).json({ success: false, error: 'Rollback execution failed: ' + error.message });
+  }
+});
+
+// ── MASTER DATA MANAGER EXTRA ADMIN ENDPOINTS (STUDENTS, ROOMS, MAJORS) ──
+
+// 1. GET /api/admin/students - Get all students (scoped)
+router.get('/admin/students', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { role, collegeId, universityId } = req.user;
+    const { page, limit, searchQuery } = req.query;
+    let whereClause = {};
+
+    if (role === 'COLLEGE_ADMIN') {
+      whereClause.collegeId = parseInt(collegeId);
+    } else if (role === 'UNI_ADMIN') {
+      whereClause.college = { universityId: parseInt(universityId) };
+    } else if (role === 'SUPER_ADMIN') {
+      const qCollegeId = req.query.collegeId;
+      if (qCollegeId) {
+        whereClause.collegeId = parseInt(qCollegeId);
+      }
+    }
+
+    if (searchQuery) {
+      whereClause.OR = [
+        { name: { contains: searchQuery, mode: 'insensitive' } },
+        { email: { contains: searchQuery, mode: 'insensitive' } },
+        { idNumber: { contains: searchQuery, mode: 'insensitive' } }
+      ];
+    }
+
+    if (page && limit) {
+      const p = parseInt(page) || 1;
+      const l = parseInt(limit) || 15;
+      const skip = (p - 1) * l;
+
+      const [students, totalCount] = await Promise.all([
+        prisma.student.findMany({
+          where: whereClause,
+          include: {
+            college: true,
+            major: true,
+            group: true,
+            level: true
+          },
+          orderBy: { name: 'asc' },
+          skip,
+          take: l
+        }),
+        prisma.student.count({ where: whereClause })
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        data: students,
+        totalCount,
+        hasMore: skip + students.length < totalCount
+      });
+    }
+
+    const students = await prisma.student.findMany({
+      where: whereClause,
+      include: {
+        college: true,
+        major: true,
+        group: true,
+        level: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.status(200).json({ success: true, data: students });
+  } catch (error) {
+    console.error('[API] Get admin students error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch students: ' + error.message });
+  }
+});
+
+// 2. POST /api/admin/students - Create or Update a student
+router.post('/admin/students', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { id, name, email, academicId, majorId, levelId, collegeId, password } = req.body;
+
+    let targetCollegeId = collegeId ? parseInt(collegeId) : undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetCollegeId = req.user.collegeId;
+    }
+
+    let student;
+    if (id) {
+      student = await prisma.student.update({
+        where: { id: parseInt(id) },
+        data: {
+          name,
+          email,
+          idNumber: academicId,
+          majorId: majorId ? parseInt(majorId) : null,
+          levelId: levelId ? parseInt(levelId) : null,
+          collegeId: targetCollegeId
+        }
+      });
+    } else {
+      const bcrypt = require('bcryptjs');
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password || '12345678', salt);
+
+      student = await prisma.student.create({
+        data: {
+          name,
+          email,
+          idNumber: academicId,
+          password: hashedPassword,
+          majorId: majorId ? parseInt(majorId) : null,
+          levelId: levelId ? parseInt(levelId) : null,
+          collegeId: targetCollegeId,
+          isEmailVerified: true
+        }
+      });
+    }
+
+    res.status(200).json({ success: true, data: student });
+  } catch (error) {
+    console.error('[API] Save admin student error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save student: ' + error.message });
+  }
+});
+
+// 3. DELETE /api/admin/students/:id - Delete a student
+router.delete('/admin/students/:id', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const studentId = parseInt(req.params.id);
+    await prisma.student.delete({
+      where: { id: studentId }
+    });
+    res.status(200).json({ success: true, message: 'Student deleted successfully' });
+  } catch (error) {
+    console.error('[API] Delete admin student error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete student: ' + error.message });
+  }
+});
+
+// 4. GET /api/admin/rooms - Get all rooms
+router.get('/admin/rooms', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { role, collegeId, universityId } = req.user;
+    let whereClause = {};
+
+    if (role === 'COLLEGE_ADMIN') {
+      whereClause.collegeId = parseInt(collegeId);
+    } else if (role === 'UNI_ADMIN') {
+      whereClause.college = { universityId: parseInt(universityId) };
+    } else if (role === 'SUPER_ADMIN') {
+      const qCollegeId = req.query.collegeId;
+      if (qCollegeId) {
+        whereClause.collegeId = parseInt(qCollegeId);
+      }
+    }
+
+    const rooms = await prisma.room.findMany({
+      where: whereClause,
+      include: { college: true },
+      orderBy: { name: 'asc' }
+    });
+    res.status(200).json({ success: true, data: rooms });
+  } catch (error) {
+    console.error('[API] Get admin rooms error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch rooms: ' + error.message });
+  }
+});
+
+// 5. POST /api/admin/rooms - Create or Update a room
+router.post('/admin/rooms', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { id, name, capacity, collegeId } = req.body;
+
+    let targetCollegeId = collegeId ? parseInt(collegeId) : undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetCollegeId = req.user.collegeId;
+    }
+
+    let room;
+    if (id) {
+      room = await prisma.room.update({
+        where: { id: parseInt(id) },
+        data: {
+          name,
+          capacity: parseInt(capacity)
+        }
+      });
+    } else {
+      room = await prisma.room.create({
+        data: {
+          name,
+          capacity: parseInt(capacity),
+          collegeId: targetCollegeId
+        }
+      });
+    }
+
+    res.status(200).json({ success: true, data: room });
+  } catch (error) {
+    console.error('[API] Save admin room error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save room: ' + error.message });
+  }
+});
+
+// 6. DELETE /api/admin/rooms/:id - Delete a room
+router.delete('/admin/rooms/:id', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const roomId = parseInt(req.params.id);
+    await prisma.room.delete({
+      where: { id: roomId }
+    });
+    res.status(200).json({ success: true, message: 'Room deleted successfully' });
+  } catch (error) {
+    console.error('[API] Delete admin room error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete room: ' + error.message });
+  }
+});
+
+// 7. GET /api/admin/majors - Get all majors
+router.get('/admin/majors', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { role, collegeId, universityId } = req.user;
+    let whereClause = {};
+
+    if (role === 'COLLEGE_ADMIN') {
+      whereClause.department = { collegeId: parseInt(collegeId) };
+    } else if (role === 'UNI_ADMIN') {
+      whereClause.department = { college: { universityId: parseInt(universityId) } };
+    } else if (role === 'SUPER_ADMIN') {
+      const qCollegeId = req.query.collegeId;
+      if (qCollegeId) {
+        whereClause.department = { collegeId: parseInt(qCollegeId) };
+      }
+    }
+
+    const majors = await prisma.major.findMany({
+      where: whereClause,
+      include: {
+        department: {
+          include: { college: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const formatted = majors.map(m => ({
+      ...m,
+      college: m.department?.college,
+      collegeId: m.department?.collegeId
+    }));
+
+    res.status(200).json({ success: true, data: formatted });
+  } catch (error) {
+    console.error('[API] Get admin majors error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch majors: ' + error.message });
+  }
+});
+
+// 8. POST /api/admin/majors - Create or Update a major
+router.post('/admin/majors', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { id, name, code, collegeId } = req.body;
+
+    let targetCollegeId = collegeId ? parseInt(collegeId) : undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetCollegeId = req.user.collegeId;
+    }
+
+    let dept = await prisma.department.findFirst({
+      where: { collegeId: targetCollegeId }
+    });
+    if (!dept) {
+      dept = await prisma.department.create({
+        data: { name: 'القسم العام', collegeId: targetCollegeId }
+      });
+    }
+
+    let major;
+    if (id) {
+      major = await prisma.major.update({
+        where: { id: parseInt(id) },
+        data: {
+          name,
+          code,
+          departmentId: dept.id
+        }
+      });
+    } else {
+      major = await prisma.major.create({
+        data: {
+          name,
+          code,
+          departmentId: dept.id
+        }
+      });
+    }
+
+    res.status(200).json({ success: true, data: major });
+  } catch (error) {
+    console.error('[API] Save admin major error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save major: ' + error.message });
+  }
+});
+
+// 9. DELETE /api/admin/majors/:id - Delete a major
+router.delete('/admin/majors/:id', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const majorId = parseInt(req.params.id);
+    await prisma.major.delete({
+      where: { id: majorId }
+    });
+    res.status(200).json({ success: true, message: 'Major deleted successfully' });
+  } catch (error) {
+    console.error('[API] Delete admin major error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete major: ' + error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// NEW DEV API: Dynamic Database Injection & Licensing Console
+// ─────────────────────────────────────────────────────────────
+const devPortalController = require('../controllers/devPortalController');
+
+router.post('/admin/dev/generate-tenant-key', verifyToken, isSuperAdmin, async (req, res) => {
+  return devPortalController.generateTenantKey(req, res);
+});
+
+router.post('/admin/dev/inject-db-string', verifyToken, isSuperAdmin, async (req, res) => {
+  return devPortalController.injectAndValidateDB(req, res);
+});
+
+router.post('/admin/dev/toggle-tenant-license', verifyToken, isSuperAdmin, async (req, res) => {
+  return devPortalController.toggleLicenseAndKillSessions(req, res);
+});
+
+// GET /api/admin/dev/tenant-configs — Fetch all universities + colleges with their TenantConfig nodes
+router.get('/admin/dev/tenant-configs', verifyToken, isSuperAdmin, async (req, res) => {
+  try {
+    const [universities, colleges] = await Promise.all([
+      prisma.university.findMany({
+        include: {
+          tenantConfig: true,
+          colleges: { select: { id: true, name: true, slug: true } }
+        },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.college.findMany({
+        include: {
+          tenantConfig: true,
+          university: { select: { id: true, name: true } }
+        },
+        orderBy: { name: 'asc' }
+      })
+    ]);
+
+    res.json({ success: true, data: { universities, colleges } });
+  } catch (error) {
+    console.error('[DevPortal] Fetch tenant configs error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tenant configurations: ' + error.message });
+  }
+});
+
+// PATCH /api/admin/dev/tenant-configs/universities/:id — Update university branding
+router.post('/admin/dev/tenant-configs/universities/:id', verifyToken, isSuperAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, slug, themeColor, logoUrl, enforceSSL, allowedDomains } = req.body;
+    const university = await prisma.university.update({
+      where: { id },
+      data: { name, slug, themeColor, logoUrl }
+    });
+    // Upsert TenantConfig for university
+    await prisma.tenantConfig.upsert({
+      where: { universityId: id },
+      update: { enabledFeatures: { enforceSSL: !!enforceSSL, allowedDomains: allowedDomains || [] } },
+      create: { universityId: id, enabledFeatures: { enforceSSL: !!enforceSSL, allowedDomains: allowedDomains || [] } }
+    });
+    res.json({ success: true, data: university });
+  } catch (error) {
+    console.error('[DevPortal] Update university config error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update university: ' + error.message });
+  }
+});
+
+// PATCH /api/admin/dev/tenant-configs/colleges/:id — Update college branding
+router.post('/admin/dev/tenant-configs/colleges/:id', verifyToken, isSuperAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, slug, themeColor, logoUrl, enforceSSL, allowedDomains } = req.body;
+    const college = await prisma.college.update({
+      where: { id },
+      data: { name, slug, themeColor, logoUrl }
+    });
+    // Upsert TenantConfig for college
+    await prisma.tenantConfig.upsert({
+      where: { collegeId: id },
+      update: { enabledFeatures: { enforceSSL: !!enforceSSL, allowedDomains: allowedDomains || [] } },
+      create: { collegeId: id, enabledFeatures: { enforceSSL: !!enforceSSL, allowedDomains: allowedDomains || [] } }
+    });
+    res.json({ success: true, data: college });
+  } catch (error) {
+    console.error('[DevPortal] Update college config error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update college: ' + error.message });
+  }
+});
+
 module.exports = router;
+
+
+
 

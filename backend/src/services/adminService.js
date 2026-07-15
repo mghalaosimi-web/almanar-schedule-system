@@ -195,7 +195,7 @@ async function getTelemetry() {
     prisma.examSchedule.count(),
     prisma.notificationLog.count(),
     prisma.rescheduleRequest.count(),
-    prisma.attendanceRecord.count()
+    prisma.attendance.count()
   ]);
 
   // جلب آخر الإشعارات المرسلة

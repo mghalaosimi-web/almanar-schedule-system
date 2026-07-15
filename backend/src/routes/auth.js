@@ -3,9 +3,12 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const fs = require('fs');
+const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
+const authenticateToken = verifyToken;
 const systemSettings = require('../services/systemSettings');
 
 const router = express.Router();
@@ -15,8 +18,26 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const captchaStore = new Map();
 const otpStore = new Map();
 
-// Configure Google OAuth Client
-const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '425434500913-1sg4gbku0f29rjuf1u8j7cc0haf9vfpq.apps.googleusercontent.com';
+// Periodic cleanup of expired CAPTCHAs and OTP codes to prevent memory leaks (runs every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of captchaStore.entries()) {
+    if (val.expires < now) {
+      captchaStore.delete(key);
+    }
+  }
+  for (const [key, val] of otpStore.entries()) {
+    if (val.expires < now) {
+      otpStore.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
+// ⚠️ SECURITY: Configure VITE_GOOGLE_CLIENT_ID in .env — do NOT hardcode here
+const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+if (!GOOGLE_CLIENT_ID) {
+  console.error('[GOOGLE AUTH] ⚠️  VITE_GOOGLE_CLIENT_ID is not set in environment variables. Google login will be disabled.');
+}
 const googleOAuthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Rate Limiters
@@ -37,6 +58,17 @@ const otpLimiter = rateLimit({
   message: {
     success: false,
     error: 'Too many OTP requests from this IP, please try again after an hour.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: {
+    success: false,
+    error: 'Too many authentication attempts from this IP, please try again after 15 minutes.'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -113,7 +145,7 @@ async function verifyGoogleToken(token) {
 }
 
 // 1. POST /api/auth/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', strictAuthLimiter, async (req, res) => {
   try {
     const { identifier, password, collegeId } = req.body;
     if (!identifier || !password) {
@@ -137,10 +169,12 @@ router.post('/login', authLimiter, async (req, res) => {
         if (adminUser.role !== 'SUPER_ADMIN' && collegeId && adminUser.collegeId !== parseInt(collegeId)) {
           return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
         }
-        const isMatch = await bcrypt.compare(password, adminUser.password);
-        if (isMatch) {
-          user = adminUser;
-          role = adminUser.role;
+        if (adminUser.password) {
+          const isMatch = await bcrypt.compare(password, adminUser.password);
+          if (isMatch) {
+            user = adminUser;
+            role = adminUser.role;
+          }
         }
       }
 
@@ -158,10 +192,12 @@ router.post('/login', authLimiter, async (req, res) => {
           if (collegeId && lecturerUser.collegeId !== parseInt(collegeId)) {
             return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
           }
-          const isMatch = await bcrypt.compare(password, lecturerUser.password);
-          if (isMatch) {
-            user = lecturerUser;
-            role = 'LECTURER';
+          if (lecturerUser.password) {
+            const isMatch = await bcrypt.compare(password, lecturerUser.password);
+            if (isMatch) {
+              user = lecturerUser;
+              role = 'LECTURER';
+            }
           }
         }
       }
@@ -192,10 +228,66 @@ router.post('/login', authLimiter, async (req, res) => {
     }
 
     if (!user) {
+      try {
+        const filePath = path.join(__dirname, '../../data/fallback_metadata.json');
+        if (fs.existsSync(filePath)) {
+          const fallback = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          if (fallback && fallback.users) {
+            // Check admins
+            const fallbackAdmin = fallback.users.admins.find(
+              a => (a.email === identifier || a.name === identifier) && a.passwordRaw === password
+            );
+            if (fallbackAdmin) {
+              user = fallbackAdmin;
+              role = fallbackAdmin.role;
+            }
+
+            if (!user) {
+              // Check lecturers
+              const fallbackLecturer = fallback.users.lecturers.find(
+                l => (l.email === identifier || l.name === identifier) && l.passwordRaw === password
+              );
+              if (fallbackLecturer) {
+                user = fallbackLecturer;
+                role = 'LECTURER';
+              }
+            }
+
+            if (!user) {
+              // Check students
+              const fallbackStudent = fallback.users.students.find(
+                s => (s.email === identifier || s.idNumber === identifier) && s.passwordRaw === password
+              );
+              if (fallbackStudent) {
+                user = fallbackStudent;
+                role = 'STUDENT';
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[OFFLINE FALLBACK] Fallback login check error:', err);
+      }
+    }
+
+    if (!user) {
+      try {
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+        const devicePlatform = req.headers['user-agent'] || 'unknown';
+        const { recordLogin } = require('../services/sessionTracker');
+        await recordLogin({ email: identifier }, role || 'UNKNOWN', ipAddress, 'FAILED', devicePlatform);
+      } catch (err) {}
       return res.status(401).json({ success: false, error: 'Invalid name, email, ID or password' });
     }
 
-    if (role === 'STUDENT' && !user.googleId) {
+    const enforceGoogle = systemSettings.get('requireGoogleLink') !== false;
+    if (role === 'STUDENT' && !user.googleId && enforceGoogle) {
+      try {
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+        const devicePlatform = req.headers['user-agent'] || 'unknown';
+        const { recordLogin } = require('../services/sessionTracker');
+        await recordLogin(user, role, ipAddress, 'FAILED_GOOGLE_LINK', devicePlatform);
+      } catch (err) {}
       return res.status(200).json({
         success: true,
         requiresGoogleLink: true,
@@ -211,19 +303,51 @@ router.post('/login', authLimiter, async (req, res) => {
     let themeColor = null;
 
     if (userCollegeId) {
-      const college = await prisma.college.findUnique({
-        where: { id: userCollegeId },
-        include: { university: true }
-      });
-      if (college) {
-        collegeName = college.name;
-        if (college.university) {
-          universityName = college.university.name;
-          universityLogo = college.university.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
-                           college.university.slug === 'almanar-college' ? '/almanar-logo.png' : college.university.logoUrl;
-          themeColor = college.university.themeColor;
+      try {
+        const college = await prisma.college.findUnique({
+          where: { id: userCollegeId },
+          include: { university: true }
+        });
+        if (college) {
+          collegeName = college.name;
+          if (college.university) {
+            universityName = college.university.name;
+            universityLogo = college.university.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
+                             college.university.slug === 'almanar-college' ? '/almanar-logo.png' : college.university.logoUrl;
+            themeColor = college.university.themeColor;
+          }
         }
+      } catch (dbErr) {
+        console.warn('Database error while fetching user college details:', dbErr.message);
+        try {
+          const filePath = path.join(__dirname, '../../data/fallback_metadata.json');
+          if (fs.existsSync(filePath)) {
+            const fallback = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            const college = fallback.colleges.find(c => c.id === userCollegeId);
+            if (college) {
+              collegeName = college.name;
+              const university = fallback.universities.find(u => u.id === college.universityId);
+              if (university) {
+                universityName = university.name;
+                universityLogo = university.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
+                                 university.slug === 'almanar-college' ? '/almanar-logo.png' : university.logoUrl;
+                themeColor = university.themeColor;
+              }
+            }
+          }
+        } catch (err) {}
       }
+    }
+
+    // Call session activity tracker to create DB SessionLog row
+    let sessionId = null;
+    try {
+      const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      const devicePlatform = req.headers['user-agent'] || 'unknown';
+      const { recordLogin } = require('../services/sessionTracker');
+      sessionId = await recordLogin(user, role, ipAddress, 'SUCCESS', devicePlatform);
+    } catch (e) {
+      console.error('[Login] Session tracking error:', e.message);
     }
 
     const token = jwt.sign(
@@ -231,6 +355,7 @@ router.post('/login', authLimiter, async (req, res) => {
         id: user.id, 
         name: user.name, 
         role, 
+        sessionId,
         majorId: role === 'STUDENT' ? user.majorId : undefined,
         levelId: role === 'STUDENT' ? user.levelId : undefined,
         isRepresentative: role === 'STUDENT' ? user.isRepresentative : undefined,
@@ -242,11 +367,6 @@ router.post('/login', authLimiter, async (req, res) => {
       { expiresIn: '90d' }
     );
 
-    // Call session activity tracker
-    try {
-      const { recordLogin } = require('../services/sessionTracker');
-      recordLogin(user, role);
-    } catch (e) {}
 
     res.status(200).json({
       success: true,
@@ -522,7 +642,26 @@ router.post('/google-login', authLimiter, async (req, res) => {
 // 4. POST /api/auth/link-google
 router.post('/link-google', authLimiter, async (req, res) => {
   try {
-    const { email, credential } = req.body;
+    let email = req.body.email;
+    const credential = req.body.credential || req.body.idToken;
+
+    if (!email && req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded && decoded.id) {
+          const studentRec = await prisma.student.findUnique({
+            where: { id: decoded.id }
+          });
+          if (studentRec) {
+            email = studentRec.email;
+          }
+        }
+      } catch (err) {
+        console.warn('JWT verification failed during link-google:', err.message);
+      }
+    }
+
     if (!email || !credential) {
       return res.status(400).json({ success: false, error: 'Email and Google credential are required' });
     }
@@ -626,11 +765,12 @@ router.post('/link-google', authLimiter, async (req, res) => {
 });
 
 // 4. POST /api/auth/complete-profile
-router.post('/complete-profile', async (req, res) => {
+// PATCH [SEC]: verifyToken added — requires valid Google session before allowing profile creation
+router.post('/complete-profile', authenticateToken, async (req, res) => {
   try {
     const { email, name, phone, idNumber, collegeId, majorId, levelId } = req.body;
     
-    if (!email || !name || !phone || !collegeId || !majorId || !levelId) {
+    if (!name || !phone || !collegeId || !majorId || !levelId) {
       return res.status(400).json({ success: false, error: 'All profile fields are required' });
     }
 
@@ -652,28 +792,34 @@ router.post('/complete-profile', async (req, res) => {
 
     const resolvedId = (idNumber && idNumber.trim() !== '') ? idNumber.trim() : 'TEMP_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
-    const existingStudent = await prisma.student.findUnique({ where: { email } });
-    if (existingStudent) {
-      return res.status(400).json({ success: false, error: 'Student already exists' });
+    const studentId = req.user.id;
+    const existingStudent = await prisma.student.findUnique({ where: { id: studentId } });
+    if (!existingStudent) {
+      return res.status(404).json({ success: false, error: 'Student account not found' });
     }
 
-    const existingIdNumber = await prisma.student.findUnique({ where: { idNumber: resolvedId } });
-    if (existingIdNumber) {
-      return res.status(400).json({ success: false, error: 'A student with this academic ID already exists' });
-    }
-
-    const student = await prisma.student.create({
-      data: {
-        email,
-        name,
-        phone,
-        idNumber: resolvedId,
-        collegeId: parseInt(collegeId),
-        majorId: parseInt(majorId),
-        levelId: parseInt(levelId),
-        isEmailVerified: true,
-        isPhoneVerified: true
+    if (idNumber && idNumber.trim() !== '' && idNumber.trim() !== existingStudent.idNumber) {
+      const existingIdNumber = await prisma.student.findUnique({ where: { idNumber: resolvedId } });
+      if (existingIdNumber && existingIdNumber.id !== studentId) {
+        return res.status(400).json({ success: false, error: 'A student with this academic ID already exists' });
       }
+    }
+
+    const updateData = {
+      name,
+      phone,
+      idNumber: resolvedId,
+      collegeId: parseInt(collegeId),
+      majorId: parseInt(majorId),
+      levelId: parseInt(levelId),
+      isEmailVerified: true,
+      isPhoneVerified: true
+    };
+    if (email) updateData.email = email;
+
+    const student = await prisma.student.update({
+      where: { id: studentId },
+      data: updateData
     });
 
     let collegeName = null;
@@ -753,10 +899,9 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore.set(phone, { code: otpCode, expires: Date.now() + 5 * 60 * 1000 });
 
-    console.log('\n======================================================');
-    console.log(`[OTP SYSTEM] 🔑 Verification code requested for: ${email}`);
-    console.log(`[OTP SYSTEM] 🟢 CODE: ${otpCode}`);
-    console.log('======================================================\n');
+    console.log('[OTP SYSTEM] Verification code generated for:', email);
+
+    // Never log the OTP code itself in production — use email delivery only
 
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
@@ -853,6 +998,38 @@ router.post('/register', authLimiter, async (req, res) => {
     }
 
     const resolvedId = (idNumber && idNumber.trim() !== '') ? idNumber.trim() : 'TEMP_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    // Verify CAPTCHA if provided
+    if (captchaChallengeId || captchaAnswer) {
+      const storedCaptcha = captchaStore.get(captchaChallengeId);
+      if (!storedCaptcha) {
+        return res.status(400).json({ success: false, error: 'كود التحقق البشري غير صالح أو منتهي الصلاحية' });
+      }
+      if (storedCaptcha.expires < Date.now()) {
+        captchaStore.delete(captchaChallengeId);
+        return res.status(400).json({ success: false, error: 'كود التحقق البشري منتهي الصلاحية' });
+      }
+      if (parseInt(captchaAnswer) !== storedCaptcha.answer) {
+        return res.status(400).json({ success: false, error: 'إجابة التحقق البشري غير صحيحة' });
+      }
+      captchaStore.delete(captchaChallengeId); // single-use
+    }
+
+    // Verify OTP if provided
+    if (otpCode) {
+      const storedOtp = otpStore.get(phone);
+      if (!storedOtp) {
+        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) غير موجود أو غير صالح' });
+      }
+      if (storedOtp.expires < Date.now()) {
+        otpStore.delete(phone);
+        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) منتهي الصلاحية' });
+      }
+      if (otpCode !== storedOtp.code) {
+        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) غير صحيح' });
+      }
+      otpStore.delete(phone); // single-use
+    }
 
     let isGoogleVerified = false;
     let verifiedEmail = email;
@@ -1086,7 +1263,8 @@ router.post('/impersonate', verifyToken, async (req, res) => {
           name: student.name, 
           role: 'STUDENT', 
           groupId: student.groupId,
-          collegeId: student.collegeId
+          collegeId: student.collegeId,
+          googleId: student.googleId || 'impersonated'
         },
         JWT_SECRET,
         { expiresIn: '24h' }
@@ -1102,7 +1280,8 @@ router.post('/impersonate', verifyToken, async (req, res) => {
           role: 'STUDENT',
           groupId: student.groupId,
           groupName: student.group ? student.group.name : '',
-          collegeId: student.collegeId
+          collegeId: student.collegeId,
+          googleId: student.googleId || 'impersonated'
         }
       });
     }

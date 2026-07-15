@@ -12,7 +12,10 @@ const defaultSettings = {
   disableLibrary: false,
   disableMap: false,
   disableSchedules: false,
-  deactivatedColleges: []
+  deactivatedColleges: [],
+  otaThemeColor: null,
+  otaHiddenButtons: [],
+  otaWarningBanner: null
 };
 
 let settings = { ...defaultSettings };

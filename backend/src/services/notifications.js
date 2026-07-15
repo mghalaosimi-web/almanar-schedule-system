@@ -1,17 +1,19 @@
 const webpush = require('web-push');
 const { prisma } = require('../db');
 
-// Ensure VAPID keys are configured
+// Ensure VAPID keys are configured via environment variables only
+// ⚠️ SECURITY: Do NOT hardcode VAPID keys here — set PUBLIC_VAPID_KEY and PRIVATE_VAPID_KEY in .env
 if (!process.env.PUBLIC_VAPID_KEY || !process.env.PRIVATE_VAPID_KEY) {
-  process.env.PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || 'BD0TO6aDGRJZi121Sz3bPVPzecZFwcX8NYqs3RerJyoLQbmDP73yUT2kpDRtjypnxAJ0KQVyIBjtaMWSWzhBupk';
-  process.env.PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || '8RJrMMchaSV4bDbBRhRFmGSGxugoYbkAQTFBRnroOgo';
+  console.error('[PUSH] ⚠️  WARNING: VAPID keys are missing from environment variables.');
+  console.error('[PUSH]     Set PUBLIC_VAPID_KEY and PRIVATE_VAPID_KEY in your .env file.');
+  console.error('[PUSH]     Push notifications will be DISABLED until keys are configured.');
+} else {
+  webpush.setVapidDetails(
+    'mailto:m.gh.alosimi@gmail.com',
+    process.env.PUBLIC_VAPID_KEY,
+    process.env.PRIVATE_VAPID_KEY
+  );
 }
-
-webpush.setVapidDetails(
-  'mailto:m.gh.alosimi@gmail.com',
-  process.env.PUBLIC_VAPID_KEY,
-  process.env.PRIVATE_VAPID_KEY
-);
 
 // Active SSE client streams
 let sseClients = [];

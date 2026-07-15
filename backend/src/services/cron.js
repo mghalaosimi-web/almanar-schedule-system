@@ -259,19 +259,21 @@ async function checkUpcomingClassesAndNotify() {
 }
 
 function initializeCronJobs() {
-  // Schedule: Runs every day at 8:00 AM (Morning Check-in)
-  cron.schedule('0 8 * * *', sendMorningCheckin);
+  const YEMEN_TZ = { timezone: 'Asia/Aden' }; // UTC+3 — توقيت صنعاء / عدن
 
-  // Schedule: Runs every day at 3:00 PM (Afternoon Check-in)
-  cron.schedule('0 15 * * *', sendAfternoonCheckin);
+  // Schedule: Runs every day at 8:00 AM Yemen time (Morning Check-in)
+  cron.schedule('0 8 * * *', sendMorningCheckin, YEMEN_TZ);
 
-  // Schedule: Runs every day at 8:00 PM (Daily Schedule Summary)
-  cron.schedule('0 20 * * *', sendDailyScheduleSummary);
+  // Schedule: Runs every day at 3:00 PM Yemen time (Afternoon Check-in)
+  cron.schedule('0 15 * * *', sendAfternoonCheckin, YEMEN_TZ);
 
-  // Schedule: Runs every 5 minutes (Upcoming lectures check)
+  // Schedule: Runs every day at 8:00 PM Yemen time (Daily Schedule Summary)
+  cron.schedule('0 20 * * *', sendDailyScheduleSummary, YEMEN_TZ);
+
+  // Schedule: Runs every 5 minutes (Upcoming lectures check) — timezone independent
   cron.schedule('*/5 * * * *', checkUpcomingClassesAndNotify);
 
-  console.log('Smart Notification Engine (Cron) is initialized.');
+  console.log('[CRON] Smart Notification Engine initialized — timezone: Asia/Aden (UTC+3)');
 }
 
 module.exports = {

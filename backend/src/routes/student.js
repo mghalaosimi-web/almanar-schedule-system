@@ -6,6 +6,8 @@ const bcrypt = require('bcryptjs');
 const { prisma } = require('../db');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
 const { getSseClients, setSseClients, broadcastSSE } = require('../services/notifications');
+const systemSettings = require('../services/systemSettings');
+const { LOGS_FILE } = require('../middleware/activityLogger');
 
 // استيراد الخدمات المفككة حديثاً لتمرير منطق العمليات
 const attendanceService = require('../services/attendanceService');
@@ -31,12 +33,23 @@ function getCoordinateDistance(lat1, lon1, lat2, lon2) {
 router.get('/tenants', async (req, res) => {
   try {
     const universities = await prisma.university.findMany({
-      include: { colleges: true }
+      orderBy: [
+        { sortIndex: 'asc' },
+        { name: 'asc' }
+      ],
+      include: {
+        colleges: {
+          orderBy: [
+            { sortIndex: 'asc' },
+            { name: 'asc' }
+          ]
+        }
+      }
     });
     const mapped = universities.map(uni => ({
       ...uni,
-      logoUrl: uni.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
-               uni.slug === 'almanar-college' ? '/almanar-logo.png' : uni.logoUrl
+      logoUrl: uni.logoUrl ? uni.logoUrl : (uni.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
+               uni.slug === 'almanar-college' ? '/almanar-logo.png' : uni.logoUrl)
     }));
     res.status(200).json({ success: true, data: mapped });
   } catch (error) {
@@ -76,8 +89,19 @@ router.get('/schedules/live', (req, res) => {
   setSseClients(clients);
   
   console.log(`[SSE] Client connected. Total clients: ${clients.length}`);
+
+  // ── Heartbeat: ping every 25s to prevent proxy/load-balancer timeouts ──
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch (e) {
+      clearInterval(heartbeat);
+    }
+  }, 25000);
+  // ────────────────────────────────────────────────────────────────
   
   req.on('close', () => {
+    clearInterval(heartbeat);
     const activeClients = getSseClients().filter(c => c.id !== client.id);
     setSseClients(activeClients);
     console.log(`[SSE] Client disconnected. Total clients: ${activeClients.length}`);
@@ -95,13 +119,6 @@ router.post('/notifications/subscribe', verifyToken, async (req, res) => {
     const { subscription } = req.body;
     if (!subscription || !subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
       return res.status(400).json({ success: false, error: 'Subscription object with endpoint, p256dh, and auth keys is required' });
-    }
-
-    let userIdField = 'adminId';
-    if (req.user.role === 'STUDENT') {
-      userIdField = 'studentId';
-    } else if (req.user.role === 'LECTURER') {
-      userIdField = 'lecturerId';
     }
 
     await prisma.pushSubscription.upsert({
@@ -658,12 +675,12 @@ router.post('/attendance/scan', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
     }
 
-    const { token, latitude, longitude } = req.body;
+    const { token } = req.body;
     if (!token) {
       return res.status(400).json({ success: false, error: 'Missing QR code token' });
     }
 
-    const record = await attendanceService.scanCheckIn(req.user.id, token, latitude, longitude);
+    const record = await attendanceService.scanCheckIn(req.user.id, token);
     
     res.status(200).json({
       success: true,
@@ -672,45 +689,119 @@ router.post('/attendance/scan', verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error('[API] Error scanning attendance:', error.message);
-    res.status(500).json({ success: false, error: error.message || 'Failed to record attendance' });
+    res.status(400).json({ success: false, error: error.message || 'Failed to record attendance' });
   }
 });
 
-// 18.5 POST GPS Student Check-In (Location and Time verification)
-/**
- * مسار تسجيل الحضور عبر تحديد الموقع الجغرافي الفعلي (GPS Check-In).
- * 
- * البيانات الواردة (Payload):
- * - scheduleId: معرف المحاضرة المجدولة (number).
- * - latitude: خط العرض للموقع الحالي (number).
- * - longitude: خط الطول للموقع الحالي (number).
- * البيانات الصادرة (Response):
- * - success: true
- * - message: رسالة نجاح التحضير الجغرافي باللغة العربية.
- * - data: كائن الحضور الذي تم إنشاؤه.
- */
-router.post('/attendance/checkin', verifyToken, async (req, res) => {
+// 18.5 POST GPS Check-In
+router.post('/student/attendance/checkin', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
     }
 
-    const { scheduleId, latitude, longitude } = req.body;
-    if (!scheduleId) {
-      return res.status(400).json({ success: false, error: 'Schedule ID is required' });
+    if (systemSettings.get('disableAttendance')) {
+      return res.status(400).json({ success: false, error: 'تسجيل الحضور معطل حالياً من قبل الإدارة' });
     }
 
-    const record = await attendanceService.gpsCheckIn(req.user.id, scheduleId, latitude, longitude);
+    const { scheduleId, bypassGPS, latitude, longitude } = req.body;
+    if (!scheduleId) {
+      return res.status(400).json({ success: false, error: 'Missing scheduleId' });
+    }
+
+    const schedule = await prisma.schedule.findUnique({
+      where: { id: parseInt(scheduleId) },
+      include: { subject: true, room: true }
+    });
+
+    if (!schedule) {
+      return res.status(404).json({ success: false, error: 'Schedule not found' });
+    }
+
+    // Default coordinates: Sanaa / Hajjah campus
+    const collegeLat = 15.35;
+    const collegeLon = 44.20;
+    
+    if (!bypassGPS) {
+      if (!latitude || !longitude) {
+        return res.status(400).json({ success: false, error: 'الرجاء تفعيل خدمات الموقع الجغرافي (GPS)' });
+      }
+      const distance = getCoordinateDistance(latitude, longitude, collegeLat, collegeLon);
+      if (distance > 150) {
+        return res.status(400).json({ success: false, error: `أنت خارج نطاق الحرم الجامعي المسموح به. المسافة الحالية: ${Math.round(distance)} متر.` });
+      }
+    }
+
+    const now = new Date();
+    const DAYS_MAP = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const todayDay = DAYS_MAP[now.getDay()];
+
+    let status = 'PRESENT';
+    if (schedule.dayOfWeek === todayDay) {
+      const [schedHours, schedMins] = schedule.startTime.split(':').map(Number);
+      const schedTimeInMinutes = schedHours * 60 + schedMins;
+      const nowTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (nowTimeInMinutes > schedTimeInMinutes + 15) {
+        status = 'LATE';
+      }
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const existing = await prisma.attendance.findFirst({
+      where: {
+        studentId: req.user.id,
+        scheduleId: parseInt(scheduleId),
+        date: today
+      }
+    });
+
+    let record;
+    if (existing) {
+      record = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          recordedById: req.user.id
+        },
+        include: {
+          student: true
+        }
+      });
+    } else {
+      record = await prisma.attendance.create({
+        data: {
+          studentId: req.user.id,
+          scheduleId: parseInt(scheduleId),
+          date: today,
+          status,
+          recordedById: req.user.id
+        },
+        include: {
+          student: true
+        }
+      });
+    }
+
+    // Broadcast update via SSE
+    broadcastSSE('ATTENDANCE_MARKED', {
+      scheduleId: parseInt(scheduleId),
+      studentId: req.user.id,
+      studentName: record.student.name,
+      status: record.status,
+      scannedAt: record.date
+    });
 
     res.status(200).json({
       success: true,
-      message: record.status === 'PRESENT' ? 'تم تسجيل حضورك بنجاح بالـ GPS!' : 'تم تسجيل حضورك متأخراً بالـ GPS!',
+      message: record.status === 'PRESENT' ? 'تم تسجيل حضورك بنجاح بالـ GPS!' : 'تم تسجيل حضورك بالـ GPS (متأخر)!',
       data: record
     });
-
   } catch (error) {
-    console.error('[API] GPS checkin error:', error.message);
-    res.status(500).json({ success: false, error: error.message || 'Failed to record attendance via GPS' });
+    console.error('[API] GPS checkin error:', error);
+    res.status(500).json({ success: false, error: 'Failed to record attendance: ' + error.message });
   }
 });
 
@@ -776,7 +867,6 @@ router.post('/db/seed', verifyToken, verifyAdmin, async (req, res) => {
 router.get('/db/activity-log', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const fs = require('fs');
-    const { LOGS_FILE } = require('../middleware/activityLogger');
     if (!fs.existsSync(LOGS_FILE)) {
       return res.status(200).json({ success: true, data: [] });
     }
@@ -933,5 +1023,13 @@ router.get('/student/export-schedule', verifyToken, async (req, res) => {
     res.status(500).json({ success: false, error: error.message || 'Failed to export schedule' });
   }
 });
+
+const studentController = require('../controllers/studentController');
+
+// GET /api/student/:id - Fetch user-specific data with isolation
+router.get('/student/:id', verifyToken, studentController.getStudentById);
+
+// PUT /api/student/:id - Modify user-specific data with isolation
+router.put('/student/:id', verifyToken, studentController.updateStudentById);
 
 module.exports = router;

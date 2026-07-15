@@ -38,16 +38,41 @@ const GoogleLinkInterceptor = React.lazy(() => import('./components/GoogleLinkIn
 const LicenseSuspended = React.lazy(() => import('./components/LicenseSuspended'));
 
 // Sleek loading fallback spinner
-const PageLoader = () => (
-  <div className="flex h-screen w-screen items-center justify-center bg-[#000]">
-    <div className="relative flex items-center justify-center">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--accent)] border-t-transparent shadow-[0_0_15px_var(--accent-glow)]" />
-      <span className="absolute text-[8px] font-black uppercase tracking-widest text-[var(--accent)] animate-pulse">
-        Load
-      </span>
+const PageLoader = () => {
+  React.useEffect(() => {
+    const userJson = localStorage.getItem('manar_user');
+    let user = null;
+    try { user = JSON.parse(userJson); } catch {}
+    
+    let otaColor = null;
+    try {
+      const cachedSettings = JSON.parse(localStorage.getItem('cached_system_settings') || '{}');
+      otaColor = cachedSettings.otaThemeColor;
+    } catch {}
+
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const color = otaColor || (isSuperAdmin 
+      ? localStorage.getItem('superadmin_selectedThemeColor')
+      : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor')));
+      
+    if (color) {
+      document.documentElement.style.setProperty('--accent', color);
+      document.documentElement.style.setProperty('--accent-glow', `${color}33`);
+      document.documentElement.style.setProperty('--accent-dim', `${color}1a`);
+    }
+  }, []);
+
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="relative flex items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--accent,#2979ff)] border-t-transparent shadow-[0_0_15px_var(--accent-glow,rgba(41,121,255,0.25))]" />
+        <span className="absolute text-[8px] font-black uppercase tracking-widest text-[var(--accent,#2979ff)] animate-pulse">
+          Load
+        </span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Global Axios Interceptor for License Revocation
 axios.interceptors.response.use(
@@ -228,10 +253,16 @@ function AppLayout() {
       let user = null;
       try { user = JSON.parse(userJson); } catch {}
       
+      let otaColor = null;
+      try {
+        const cachedSettings = JSON.parse(localStorage.getItem('cached_system_settings') || '{}');
+        otaColor = cachedSettings.otaThemeColor;
+      } catch {}
+
       const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-      const color = isSuperAdmin 
+      const color = otaColor || (isSuperAdmin 
         ? localStorage.getItem('superadmin_selectedThemeColor')
-        : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor'));
+        : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor')));
         
       if (color) {
         document.documentElement.style.setProperty('--accent', color);
@@ -471,6 +502,40 @@ function AppLayout() {
           }
         } else if (payload.type === 'ATTENDANCE_MARKED') {
           window.dispatchEvent(new CustomEvent('MANAR_ATTENDANCE_MARKED', { detail: payload.data }));
+        } else if (payload.type === 'DEV_ACTIVITY_LOG') {
+          toast(payload.data.message, {
+            icon: '⚡',
+            duration: 5000,
+            style: { border: '1px solid #a855f7' }
+          });
+          window.dispatchEvent(new CustomEvent('MANAR_DEV_ACTIVITY_LOG', { detail: payload.data }));
+        } else if (payload.type === 'SYSTEM_SETTINGS_UPDATE') {
+          if (payload.data && payload.data.settings) {
+            localStorage.setItem('cached_system_settings', JSON.stringify(payload.data.settings));
+            window.dispatchEvent(new CustomEvent('MANAR_SYSTEM_SETTINGS_UPDATE', { detail: payload.data.settings }));
+            
+            // Live OTA theme injection
+            const userJson = localStorage.getItem('manar_user');
+            let user = null;
+            try { user = JSON.parse(userJson); } catch {}
+            const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+            const otaColor = payload.data.settings.otaThemeColor;
+            
+            if (otaColor) {
+              document.documentElement.style.setProperty('--accent', otaColor);
+              document.documentElement.style.setProperty('--accent-glow', `${otaColor}33`);
+              document.documentElement.style.setProperty('--accent-dim', `${otaColor}1a`);
+            } else {
+              const origColor = isSuperAdmin 
+                ? localStorage.getItem('superadmin_selectedThemeColor')
+                : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor'));
+              if (origColor) {
+                document.documentElement.style.setProperty('--accent', origColor);
+                document.documentElement.style.setProperty('--accent-glow', `${origColor}33`);
+                document.documentElement.style.setProperty('--accent-dim', `${origColor}1a`);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error('[SSE] Error processing incoming event:', err);

@@ -45,21 +45,20 @@ function getCoordinateDistance(lat1, lon1, lat2, lon2) {
  * المنطق البرمجي والتدفق:
  * 1. فك تشفير وفحص سلامة الـ JWT Token المرسل من رمز الـ QR.
  * 2. التحقق من أن الرمز مخصص لعملية التحضير (ATTENDANCE_QR).
- * 3. حساب المسافة الجغرافية بين إحداثيات الطالب المدخلة وإحداثيات الكلية المركزية للتأكد من وجوده الفعلي داخل الحرم الجامعي (النطاق المسموح: 150 متر).
- * 4. مقارنة توقيت التحضير الفعلي بوقت بدء المحاضرة المجدولة:
+ * 3. مقارنة توقيت التحضير الفعلي بوقت بدء المحاضرة المجدولة:
  *    - إذا تجاوز وقت التحضير وقت بدء المحاضرة بأكثر من 15 دقيقة، يتم تسجيل حالة الحضور كمتأخر (LATE).
  *    - خلافاً لذلك، تسجل كحاضر (PRESENT).
- * 5. تحديث أو إنشاء سجل الحضور (Upsert) في جدول AttendanceRecord لتجنب تكرار التحضير لنفس اليوم.
- * 6. إرسال إشعار فوري عبر قنوات البث المباشر (SSE Broadcast) لتحديث واجهة الدكتور أو المسؤول في الوقت الحقيقي.
+ * 4. تحديث أو إنشاء سجل الحضور (Upsert) في جدول AttendanceRecord لتجنب تكرار التحضير لنفس اليوم.
+ * 5. إرسال إشعار فوري عبر قنوات البث المباشر (SSE Broadcast) لتحديث واجهة الدكتور أو المسؤول في الوقت الحقيقي.
  * 
+ * ملاحظة: تم إلغاء التحقق من الموقع الجغرافي (GPS). نظام الحضور يعتمد على QR + تحضير المندوب.
+ *
  * @param {number} studentId - المعرف الفريد للطالب.
  * @param {string} token - الرمز الرقمي المشفر الممسوح من شاشة العرض (QR Token).
- * @param {number} latitude - خط العرض لموقع الطالب الفعلي عبر نظام تحديد المواقع (GPS).
- * @param {number} longitude - خط الطول لموقع الطالب الفعلي عبر نظام تحديد المواقع (GPS).
  * @returns {Promise<Object>} كائن يحتوي على نتيجة العملية وسجل الحضور الذي تم إنشاؤه.
- * @throws {Error} في حال كان الرمز منتهي الصلاحية، غير صالح، أو خارج النطاق الجغرافي.
+ * @throws {Error} في حال كان الرمز منتهي الصلاحية أو غير صالح.
  */
-async function scanCheckIn(studentId, token, latitude, longitude) {
+async function scanCheckIn(studentId, token) {
   let decoded;
   try {
     decoded = jwt.verify(token, JWT_SECRET);
@@ -69,19 +68,6 @@ async function scanCheckIn(studentId, token, latitude, longitude) {
 
   if (decoded.role !== 'ATTENDANCE_QR') {
     throw new Error('Invalid QR token payload');
-  }
-
-  const CAMPUS_LAT = 15.35;
-  const CAMPUS_LON = 44.20;
-  const ALLOWED_RADIUS = 150; // النطاق المسموح به بالأمتار
-
-  if (latitude === undefined || longitude === undefined) {
-    throw new Error('GPS coordinates are required to verify location');
-  }
-
-  const distance = getCoordinateDistance(latitude, longitude, CAMPUS_LAT, CAMPUS_LON);
-  if (distance > ALLOWED_RADIUS) {
-    throw new Error(`خارج النطاق الجغرافي المسموح به. مسافتك: ${Math.round(distance)} متر من الكلية.`);
   }
 
   const schedule = await prisma.schedule.findUnique({
@@ -111,29 +97,40 @@ async function scanCheckIn(studentId, token, latitude, longitude) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const record = await prisma.attendanceRecord.upsert({
+  const existing = await prisma.attendance.findFirst({
     where: {
-      studentId_scheduleId_date: {
-        studentId: studentId,
-        scheduleId: decoded.scheduleId,
-        date: today
-      }
-    },
-    update: {
-      status,
-      scannedAt: new Date()
-    },
-    create: {
       studentId: studentId,
       scheduleId: decoded.scheduleId,
-      date: today,
-      status,
-      scannedAt: new Date()
-    },
-    include: {
-      student: true
+      date: today
     }
   });
+
+  let record;
+  if (existing) {
+    record = await prisma.attendance.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        recordedById: studentId
+      },
+      include: {
+        student: true
+      }
+    });
+  } else {
+    record = await prisma.attendance.create({
+      data: {
+        studentId: studentId,
+        scheduleId: decoded.scheduleId,
+        date: today,
+        status,
+        recordedById: studentId
+      },
+      include: {
+        student: true
+      }
+    });
+  }
 
   // بث إشعار فوري عبر SSE لتحديث واجهة المحاضر تلقائياً
   broadcastSSE('ATTENDANCE_MARKED', {
@@ -141,142 +138,7 @@ async function scanCheckIn(studentId, token, latitude, longitude) {
     studentId: studentId,
     studentName: record.student.name,
     status: record.status,
-    scannedAt: record.scannedAt
-  });
-
-  return record;
-}
-
-/**
- * معالجة وتوثيق حضور الطالب عبر التحديد الجغرافي الفعلي (GPS Check-In).
- * 
- * المنطق البرمجي والتدفق:
- * 1. التحقق من وجود الحصة المحددة في النظام.
- * 2. التحقق الجغرافي: حساب مسافة الطالب للتأكد من وجوده داخل محيط 150 متر من الكلية.
- * 3. التحقق من الزمان:
- *    - التأكد من مطابقة اليوم الحالي لليوم المجدول للحصة.
- *    - التأكد من أن توقيت التحضير يقع ضمن نافذة زمنية مرنة للمحاضرة (30 دقيقة قبل البدء وحتى 30 دقيقة بعد نهاية المحاضرة).
- * 4. مقارنة توقيت البدء الفعلي: إذا تأخر الطالب بأكثر من 15 دقيقة عن موعد بدء المحاضرة، تسجل الحالة متأخر (LATE)، وإلا فتسجل حاضر (PRESENT).
- * 5. حفظ وحقن البيانات في جدولي الحضور المتكاملين (AttendanceRecord و Attendance) لضمان التوافقية بين النظام التلقائي والتحضير اليدوي للمندوب.
- * 6. بث التحديث عبر قنوات الـ SSE وتنبيه الأنظمة المحيطة.
- * 
- * @param {number} studentId - المعرف الفريد للطالب.
- * @param {number} scheduleId - معرف الجدول الدراسي.
- * @param {number} latitude - خط العرض المكتشف من جهاز الطالب.
- * @param {number} longitude - خط الطول المكتشف من جهاز الطالب.
- * @returns {Promise<Object>} سجل الحضور المحدث أو الذي تم إنشاؤه.
- * @throws {Error} في حال كان الطالب خارج النطاق الجغرافي، أو في توقيت/يوم غير مطابق للحصة.
- */
-async function gpsCheckIn(studentId, scheduleId, latitude, longitude) {
-  const schedule = await prisma.schedule.findUnique({
-    where: { id: parseInt(scheduleId) },
-    include: { subject: true, group: true }
-  });
-
-  if (!schedule) {
-    throw new Error('Schedule not found');
-  }
-
-  const CAMPUS_LAT = 15.35;
-  const CAMPUS_LON = 44.20;
-  const ALLOWED_RADIUS = 150;
-
-  if (latitude === undefined || longitude === undefined) {
-    throw new Error('GPS coordinates (latitude/longitude) are required');
-  }
-
-  const distance = getCoordinateDistance(latitude, longitude, CAMPUS_LAT, CAMPUS_LON);
-  if (distance > ALLOWED_RADIUS) {
-    throw new Error(`أنت خارج النطاق الجغرافي للكلية. مسافتك الحالية: ${Math.round(distance)} متر من الكلية.`);
-  }
-
-  const now = new Date();
-  const DAYS_MAP = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-  const todayDay = DAYS_MAP[now.getDay()];
-
-  if (schedule.dayOfWeek !== todayDay) {
-    throw new Error(`اليوم هو ${todayDay} والمحاضرة مجدولة ليوم ${schedule.dayOfWeek}.`);
-  }
-
-  const [startH, startM] = schedule.startTime.split(':').map(Number);
-  const [endH, endM] = schedule.endTime.split(':').map(Number);
-  const startTotal = startH * 60 + startM;
-  const endTotal = endH * 60 + endM;
-  const nowTotal = now.getHours() * 60 + now.getMinutes();
-
-  // السماح بالتحضير خلال نافذة ممتدة: 30 دقيقة قبل البدء وحتى 30 دقيقة بعد نهاية المحاضرة
-  if (nowTotal < startTotal - 30 || nowTotal > endTotal + 30) {
-    throw new Error(`المحاضرة تبدأ الساعة ${schedule.startTime} وتنتهي الساعة ${schedule.endTime}. الوقت الحالي خارج النطاق المسموح.`);
-  }
-
-  let status = 'PRESENT';
-  if (nowTotal > startTotal + 15) {
-    status = 'LATE';
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // 1) التحديث في جدول AttendanceRecord (الخاص بمسح الـ QR والتحضير التلقائي)
-  const record = await prisma.attendanceRecord.upsert({
-    where: {
-      studentId_scheduleId_date: {
-        studentId: studentId,
-        scheduleId: schedule.id,
-        date: today
-      }
-    },
-    update: {
-      status,
-      scannedAt: new Date()
-    },
-    create: {
-      studentId: studentId,
-      scheduleId: schedule.id,
-      date: today,
-      status,
-      scannedAt: new Date()
-    },
-    include: {
-      student: true
-    }
-  });
-
-  // 2) التحديث في جدول Attendance (الخاص بتحضير المندوب اليدوي لضمان تناغم الجداول)
-  const existingAttendance = await prisma.attendance.findFirst({
-    where: {
-      studentId: studentId,
-      scheduleId: schedule.id,
-      date: today
-    }
-  });
-
-  if (existingAttendance) {
-    await prisma.attendance.update({
-      where: { id: existingAttendance.id },
-      data: {
-        status: status === 'LATE' ? 'PRESENT' : status,
-        recordedById: studentId
-      }
-    });
-  } else {
-    await prisma.attendance.create({
-      data: {
-        studentId: studentId,
-        scheduleId: schedule.id,
-        date: today,
-        status: status === 'LATE' ? 'PRESENT' : status,
-        recordedById: studentId
-      }
-    });
-  }
-
-  broadcastSSE('ATTENDANCE_MARKED', {
-    scheduleId: schedule.id,
-    studentId: studentId,
-    studentName: record.student.name,
-    status: status,
-    scannedAt: new Date()
+    scannedAt: record.date
   });
 
   return record;
@@ -289,7 +151,7 @@ async function gpsCheckIn(studentId, scheduleId, latitude, longitude) {
  * @returns {Promise<Object>} يحتوي على نسب وأعداد الحضور الفعلي، المتأخر، الغائب، والإجمالي.
  */
 async function getAttendanceStatsSummary(studentId) {
-  const records = await prisma.attendanceRecord.findMany({
+  const records = await prisma.attendance.findMany({
     where: { studentId }
   });
 
@@ -297,14 +159,16 @@ async function getAttendanceStatsSummary(studentId) {
   const present = records.filter(r => r.status === 'PRESENT').length;
   const late = records.filter(r => r.status === 'LATE').length;
   const absent = records.filter(r => r.status === 'ABSENT').length;
+  const excused = records.filter(r => r.status === 'EXCUSED').length;
   
-  const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 100;
+  const percentage = total > 0 ? Math.round(((present + late + excused) / total) * 100) : 100;
 
   return {
     percentage,
     present,
     late,
     absent,
+    excused,
     total
   };
 }
@@ -315,7 +179,7 @@ async function getAttendanceStatsSummary(studentId) {
  * المنطق البرمجي:
  * 1. استرجاع جميع سجلات الحضور المسجلة للطالب وربطها بالجدول والمادة.
  * 2. التجميع حسب رمز المادة الفريد (Subject Code).
- * 3. حساب نسبة الحضور (حاضر + معذور) ونسبة الغياب المئوية.
+ * 3. حساب نسبة الحضور (حاضر + متأخر + معذور) ونسبة الغياب المئوية.
  * 4. تطبيق اللائحة الأكاديمية:
  *    - إذا تجاوزت نسبة الغياب 15%، يتم تفعيل علم الإنذار بالحرمان (hasWarning).
  *    - إذا تجاوزت نسبة الغياب 25%، يتم تفعيل علم الحرمان الأكاديمي الفعلي (hasDeprivation).
@@ -345,6 +209,7 @@ async function getAttendanceStatsBySubject(studentId) {
         subjectName: subject.name,
         subjectCode: subject.code,
         presentCount: 0,
+        lateCount: 0,
         absentCount: 0,
         excusedCount: 0,
         totalCount: 0
@@ -354,6 +219,8 @@ async function getAttendanceStatsBySubject(studentId) {
     subjectStats[subject.code].totalCount++;
     if (att.status === 'PRESENT') {
       subjectStats[subject.code].presentCount++;
+    } else if (att.status === 'LATE') {
+      subjectStats[subject.code].lateCount++;
     } else if (att.status === 'ABSENT') {
       subjectStats[subject.code].absentCount++;
     } else if (att.status === 'EXCUSED') {
@@ -362,7 +229,7 @@ async function getAttendanceStatsBySubject(studentId) {
   });
 
   const statsList = Object.values(subjectStats).map(stat => {
-    const presentAndExcused = stat.presentCount + stat.excusedCount;
+    const presentAndExcused = stat.presentCount + stat.lateCount + stat.excusedCount;
     const presentPercent = stat.totalCount > 0 ? Math.round((presentAndExcused / stat.totalCount) * 100) : 100;
     const absenceRate = stat.totalCount > 0 ? (stat.absentCount / stat.totalCount) * 100 : 0;
     
@@ -384,7 +251,7 @@ async function getAttendanceStatsBySubject(studentId) {
 module.exports = {
   getCoordinateDistance,
   scanCheckIn,
-  gpsCheckIn,
+  // gpsCheckIn مُلغاة — الحضور يعتمد على المندوب + QR بدون GPS
   getAttendanceStatsSummary,
   getAttendanceStatsBySubject
 };

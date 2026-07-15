@@ -10,6 +10,21 @@ async function isRep(req, res, next) {
   if (req.user?.role !== 'STUDENT' || !req.user.isRepresentative) {
     return res.status(403).json({ success: false, error: 'Access denied. Representative privileges required.' });
   }
+  
+  // Dynamically fetch groupId from database to prevent stale token issues
+  if (!req.user.groupId) {
+    try {
+      const student = await prisma.student.findUnique({
+        where: { id: req.user.id }
+      });
+      if (student && student.groupId) {
+        req.user.groupId = student.groupId;
+      }
+    } catch (err) {
+      console.error('[isRep] Error fetching student groupId:', err);
+    }
+  }
+
   if (!req.user.groupId) {
     return res.status(400).json({ success: false, error: 'Representative has no assigned group.' });
   }
@@ -475,18 +490,23 @@ router.post('/students/:id/reject', verifyToken, isRep, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Student not found in your cohort.' });
     }
 
+    // SECURITY: Only allow rejecting students who are NOT yet assigned to a group.
+    // Students with a groupId are considered active/verified and CANNOT be deleted by the rep.
+    if (student.groupId) {
+      return res.status(403).json({
+        success: false,
+        error: 'لا يمكنك حذف طالب منضم لمجموعة. يرجى مراجعة الإدارة لإجراء أي تعديلات على الطلاب المُفعَّلين.'
+      });
+    }
+
     // AUDIT CHECK: Prevent hard delete if the student has existing attendance history.
     // This protects data integrity — attendance records are immutable audit trails.
-    const [attendanceRecordCount, attendanceCount] = await Promise.all([
-      prisma.attendanceRecord.count({ where: { studentId } }),
-      prisma.attendance.count({ where: { studentId } })
-    ]);
+    const attendanceCount = await prisma.attendance.count({ where: { studentId } });
 
-    if (attendanceRecordCount > 0 || attendanceCount > 0) {
+    if (attendanceCount > 0) {
       return res.status(400).json({
         success: false,
         error: 'Cannot delete student with attendance history. The student has existing attendance records that must be preserved for audit purposes.',
-        attendanceRecords: attendanceRecordCount,
         attendanceEntries: attendanceCount
       });
     }

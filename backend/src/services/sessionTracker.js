@@ -1,6 +1,7 @@
 const { getSseClients } = require('./notifications');
+const { prisma } = require('../db');
 
-// In-memory data structures
+// In-memory data structures (fallback / runtime telemetry)
 const activityLogs = [];
 const activeAPIUsers = new Map(); // key: "id-role", value: { id, name, email, role, lastActive }
 
@@ -22,16 +23,98 @@ function pushLog(name, email, role, action, details = '') {
   }
 }
 
-function recordLogin(user, role) {
+async function recordLogin(user, role, ipAddress = 'unknown', status = 'SUCCESS', devicePlatform = 'Web/Desktop') {
   if (!user) return;
+  
+  // 1. In-memory
   pushLog(user.name, user.email, role || user.role, 'LOGIN');
   keepAlive(user, role);
+
+  // Parse User-Agent using ua-parser-js
+  const { UAParser } = require('ua-parser-js');
+  let osName = 'Web/Desktop';
+  let browserName = 'Unknown';
+  let userAgentFull = devicePlatform || '';
+  
+  if (devicePlatform && devicePlatform.includes('Mozilla')) {
+    try {
+      const parser = new UAParser(devicePlatform);
+      const parsed = parser.getResult();
+      osName = parsed.os.name || 'Web/Desktop';
+      browserName = parsed.browser.name || 'Unknown';
+    } catch (uaErr) {
+      console.warn('[SessionTracker] UA parse error:', uaErr.message);
+    }
+  } else {
+    if (devicePlatform && ['Android', 'iOS', 'Web'].includes(devicePlatform)) {
+      osName = devicePlatform;
+    }
+  }
+
+  // 2. Database
+  try {
+    const session = await prisma.sessionLog.create({
+      data: {
+        userEmail: user.email || 'unknown',
+        role: role || user.role || 'STUDENT',
+        loginTime: new Date(),
+        logoutTime: null,
+        devicePlatform: devicePlatform ? devicePlatform.substring(0, 200) : 'Web/Desktop',
+        ipAddress: ipAddress || 'unknown',
+        status,
+        isRevoked: false,
+        userAgent: userAgentFull.substring(0, 500),
+        deviceOs: osName,
+        browser: browserName,
+        appVersion: '3.5.0',
+        country: 'YE'
+      }
+    });
+    return session.id;
+  } catch (err) {
+    console.error('[SessionTracker] DB Login log error:', err.message);
+  }
 }
 
-function recordLogout(user, role) {
+async function recordLogout(user, role, ipAddress = 'unknown') {
   if (!user) return;
+
+  // 1. In-memory
   pushLog(user.name, user.email, role || user.role, 'LOGOUT');
   activeAPIUsers.delete(`${user.id}-${role || user.role}`);
+
+  // 2. Database
+  try {
+    const lastSession = await prisma.sessionLog.findFirst({
+      where: { userEmail: user.email, status: 'SUCCESS', logoutTime: null },
+      orderBy: { loginTime: 'desc' }
+    });
+    if (lastSession) {
+      await prisma.sessionLog.update({
+        where: { id: lastSession.id },
+        data: { logoutTime: new Date() }
+      });
+    }
+  } catch (err) {
+    console.error('[SessionTracker] DB Logout log error:', err.message);
+  }
+}
+
+async function recordAuditLog(action, entityType, entityId, userEmail, ipAddress, details) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        action,
+        entityType,
+        entityId: entityId ? parseInt(entityId) : null,
+        userEmail: userEmail || 'system',
+        ipAddress: ipAddress || '127.0.0.1',
+        details: details || {}
+      }
+    });
+  } catch (err) {
+    console.error('[SessionTracker] DB AuditLog error:', err.message);
+  }
 }
 
 function recordImpersonate(adminName, adminEmail, targetName, targetEmail, targetRole) {
@@ -164,7 +247,9 @@ module.exports = {
   recordLogin,
   recordLogout,
   recordImpersonate,
+  recordAuditLog,
   keepAlive,
   getOnlineUsers,
   getActivityLogs
 };
+

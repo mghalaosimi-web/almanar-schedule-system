@@ -13,52 +13,23 @@ router.get('/lecturer/schedule', verifyToken, async (req, res) => {
     if (req.user.role !== 'LECTURER') {
       return res.status(403).json({ success: false, error: 'Forbidden: Lecturer access required' });
     }
-    const { page, limit } = req.query;
-
-    let schedules;
-    if (page && limit) {
-      const p = parseInt(page) || 1;
-      const l = parseInt(limit) || 15;
-      const skip = (p - 1) * l;
-
-      schedules = await prisma.schedule.findMany({
-        where: { lecturerId: req.user.id },
-        include: {
-          subject: true,
-          room: true,
-          group: {
-            include: {
-              major: true,
-              level: true
-            }
-          },
-          overrides: {
-            where: { date: { gte: new Date() } },
-            include: { newRoom: true }
+    const schedules = await prisma.schedule.findMany({
+      where: { lecturerId: req.user.id },
+      include: {
+        subject: true,
+        room: true,
+        group: {
+          include: {
+            major: true,
+            level: true
           }
         },
-        skip,
-        take: l
-      });
-    } else {
-      schedules = await prisma.schedule.findMany({
-        where: { lecturerId: req.user.id },
-        include: {
-          subject: true,
-          room: true,
-          group: {
-            include: {
-              major: true,
-              level: true
-            }
-          },
-          overrides: {
-            where: { date: { gte: new Date() } },
-            include: { newRoom: true }
-          }
+        overrides: {
+          where: { date: { gte: new Date() } },
+          include: { newRoom: true }
         }
-      });
-    }
+      }
+    });
 
     // ── N+1 FIX: batch all "shared class" lookups into ONE query ──────────
     const sigOf = (s) => `${s.dayOfWeek}|${s.startTime}|${s.subjectId}|${s.roomId}|${s.collegeId}`;
@@ -260,8 +231,8 @@ router.get('/lecturer/attendance/report', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Schedule not found or not owned by lecturer' });
     }
 
-    // Fetch existing records for this day
-    const records = await prisma.attendanceRecord.findMany({
+    // Fetch existing records for this day from the unified Attendance table
+    const records = await prisma.attendance.findMany({
       where: {
         scheduleId: schedule.id,
         date: targetDate
@@ -277,7 +248,7 @@ router.get('/lecturer/attendance/report', verifyToken, async (req, res) => {
         idNumber: student.idNumber,
         email: student.email,
         status: record ? record.status : 'ABSENT',
-        scannedAt: record ? record.scannedAt : null
+        scannedAt: record ? record.date : null
       };
     });
 
@@ -344,5 +315,13 @@ router.get('/lecturer/attendance/export/:scheduleId', verifyToken, async (req, r
     res.status(500).json({ success: false, error: 'Failed to export attendance data' });
   }
 });
+
+const lecturerController = require('../controllers/lecturerController');
+
+// GET /api/lecturer/:id - Fetch user-specific data with isolation
+router.get('/lecturer/:id', verifyToken, lecturerController.getLecturerById);
+
+// PUT /api/lecturer/:id - Modify user-specific data with isolation
+router.put('/lecturer/:id', verifyToken, lecturerController.updateLecturerById);
 
 module.exports = router;

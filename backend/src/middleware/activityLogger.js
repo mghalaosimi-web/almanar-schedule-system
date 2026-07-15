@@ -24,6 +24,15 @@ function writeLog(message) {
     const logLine = `${isoString} | [${timestamp}] ${message}\n`;
     fs.appendFileSync(LOGS_FILE, logLine, 'utf8');
     console.log(`[ACTIVITY] ${message}`);
+    
+    // Broadcast via SSE in real-time
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('DEV_ACTIVITY_LOG', {
+        message,
+        timestamp: new Date().toLocaleTimeString('ar-YE', { timeZone: 'Asia/Aden' })
+      });
+    } catch (e) {}
   } catch (err) {
     console.warn('[ACTIVITY LOGGER] Failed to write log:', err.message);
   }

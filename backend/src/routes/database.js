@@ -28,7 +28,7 @@ router.get('/admin/dev/db/tables', verifyToken, requireSuperAdmin, async (req, r
       Schedule: await prisma.schedule.count(),
       ScheduleOverride: await prisma.scheduleOverride.count(),
       ExamSchedule: await prisma.examSchedule.count(),
-      AttendanceRecord: await prisma.attendanceRecord.count(),
+      Attendance: await prisma.attendance.count(),
       Feedback: await prisma.feedback.count(),
       NotificationLog: await prisma.notificationLog.count(),
       VerificationCode: await prisma.verificationCode.count(),
@@ -167,7 +167,7 @@ router.get('/admin/dev/db/diagnostics', verifyToken, requireSuperAdmin, async (r
 
     // Check 4: Orphaned attendance records
     const orphanAttendanceResult = await prisma.$queryRaw`
-      SELECT COUNT(*)::integer as count FROM "AttendanceRecord" 
+      SELECT COUNT(*)::integer as count FROM "Attendance" 
       WHERE "studentId" NOT IN (SELECT id FROM "Student")
     `.catch(() => [{ count: 0 }]);
     const orphanAttendanceCount = parseInt(orphanAttendanceResult[0]?.count || 0);
