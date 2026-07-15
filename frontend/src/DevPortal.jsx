@@ -20,6 +20,7 @@ import ApiRequestInspector  from './components/dev-portal/ApiRequestInspector';
 import DeviceStatsPanel     from './components/dev-portal/DeviceStatsPanel';
 import AIPredictiveInsights from './components/dev-portal/AIPredictiveInsights';
 import SqlTerminal          from './components/dev-portal/SqlTerminal';
+import DbIntegrationMap     from './components/dev-portal/DbIntegrationMap';
 import SelfHealingPatcher   from './components/dev-portal/SelfHealingPatcher';
 
 // ── Mini Stat Card ────────────────────────────────────────────────────────────
@@ -206,6 +207,7 @@ export default function DevPortal() {
     { id: 'alerts',        labelAr: 'بث التنبيهات الفورية',   labelEn: 'Universal Alerts',      icon: '📢' },
     { id: 'crud',          labelAr: 'التحكم الشامل بالكيانات', labelEn: 'Master Entity CRUD',    icon: '⚙️' },
     { id: 'branding',      labelAr: 'المستأجرين والعلامة',    labelEn: 'Tenants & Branding',    icon: '🏛️' },
+    { id: 'db-map',        labelAr: 'خريطة الربط وقواعد البيانات', labelEn: 'Database Integration Map', icon: '🗺️' },
     { id: 'impersonation', labelAr: 'محاكاة الحسابات',        labelEn: 'God Impersonator',      icon: '🚀' },
     { id: 'insights',      labelAr: 'مستشار التنبؤ الذكي',    labelEn: 'AI Operations Insights', icon: '🤖' },
     { id: 'patcher',       labelAr: 'الشفاء الذاتي بـ AI',     labelEn: 'AI Self-Healing Patcher', icon: '🩺' },
@@ -502,6 +504,11 @@ export default function DevPortal() {
               {/* ── Tab: Tenants ── */}
               {activeTab === 'branding' && (
                 <TenantsManager API_URL={API_URL} token={token} isAr={isAr} />
+              )}
+
+              {/* ── Tab: Database Integration Map ── */}
+              {activeTab === 'db-map' && (
+                <DbIntegrationMap API_URL={API_URL} token={token} isAr={isAr} />
               )}
 
               {/* ── Tab: Impersonation ── */}
