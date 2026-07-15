@@ -722,7 +722,7 @@ function AppLayout() {
           <div className="flex items-center gap-3 min-w-0 flex-1 md:flex-none">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`h-12 w-12 flex items-center justify-center ${isAr ? '-mr-2 ml-1' : '-ml-2 mr-1'} text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-xl`}
+              className={`h-12 w-12 flex md:hidden items-center justify-center ${isAr ? '-mr-2 ml-1' : '-ml-2 mr-1'} text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-xl`}
               aria-label="Toggle Menu"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

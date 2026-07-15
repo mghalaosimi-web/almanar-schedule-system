@@ -47,7 +47,7 @@ try {
 // 4. Seed database with initial data (safe: seed script skips if data exists)
 console.log('[BUILD] Running database seed...');
 try {
-  execSync('node backend/prisma/seed.js', { stdio: 'inherit' });
+  execSync('cd backend && node prisma/seed.js', { stdio: 'inherit' });
   console.log('[BUILD] Database seed completed.');
 } catch (error) {
   console.warn('[BUILD] Seed warning (non-fatal):', error.message);

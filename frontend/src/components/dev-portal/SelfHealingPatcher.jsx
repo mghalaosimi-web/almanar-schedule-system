@@ -170,7 +170,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                 {isAr ? 'جاري تحميل سجل الأخطاء...' : 'Loading patch queue...'}
               </div>
             ) : pendingPatches.length === 0 ? (
-              <div className="py-12 text-center text-slate-600 text-xs italic">
+              <div className="py-12 text-center text-slate-650 text-xs italic">
                 {isAr ? 'لا توجد أخطاء معلقة بانتظار الإصلاح حالياً 🎉' : 'No pending errors found! All systems stable 🎉'}
               </div>
             ) : (
@@ -214,17 +214,17 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                 <div className="text-center text-slate-650 py-4 italic">{isAr ? 'الأرشيف فارغ' : 'Archive empty'}</div>
               ) : (
                 [...resolvedPatches, ...dismissedPatches].map(p => (
-                  <div key={p.id} className="flex justify-between items-center py-2 border-b border-slate-800/40">
+                  <div key={p.id} className="flex justify-between items-center py-2 border-b border-slate-800/40 font-sans">
                     <div className="truncate pr-2">
-                      <span className="font-bold text-slate-300">{p.fileBasename}</span>
-                      <span className="text-slate-550 block font-mono text-[8px]">{p.errorMessage.substring(0, 35)}...</span>
+                      <span className="font-bold text-slate-350 block truncate">{p.fileBasename}</span>
+                      <span className="text-slate-550 block font-mono text-[8px] truncate">{p.errorMessage}</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 ${
                       p.status === 'APPROVED' 
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : 'bg-slate-800 text-slate-450'
                     }`}>
-                      {p.status === 'APPROVED' ? 'PATHECHED' : 'DISMISSED'}
+                      {p.status === 'APPROVED' ? 'PATCHED' : 'DISMISSED'}
                     </span>
                   </div>
                 ))
@@ -269,25 +269,25 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                 </div>
 
                 {/* Error Box */}
-                <div className="bg-red-500/10 border border-red-500/25 p-4 rounded-xl font-mono text-[10px] text-red-400 space-y-2 max-h-40 overflow-y-auto">
+                <div className="bg-red-500/10 border border-red-500/25 p-4 rounded-xl font-mono text-[10px] text-red-400 space-y-2 max-h-40 overflow-y-auto text-left">
                   <div className="font-bold text-[11px]">{selectedPatch.errorName}: {selectedPatch.errorMessage}</div>
                   <pre className="whitespace-pre-wrap leading-relaxed text-[9px] text-red-300/80">{selectedPatch.errorStack}</pre>
                 </div>
 
                 {/* AI Explanation Banner */}
-                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-2">
+                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-2 text-left">
                   <div className="flex items-center gap-2 text-purple-400 text-xs font-bold">
                     <span>🤖</span>
                     <span>{isAr ? 'تفسير Gemini AI وإصلاح المقترح:' : 'Gemini AI Explanation & Repair:'}</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                  <p className="text-[11px] text-slate-350 leading-relaxed font-medium">
                     {isAr ? selectedPatch.explanationAr : selectedPatch.explanationEn}
                   </p>
                 </div>
 
                 {/* Split Code View / Diff Simulator */}
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-left">
                     {isAr ? 'الكود المصلح المقترح (Proposed Repair):' : 'Proposed Code Repair:'}
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -299,7 +299,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                       <textarea
                         readOnly
                         value={selectedPatch.originalCode}
-                        className="bg-slate-950/80 border border-slate-900 focus:outline-none rounded-b-xl p-4 font-mono text-[9px] text-slate-500 h-60 w-full overflow-auto whitespace-pre leading-relaxed select-none"
+                        className="bg-slate-950/80 border border-slate-900 focus:outline-none rounded-b-xl p-4 font-mono text-[9px] text-slate-500 h-60 w-full overflow-auto whitespace-pre leading-relaxed select-none text-left"
                       />
                     </div>
 
@@ -311,7 +311,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                       <textarea
                         readOnly
                         value={selectedPatch.proposedCode}
-                        className="bg-slate-950/80 border border-emerald-900/20 focus:outline-none rounded-b-xl p-4 font-mono text-[9px] text-emerald-400 h-60 w-full overflow-auto whitespace-pre leading-relaxed select-none"
+                        className="bg-slate-950/80 border border-emerald-900/20 focus:outline-none rounded-b-xl p-4 font-mono text-[9px] text-emerald-450 h-60 w-full overflow-auto whitespace-pre leading-relaxed select-none text-left"
                       />
                     </div>
                   </div>
@@ -322,7 +322,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                   <button
                     onClick={() => handleDismiss(selectedPatch.id)}
                     disabled={actioningPatch === selectedPatch.id}
-                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-350 text-xs font-bold rounded-xl transition"
+                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-350 text-xs font-bold rounded-xl transition cursor-pointer"
                   >
                     {isAr ? 'استبعاد 🗑️' : 'Dismiss 🗑️'}
                   </button>
@@ -330,7 +330,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
                   <button
                     onClick={() => handleApprove(selectedPatch.id)}
                     disabled={actioningPatch === selectedPatch.id}
-                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 border border-emerald-500/20"
+                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 border border-emerald-500/20 cursor-pointer"
                   >
                     {actioningPatch === selectedPatch.id ? (
                       <>
