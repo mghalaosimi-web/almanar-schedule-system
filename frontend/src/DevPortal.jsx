@@ -158,6 +158,7 @@ export default function DevPortal() {
       googleId: targetUser.googleId || 'impersonated',
       groupId: targetUser.groupId,
       collegeId: targetUser.collegeId,
+      isRepresentative: targetUser.isRepresentative,
       universityId: targetUser.universityId,
       collegeName: targetUser.collegeName,
       universityName: targetUser.universityName,
@@ -174,7 +175,11 @@ export default function DevPortal() {
         department: targetUser.groupName || targetUser.major?.name || '',
         groupId: targetUser.groupId
       }));
-      window.location.href = '/student/home';
+      if (userToSave.isRepresentative) {
+        window.location.href = '/student/representative';
+      } else {
+        window.location.href = '/student/home';
+      }
     } else if (role === 'LECTURER') {
       window.location.href = '/lecturer/home';
     } else {

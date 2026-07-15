@@ -1264,6 +1264,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
           role: 'STUDENT', 
           groupId: student.groupId,
           collegeId: student.collegeId,
+          isRepresentative: student.isRepresentative,
           googleId: student.googleId || 'impersonated'
         },
         JWT_SECRET,
@@ -1281,6 +1282,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
           groupId: student.groupId,
           groupName: student.group ? student.group.name : '',
           collegeId: student.collegeId,
+          isRepresentative: student.isRepresentative,
           googleId: student.googleId || 'impersonated'
         }
       });

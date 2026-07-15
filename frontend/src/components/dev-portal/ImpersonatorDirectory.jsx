@@ -108,6 +108,11 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
                     }`}>
                       {user.type}
                     </span>
+                    {user.isRepresentative && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {isAr ? 'مندوب' : 'Representative'}
+                      </span>
+                    )}
                   </h4>
                   <span className="text-[10px] text-slate-500 font-mono block mt-1">{user.email}</span>
                 </div>
