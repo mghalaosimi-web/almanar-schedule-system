@@ -55,12 +55,7 @@ try {
 
 // 5. Construct VITE_API_URL if needed
 if (!process.env.VITE_API_URL) {
-  if (process.env.RENDER_EXTERNAL_URL) {
-    process.env.VITE_API_URL = `${process.env.RENDER_EXTERNAL_URL}/api`;
-    console.log(`[BUILD] Constructing VITE_API_URL from RENDER_EXTERNAL_URL: ${process.env.VITE_API_URL}`);
-  } else {
-    console.log('[BUILD] No VITE_API_URL or RENDER_EXTERNAL_URL provided. Frontend will resolve API endpoint dynamically in the browser.');
-  }
+  console.log('[BUILD] No VITE_API_URL provided. Frontend will resolve API endpoint dynamically at runtime in the browser.');
 } else {
   console.log(`[BUILD] Using provided VITE_API_URL: ${process.env.VITE_API_URL}`);
 }
