@@ -126,6 +126,15 @@ if (!global.prisma) {
       return new Proxy((currentTarget && currentTarget[prop]) || {}, {
         get(modelTarget, action) {
           if (typeof action !== 'string') return modelTarget[action];
+          if (typeof modelTarget[action] !== 'function') {
+            return async function (...args) {
+              if (global.isOfflineMode && !activeTenantClient) {
+                return fallbackEngine.execute(prop, action, args[0]);
+              }
+              console.warn(`[DATABASE] Method ${prop}.${action} is not a function.`);
+              return undefined;
+            };
+          }
           return async function (...args) {
             if (global.isOfflineMode && !activeTenantClient) {
               return fallbackEngine.execute(prop, action, args[0]);

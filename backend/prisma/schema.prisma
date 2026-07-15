@@ -234,19 +234,26 @@ model ScheduleOverride {
 }
 
 model NotificationLog {
-  id        Int                @id @default(autoincrement())
-  studentId Int?
-  student   Student?           @relation(fields: [studentId], references: [id])
-  groupId   Int?
-  group     Group?             @relation(fields: [groupId], references: [id])
-  message   String
-  sentTime  DateTime           @default(now())
-  status    NotificationStatus
+  id           Int                @id @default(autoincrement())
+  studentId    Int?
+  student      Student?           @relation(fields: [studentId], references: [id])
+  groupId      Int?
+  group        Group?             @relation(fields: [groupId], references: [id])
+  title        String?            // عنوان الإشعار
+  message      String
+  sentTime     DateTime           @default(now())
+  deliveredAt  DateTime?          // وقت استلام الجهاز للإشعار
+  readAt       DateTime?          // وقت فتح الطالب للإشعار
+  deviceToken  String?            // رمز الجهاز المستقبِل
+  platform     String?            // Android / iOS / Web
+  status       NotificationStatus
 
   @@index([studentId])
   @@index([groupId])
   @@index([sentTime])
+  @@index([status])
 }
+
 
 enum AdminRole {
   SUPER_ADMIN
@@ -369,6 +376,7 @@ model University {
   slug          String        @unique
   logoUrl       String?
   themeColor    String?
+  sortIndex     Int           @default(0)
   colleges      College[]
   governorateId String?
   governorate   Governorate?  @relation(fields: [governorateId], references: [id])
@@ -381,6 +389,7 @@ model College {
   name          String
   slug          String         @unique
   location      String?
+  sortIndex     Int            @default(0)
   universityId  Int
   university    University     @relation(fields: [universityId], references: [id])
   departments   Department[]
@@ -425,22 +434,28 @@ model GroupResource {
 }
 
 model TenantConfig {
-  id           Int         @id @default(autoincrement())
-  universityId Int?        @unique
-  university   University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  collegeId    Int?        @unique
-  college      College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  id                  String      @id @default(uuid())
+  universityId        Int?        @unique
+  university          University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  collegeId           Int?        @unique
+  college             College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
   
   // Customization & Branding
-  themeColor   String?     // Hex color
-  logoUrl      String?     // Custom logo url
-  customDomain String?     // Custom subdomain/domain
+  themeColor          String?     // Hex color
+  logoUrl             String?     // Custom logo url
+  customDomain        String?     // Custom subdomain/domain
+  databaseUrl         String?     // Encrypted connection string (PostgreSQL URI)
+  
+  // Licensing & Dynamic DB Integration
+  whitelabelKey       String?     @unique // Secure generated hash for licensing
+  databaseUrlOverride String?     // Direct connection string override for tenant
+  isLicenseActive     Boolean     @default(true) // Global kill-switch for this tenant
   
   // Feature Flags
-  enabledFeatures Json     @default("{}") // JSON config: {"qrAttendance": true, etc.}
+  enabledFeatures     Json        @default("{}") // JSON config: {"qrAttendance": true, etc.}
   
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 }
 
 enum PostCategory {
@@ -490,4 +505,61 @@ model Feedback {
 
   @@index([studentId])
 }
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  entityType String
+  entityId   Int?
+  userEmail  String
+  ipAddress  String
+  timestamp  DateTime @default(now())
+  details    Json
+
+  @@index([timestamp])
+  @@index([userEmail])
+}
+
+model SessionLog {
+  id             Int       @id @default(autoincrement())
+  userEmail      String
+  role           String
+  loginTime      DateTime  @default(now())
+  logoutTime     DateTime?
+  devicePlatform String?
+  ipAddress      String
+  status         String
+  isRevoked      Boolean   @default(false)
+  userAgent      String?
+  deviceOs       String?
+  browser        String?
+  appVersion     String?
+  country        String?
+
+  @@index([userEmail])
+  @@index([loginTime])
+}
+
+model InsightLog {
+  id          Int      @id @default(autoincrement())
+  generatedAt DateTime @default(now())
+  category    String
+  severity    String
+  title       String
+  body        String   @db.Text
+  data        Json?
+
+  @@index([generatedAt])
+}
+
+model BlockedIP {
+  id        Int      @id @default(autoincrement())
+  ip        String   @unique
+  reason    String?
+  blockedAt DateTime @default(now())
+
+  @@index([ip])
+}
+
+
 
