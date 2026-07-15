@@ -84,7 +84,7 @@ async function isSuperAdmin(req, res, next) {
     const admin = await prisma.admin.findUnique({
       where: { id: req.user.id }
     });
-    if (!admin || admin.email !== 'developer@mghal.com') {
+    if (!admin || (admin.email !== 'developer@mghal.com' && admin.email !== 'm.gh.alosimi@gmail.com')) {
       return res.status(403).json({ success: false, error: 'Forbidden: Restricted to developer only' });
     }
     next();

@@ -128,7 +128,8 @@ export default function TenantsManager({ API_URL, token, onImpersonate, isAr }) 
         fetchTenants();
       }
     } catch (err) {
-      toast.error(isAr ? 'فشل إنشاء المفتاح' : 'Failed to generate key');
+      const msg = err.response?.data?.error || (isAr ? 'فشل إنشاء المفتاح' : 'Failed to generate key');
+      toast.error(msg);
     }
   };
 
