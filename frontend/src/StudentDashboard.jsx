@@ -545,6 +545,98 @@ export default function StudentDashboard() {
     };
   }, []);
 
+  // Live exchange synchronization via SSE events
+  useEffect(() => {
+    const handlePostCreated = (e) => {
+      const { groupId, post } = e.detail;
+      const userJson = localStorage.getItem('manar_user');
+      let currentUser = null;
+      try { currentUser = JSON.parse(userJson); } catch {}
+      if (currentUser && currentUser.groupId === groupId) {
+        setPosts(prev => {
+          if (prev.some(p => p.id === post.id)) return prev;
+          return [post, ...prev];
+        });
+      }
+    };
+
+    const handlePostDeleted = (e) => {
+      const { groupId, postId } = e.detail;
+      const userJson = localStorage.getItem('manar_user');
+      let currentUser = null;
+      try { currentUser = JSON.parse(userJson); } catch {}
+      if (currentUser && currentUser.groupId === groupId) {
+        setPosts(prev => prev.filter(p => p.id !== postId));
+        setSelectedPost(prev => prev && prev.id === postId ? null : prev);
+      }
+    };
+
+    const handleCommentCreated = (e) => {
+      const { groupId, postId, comment } = e.detail;
+      const userJson = localStorage.getItem('manar_user');
+      let currentUser = null;
+      try { currentUser = JSON.parse(userJson); } catch {}
+      if (currentUser && currentUser.groupId === groupId) {
+        // Update posts list comments count
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            const count = (p._count?.comments || 0) + 1;
+            return { ...p, _count: { ...p._count, comments: count } };
+          }
+          return p;
+        }));
+        // Update selected post comments list
+        setSelectedPost(prev => {
+          if (prev && prev.id === postId) {
+            const comments = prev.comments || [];
+            if (comments.some(c => c.id === comment.id)) return prev;
+            return { ...prev, comments: [...comments, comment] };
+          }
+          return prev;
+        });
+      }
+    };
+
+    const handleCommentDeleted = (e) => {
+      const { groupId, postId, commentId } = e.detail;
+      const userJson = localStorage.getItem('manar_user');
+      let currentUser = null;
+      try { currentUser = JSON.parse(userJson); } catch {}
+      if (currentUser && currentUser.groupId === groupId) {
+        // Update posts list comments count
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            const count = Math.max(0, (p._count?.comments || 0) - 1);
+            return { ...p, _count: { ...p._count, comments: count } };
+          }
+          return p;
+        }));
+        // Update selected post comments list
+        setSelectedPost(prev => {
+          if (prev && prev.id === postId) {
+            return {
+              ...prev,
+              comments: (prev.comments || []).filter(c => c.id !== commentId)
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
+    window.addEventListener('MANAR_EXCHANGE_POST_CREATED', handlePostCreated);
+    window.addEventListener('MANAR_EXCHANGE_POST_DELETED', handlePostDeleted);
+    window.addEventListener('MANAR_EXCHANGE_COMMENT_CREATED', handleCommentCreated);
+    window.addEventListener('MANAR_EXCHANGE_COMMENT_DELETED', handleCommentDeleted);
+
+    return () => {
+      window.removeEventListener('MANAR_EXCHANGE_POST_CREATED', handlePostCreated);
+      window.removeEventListener('MANAR_EXCHANGE_POST_DELETED', handlePostDeleted);
+      window.removeEventListener('MANAR_EXCHANGE_COMMENT_CREATED', handleCommentCreated);
+      window.removeEventListener('MANAR_EXCHANGE_COMMENT_DELETED', handleCommentDeleted);
+    };
+  }, []);
+
   // إعادة جدولة المنبهات المحلية عند تبدل قائمة الجداول
   useEffect(() => {
     if (schedules && schedules.length > 0) {

@@ -93,6 +93,14 @@ router.post('/posts', verifyToken, async (req, res) => {
     });
 
     res.status(201).json({ success: true, data: post });
+    
+    // Broadcast via SSE for real-time updates
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_POST_CREATED', { groupId: student.groupId, post });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast post creation:', e.message);
+    }
   } catch (error) {
     console.error('[API] Error creating exchange post:', error);
     res.status(500).json({ success: false, error: 'Failed to create exchange post' });
@@ -213,6 +221,14 @@ router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
     });
 
     res.status(201).json({ success: true, data: comment });
+
+    // Broadcast via SSE for real-time updates
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_COMMENT_CREATED', { groupId: student.groupId, postId, comment });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast comment creation:', e.message);
+    }
   } catch (error) {
     console.error('[API] Error posting exchange comment:', error);
     res.status(500).json({ success: false, error: 'Failed to post comment' });
@@ -246,6 +262,14 @@ router.delete('/posts/:postId', verifyToken, async (req, res) => {
     });
 
     res.status(200).json({ success: true, message: 'Post deleted successfully.' });
+
+    // Broadcast via SSE for real-time updates
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_POST_DELETED', { groupId: post.groupId, postId });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast post deletion:', e.message);
+    }
   } catch (error) {
     console.error('[API] Error deleting post:', error);
     res.status(500).json({ success: false, error: 'Failed to delete post' });
@@ -262,7 +286,8 @@ router.delete('/comments/:commentId', verifyToken, async (req, res) => {
     const { commentId } = req.params;
 
     const comment = await prisma.exchangeComment.findUnique({
-      where: { id: commentId }
+      where: { id: commentId },
+      include: { post: true }
     });
 
     if (!comment) {
@@ -279,6 +304,14 @@ router.delete('/comments/:commentId', verifyToken, async (req, res) => {
     });
 
     res.status(200).json({ success: true, message: 'Comment deleted successfully.' });
+
+    // Broadcast via SSE for real-time updates
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_COMMENT_DELETED', { groupId: comment.post.groupId, postId: comment.postId, commentId });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast comment deletion:', e.message);
+    }
   } catch (error) {
     console.error('[API] Error deleting comment:', error);
     res.status(500).json({ success: false, error: 'Failed to delete comment' });

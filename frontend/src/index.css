@@ -393,12 +393,15 @@ input, button, select, textarea {
   .bg-zinc-900,
   .bg-zinc-950,
   .bg-neutral-900,
-  .bg-neutral-950 {
+  .bg-neutral-950,
+  .bg-slate-955,
+  .bg-gray-955 {
     background-color: var(--bg-card) !important;
   }
 
-  .bg-gray-955 {
-    background-color: var(--bg-card) !important;
+  .text-slate-955,
+  .text-gray-955 {
+    color: #05070f !important;
   }
 
   .bg-gray-950 {
@@ -426,7 +429,10 @@ input, button, select, textarea {
   .bg-gray-900\/30,
   .bg-gray-900\/60,
   .bg-gray-955\/50,
-  .bg-gray-955\/60 {
+  .bg-gray-955\/60,
+  .bg-slate-955\/80,
+  .bg-slate-955\/60,
+  .bg-slate-955\/50 {
     background-color: var(--bg-card) !important;
     backdrop-filter: none !important;
   }

@@ -536,6 +536,14 @@ function AppLayout() {
               }
             }
           }
+        } else if (payload.type === 'EXCHANGE_POST_CREATED') {
+          window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_POST_CREATED', { detail: payload.data }));
+        } else if (payload.type === 'EXCHANGE_POST_DELETED') {
+          window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_POST_DELETED', { detail: payload.data }));
+        } else if (payload.type === 'EXCHANGE_COMMENT_CREATED') {
+          window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_COMMENT_CREATED', { detail: payload.data }));
+        } else if (payload.type === 'EXCHANGE_COMMENT_DELETED') {
+          window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_COMMENT_DELETED', { detail: payload.data }));
         }
       } catch (err) {
         console.error('[SSE] Error processing incoming event:', err);
