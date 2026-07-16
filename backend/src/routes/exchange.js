@@ -38,7 +38,31 @@ router.get('/posts', verifyToken, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.status(200).json({ success: true, data: posts });
+    const mappedPosts = posts.map(post => {
+      const isMine = post.studentId === req.user.id;
+      return {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        category: post.category,
+        groupId: post.groupId,
+        studentId: post.isAnonymous ? null : post.studentId,
+        isAnonymous: post.isAnonymous,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        _count: post._count,
+        isMine,
+        student: post.isAnonymous ? {
+          id: null,
+          name: 'Anonymous',
+          idPhotoUrl: null,
+          isRepresentative: false,
+          isAnonymous: true
+        } : post.student
+      };
+    });
+
+    res.status(200).json({ success: true, data: mappedPosts });
   } catch (error) {
     console.error('[API] Error fetching exchange posts:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch exchange posts' });
@@ -52,7 +76,7 @@ router.post('/posts', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Access denied. Student account required.' });
     }
 
-    const { title, content, category } = req.body;
+    const { title, content, category, isAnonymous } = req.body;
     if (!title || !content) {
       return res.status(400).json({ success: false, error: 'Title and content are required' });
     }
@@ -75,7 +99,8 @@ router.post('/posts', verifyToken, async (req, res) => {
         content: content.trim(),
         category: postCategory,
         groupId: student.groupId,
-        studentId: student.id
+        studentId: student.id,
+        isAnonymous: !!isAnonymous
       },
       include: {
         student: {
@@ -92,7 +117,28 @@ router.post('/posts', verifyToken, async (req, res) => {
       }
     });
 
-    res.status(201).json({ success: true, data: post });
+    const responseData = {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      category: post.category,
+      groupId: post.groupId,
+      studentId: post.isAnonymous ? null : post.studentId,
+      isAnonymous: post.isAnonymous,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      _count: post._count,
+      isMine: true,
+      student: post.isAnonymous ? {
+        id: null,
+        name: 'Anonymous',
+        idPhotoUrl: null,
+        isRepresentative: false,
+        isAnonymous: true
+      } : post.student
+    };
+
+    res.status(201).json({ success: true, data: responseData });
     
     // Broadcast via SSE for real-time updates
     try {
@@ -160,7 +206,47 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden. This post belongs to another group.' });
     }
 
-    res.status(200).json({ success: true, data: post });
+    const isPostMine = post.studentId === req.user.id;
+    const mappedPost = {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      category: post.category,
+      groupId: post.groupId,
+      studentId: post.isAnonymous ? null : post.studentId,
+      isAnonymous: post.isAnonymous,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      isMine: isPostMine,
+      student: post.isAnonymous ? {
+        id: null,
+        name: 'Anonymous',
+        idPhotoUrl: null,
+        isRepresentative: false,
+        isAnonymous: true
+      } : post.student,
+      comments: (post.comments || []).map(comment => {
+        const isCommentMine = comment.studentId === req.user.id;
+        return {
+          id: comment.id,
+          postId: comment.postId,
+          content: comment.content,
+          createdAt: comment.createdAt,
+          isAnonymous: comment.isAnonymous,
+          isMine: isCommentMine,
+          studentId: comment.isAnonymous ? null : comment.studentId,
+          student: comment.isAnonymous ? {
+            id: null,
+            name: 'Anonymous',
+            idPhotoUrl: null,
+            isRepresentative: false,
+            isAnonymous: true
+          } : comment.student
+        };
+      })
+    };
+
+    res.status(200).json({ success: true, data: mappedPost });
   } catch (error) {
     console.error('[API] Error fetching single post:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch post details' });
@@ -175,7 +261,7 @@ router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
     }
 
     const { postId } = req.params;
-    const { content } = req.body;
+    const { content, isAnonymous } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, error: 'Comment content cannot be empty.' });
@@ -206,7 +292,8 @@ router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
       data: {
         content: content.trim(),
         postId,
-        studentId: student.id
+        studentId: student.id,
+        isAnonymous: !!isAnonymous
       },
       include: {
         student: {
@@ -220,7 +307,24 @@ router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
       }
     });
 
-    res.status(201).json({ success: true, data: comment });
+    const responseData = {
+      id: comment.id,
+      postId: comment.postId,
+      content: comment.content,
+      createdAt: comment.createdAt,
+      isAnonymous: comment.isAnonymous,
+      studentId: comment.isAnonymous ? null : comment.studentId,
+      isMine: true,
+      student: comment.isAnonymous ? {
+        id: null,
+        name: 'Anonymous',
+        idPhotoUrl: null,
+        isRepresentative: false,
+        isAnonymous: true
+      } : comment.student
+    };
+
+    res.status(201).json({ success: true, data: responseData });
 
     // Broadcast via SSE for real-time updates
     try {

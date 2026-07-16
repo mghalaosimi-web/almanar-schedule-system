@@ -486,6 +486,35 @@ function AppLayout() {
               style: { border: '1px solid #60c4ff' }
             });
             window.dispatchEvent(new CustomEvent('MANAR_BROADCAST_RECEIVE'));
+
+            if (payload.data.broadcastId && currentUser?.role === 'STUDENT') {
+              axios.post(`${API_URL}/api/notifications/mark-delivered`, {
+                broadcastId: payload.data.broadcastId
+              }, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+              }).catch(e => console.warn('[App] Failed to mark broadcast delivered:', e.message));
+            }
+          }
+        } else if (payload.type === 'NEW_NOTIFICATION') {
+          const userJson = localStorage.getItem('manar_user');
+          let currentUser = null;
+          try { currentUser = JSON.parse(userJson); } catch {}
+
+          if (currentUser && currentUser.id === payload.data.studentId) {
+            toast(payload.data.message, {
+              icon: '📢',
+              duration: 8000,
+              style: { border: '1px solid #a855f7' }
+            });
+            window.dispatchEvent(new CustomEvent('MANAR_BROADCAST_RECEIVE'));
+
+            if (payload.data.broadcastId) {
+              axios.post(`${API_URL}/api/notifications/mark-delivered`, {
+                broadcastId: payload.data.broadcastId
+              }, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+              }).catch(e => console.warn('[App] Failed to mark admin notification delivered:', e.message));
+            }
           }
         } else if (payload.type === 'ATTENDANCE_RECORDED') {
           const userJson = localStorage.getItem('manar_user');

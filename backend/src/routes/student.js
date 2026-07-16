@@ -464,8 +464,11 @@ router.get('/notifications/student', verifyToken, async (req, res) => {
     const logs = await prisma.notificationLog.findMany({
       where: {
         OR: [
-          { groupId: req.user.groupId },
-          { groupId: null }
+          { studentId: req.user.id },
+          {
+            groupId: req.user.groupId,
+            studentId: null
+          }
         ]
       },
       include: {
@@ -480,6 +483,74 @@ router.get('/notifications/student', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Error fetching student notifications:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch student notifications' });
+  }
+});
+
+// 14a. POST mark student notifications as delivered
+router.post('/notifications/mark-delivered', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { logIds, broadcastId } = req.body;
+    
+    let whereClause = {
+      studentId: req.user.id,
+      deliveredAt: null
+    };
+
+    if (broadcastId) {
+      whereClause.broadcastId = broadcastId;
+    } else if (logIds && Array.isArray(logIds)) {
+      whereClause.id = { in: logIds.map(id => parseInt(id)) };
+    }
+
+    await prisma.notificationLog.updateMany({
+      where: whereClause,
+      data: {
+        deliveredAt: new Date()
+      }
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[API] Error marking notifications delivered:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notifications delivered' });
+  }
+});
+
+// 14b. POST mark student notifications as read
+router.post('/notifications/mark-read', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { logIds, broadcastId } = req.body;
+    
+    let whereClause = {
+      studentId: req.user.id,
+      readAt: null
+    };
+
+    if (broadcastId) {
+      whereClause.broadcastId = broadcastId;
+    } else if (logIds && Array.isArray(logIds)) {
+      whereClause.id = { in: logIds.map(id => parseInt(id)) };
+    }
+
+    const now = new Date();
+    await prisma.notificationLog.updateMany({
+      where: whereClause,
+      data: {
+        readAt: now,
+        deliveredAt: now
+      }
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[API] Error marking notifications read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notifications read' });
   }
 });
 

@@ -38,13 +38,16 @@ export default function ExchangeHubTab({
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('GENERAL');
+  const [newPostIsAnonymous, setNewPostIsAnonymous] = useState(false);
 
   // Comment Form States
   const [newCommentText, setNewCommentText] = useState('');
+  const [newCommentIsAnonymous, setNewCommentIsAnonymous] = useState(false);
 
   // Group Chat Input States
   const [chatInput, setChatInput] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
+  const [chatIsAnonymous, setChatIsAnonymous] = useState(false);
 
   const chatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -99,7 +102,8 @@ export default function ExchangeHubTab({
       const success = await handleCreatePost(
         `chat_${Date.now()}`,
         chatInput.trim(),
-        'GENERAL'
+        'GENERAL',
+        chatIsAnonymous
       );
       if (success) {
         setChatInput('');
@@ -130,21 +134,23 @@ export default function ExchangeHubTab({
   const onCreatePostSubmit = async (e) => {
     e.preventDefault();
     if (!newPostTitle.trim() || !newPostContent.trim()) return;
-    const success = await handleCreatePost(newPostTitle, newPostContent, newPostCategory);
+    const success = await handleCreatePost(newPostTitle, newPostContent, newPostCategory, newPostIsAnonymous);
     if (success) {
       setIsNewPostModalOpen(false);
       setNewPostTitle('');
       setNewPostContent('');
       setNewPostCategory('GENERAL');
+      setNewPostIsAnonymous(false);
     }
   };
 
   const onCreateCommentSubmit = async (e) => {
     e.preventDefault();
     if (!newCommentText.trim()) return;
-    const success = await handleCreateComment(newCommentText);
+    const success = await handleCreateComment(newCommentText, newCommentIsAnonymous);
     if (success) {
       setNewCommentText('');
+      setNewCommentIsAnonymous(false);
     }
   };
 
@@ -167,7 +173,11 @@ export default function ExchangeHubTab({
         >
           <div className="flex justify-between items-start gap-3">
             <div className="flex items-center gap-3">
-              {selectedPost.student?.idPhotoUrl ? (
+              {selectedPost.student?.isAnonymous ? (
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shrink-0">
+                  🕵️
+                </div>
+              ) : selectedPost.student?.idPhotoUrl ? (
                 <img
                   src={selectedPost.student.idPhotoUrl}
                   alt={selectedPost.student.name}
@@ -180,8 +190,10 @@ export default function ExchangeHubTab({
               )}
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black text-white">{selectedPost.student?.name}</span>
-                  {selectedPost.student?.isRepresentative && (
+                  <span className="text-xs font-black text-white">
+                    {selectedPost.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : selectedPost.student?.name}
+                  </span>
+                  {!selectedPost.student?.isAnonymous && selectedPost.student?.isRepresentative && (
                     <span className="text-[8px] font-black uppercase bg-[#00f59b]/10 border border-[#00f59b]/25 text-[#00f59b] px-1.5 py-0.5 rounded">
                       {isAr ? 'مندوب' : 'Rep'}
                     </span>
@@ -197,7 +209,7 @@ export default function ExchangeHubTab({
               <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${getCategoryBadgeClass(selectedPost.category)}`}>
                 {getCategoryLabel(selectedPost.category)}
               </span>
-              {selectedPost.student?.id === currentStudentId && (
+              {selectedPost.isMine && (
                 <button
                   onClick={() => handleDeletePost(selectedPost.id)}
                   className="p-1.5 rounded bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 text-xs transition-colors"
@@ -232,7 +244,11 @@ export default function ExchangeHubTab({
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex items-center gap-2.5">
-                      {comment.student?.idPhotoUrl ? (
+                      {comment.student?.isAnonymous ? (
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0">
+                          🕵️
+                        </div>
+                      ) : comment.student?.idPhotoUrl ? (
                         <img
                           src={comment.student.idPhotoUrl}
                           alt={comment.student.name}
@@ -245,8 +261,10 @@ export default function ExchangeHubTab({
                       )}
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-extrabold text-white">{comment.student?.name}</span>
-                          {comment.student?.isRepresentative && (
+                          <span className="text-xs font-extrabold text-white">
+                            {comment.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : comment.student?.name}
+                          </span>
+                          {!comment.student?.isAnonymous && comment.student?.isRepresentative && (
                             <span className="text-[7px] font-black uppercase bg-[#00f59b]/10 border border-[#00f59b]/25 text-[#00f59b] px-1 py-0.2 rounded">
                               {isAr ? 'مندوب' : 'Rep'}
                             </span>
@@ -258,7 +276,7 @@ export default function ExchangeHubTab({
                       </div>
                     </div>
 
-                    {comment.student?.id === currentStudentId && (
+                    {comment.isMine && (
                       <button
                         onClick={() => handleDeleteComment(comment.id)}
                         className="p-1.5 rounded bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 text-[10px] transition-colors"
@@ -281,22 +299,38 @@ export default function ExchangeHubTab({
           )}
 
           {/* Comment Write Bar */}
-          <form onSubmit={onCreateCommentSubmit} className="flex gap-2 items-end pt-2">
-            <textarea
-              value={newCommentText}
-              onChange={(e) => setNewCommentText(e.target.value)}
-              placeholder={t('exchange.commentPlaceholder') || (isAr ? 'اكتب تعليقك الأكاديمي هنا...' : 'Write a comment...')}
-              rows={2}
-              className="flex-1 bg-slate-955/80 border border-white/5 rounded-xl p-3 text-xs text-slate-300 focus:outline-none focus:border-[#00f59b]/50 placeholder-slate-600 resize-none font-medium text-right font-sans"
-              dir="rtl"
-            />
-            <button
-              type="submit"
-              disabled={commentSubmitting || !newCommentText.trim()}
-              className="px-4 py-3 bg-[#00f59b] hover:bg-[#00d484] disabled:bg-slate-800 disabled:text-slate-500 text-slate-955 font-black text-xs rounded-xl transition-all shadow-lg shadow-[#00f59b]/10 whitespace-nowrap active:scale-95 duration-150 shrink-0 h-[46px] flex items-center justify-center"
-            >
-              {commentSubmitting ? (t('exchange.commenting') || (isAr ? 'جاري التعليق' : 'Commenting...')) : (t('exchange.commentBtn') || (isAr ? 'تعليق' : 'Comment'))}
-            </button>
+          <form onSubmit={onCreateCommentSubmit} className="space-y-2 pt-2">
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                placeholder={t('exchange.commentPlaceholder') || (isAr ? 'اكتب تعليقك الأكاديمي هنا...' : 'Write a comment...')}
+                rows={2}
+                className="flex-1 bg-slate-955/80 border border-white/5 rounded-xl p-3 text-xs text-slate-350 focus:outline-none focus:border-[#00f59b]/50 placeholder-slate-650 resize-none font-medium text-right font-sans"
+                dir="rtl"
+              />
+              <button
+                type="submit"
+                disabled={commentSubmitting || !newCommentText.trim()}
+                className="px-4 py-3 bg-[#00f59b] hover:bg-[#00d484] disabled:bg-slate-800 disabled:text-slate-500 text-slate-955 font-black text-xs rounded-xl transition-all shadow-lg shadow-[#00f59b]/10 whitespace-nowrap active:scale-95 duration-150 shrink-0 h-[46px] flex items-center justify-center"
+              >
+                {commentSubmitting ? (t('exchange.commenting') || (isAr ? 'جاري التعليق' : 'Commenting...')) : (t('exchange.commentBtn') || (isAr ? 'تعليق' : 'Comment'))}
+              </button>
+            </div>
+            
+            {/* خيار الهوية المجهولة للتعليق */}
+            <div className="flex items-center gap-2 justify-start px-1 select-none">
+              <input
+                type="checkbox"
+                id="isAnonymousComment"
+                checked={newCommentIsAnonymous}
+                onChange={(e) => setNewCommentIsAnonymous(e.target.checked)}
+                className="accent-[var(--accent)] h-3.5 w-3.5 rounded border-white/10 bg-black cursor-pointer"
+              />
+              <label htmlFor="isAnonymousComment" className="text-[10px] text-slate-400 font-bold cursor-pointer">
+                🕵️ {isAr ? 'تعليق بهوية مجهولة' : 'Comment anonymously'}
+              </label>
+            </div>
           </form>
         </div>
       </div>
@@ -356,7 +390,7 @@ export default function ExchangeHubTab({
               </div>
             ) : chatMessages.length > 0 ? (
               chatMessages.map((msg) => {
-                const isMine = msg.student?.id === currentStudentId;
+                const isMine = msg.isMine;
                 return (
                   <div
                     key={msg.id}
@@ -364,9 +398,15 @@ export default function ExchangeHubTab({
                   >
                     {/* Other user's avatar */}
                     {!isMine && (
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-white/10 to-white/5 border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0 shadow-sm mt-0.5">
-                        {msg.student?.name ? msg.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-                      </div>
+                      msg.student?.isAnonymous ? (
+                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                          🕵️
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-white/10 to-white/5 border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0 shadow-sm mt-0.5">
+                          {msg.student?.name ? msg.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
+                        </div>
+                      )
                     )}
 
                     {/* Chat Bubble Card */}
@@ -374,8 +414,10 @@ export default function ExchangeHubTab({
                       {/* Name of sender (other user) */}
                       {!isMine && (
                         <div className="flex items-center gap-1 px-1">
-                          <span className="text-[10px] font-black text-[#00f59b]">{msg.student?.name}</span>
-                          {msg.student?.isRepresentative && (
+                          <span className="text-[10px] font-black text-[#00f59b]">
+                            {msg.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : msg.student?.name}
+                          </span>
+                          {!msg.student?.isAnonymous && msg.student?.isRepresentative && (
                             <span className="text-[7px] font-bold uppercase bg-[#00f59b]/15 border border-[#00f59b]/30 text-[#00f59b] px-1 py-0.2 rounded">
                               {isAr ? 'مندوب' : 'Rep'}
                             </span>
@@ -424,7 +466,20 @@ export default function ExchangeHubTab({
           </div>
 
           {/* Chat Send Input Box */}
-          <form onSubmit={handleSendChatMessage} className="flex gap-2 items-center bg-slate-950/80 border border-white/5 rounded-2xl p-2">
+          <form onSubmit={handleSendChatMessage} className="flex gap-2 items-center bg-slate-955 border border-white/5 rounded-2xl p-2">
+            {/* زر الهوية المجهولة */}
+            <button
+              type="button"
+              onClick={() => setChatIsAnonymous(prev => !prev)}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 text-sm h-9 w-9 ${
+                chatIsAnonymous
+                  ? 'bg-[#00f59b]/10 border border-[#00f59b]/35 text-[#00f59b]'
+                  : 'bg-white/5 border border-white/5 text-slate-500 hover:text-slate-300'
+              }`}
+              title={isAr ? 'تفعيل الهوية المجهولة' : 'Toggle anonymous mode'}
+            >
+              🕵️
+            </button>
             <input
               type="text"
               value={chatInput}
@@ -520,7 +575,11 @@ export default function ExchangeHubTab({
                   
                   <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center gap-2.5">
-                      {post.student?.idPhotoUrl ? (
+                      {post.student?.isAnonymous ? (
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0">
+                          🕵️
+                        </div>
+                      ) : post.student?.idPhotoUrl ? (
                         <img
                           src={post.student.idPhotoUrl}
                           alt={post.student.name}
@@ -533,8 +592,10 @@ export default function ExchangeHubTab({
                       )}
                       <div>
                         <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-extrabold text-white">{post.student?.name}</span>
-                          {post.student?.isRepresentative && (
+                          <span className="text-[11px] font-extrabold text-white">
+                            {post.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : post.student?.name}
+                          </span>
+                          {!post.student?.isAnonymous && post.student?.isRepresentative && (
                             <span className="text-[7px] font-black uppercase bg-[#00f59b]/10 border border-[#00f59b]/25 text-[#00f59b] px-1 py-0.2 rounded">
                               {isAr ? 'مندوب' : 'Rep'}
                             </span>
@@ -636,6 +697,20 @@ export default function ExchangeHubTab({
                     rows={4}
                     className="w-full bg-slate-955 border border-white/5 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-[#00f59b]/50 resize-none text-right font-sans font-medium"
                   />
+                </div>
+
+                {/* خيار الهوية المجهولة */}
+                <div className="flex items-center gap-2 py-1 justify-start select-none">
+                  <input
+                    type="checkbox"
+                    id="isAnonymousForum"
+                    checked={newPostIsAnonymous}
+                    onChange={(e) => setNewPostIsAnonymous(e.target.checked)}
+                    className="accent-[var(--accent)] h-4 w-4 rounded border-white/10 bg-black cursor-pointer"
+                  />
+                  <label htmlFor="isAnonymousForum" className="text-slate-350 cursor-pointer select-none">
+                    🕵️ {isAr ? 'نشر بهوية مجهولة (طالب مجهول)' : 'Post anonymously'}
+                  </label>
                 </div>
 
                 <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">

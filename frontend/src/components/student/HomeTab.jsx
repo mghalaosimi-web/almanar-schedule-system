@@ -343,21 +343,21 @@ export default function HomeTab({
         </div>
         
         <div className="grid grid-cols-2 gap-3">
-          {/* التحضير بالـ GPS */}
+          {/* الهوية الرقمية */}
           <button
-            onClick={() => navigate('/student/scan')}
+            onClick={() => setActiveTab('profile')}
             className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150"
             style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
           >
             <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
               <svg className="w-[22px] h-[22px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                <circle cx="12" cy="10" r="3"/>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
             <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'حضور بالـ GPS' : 'GPS Check-in'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'تسجيل حضور فوري' : 'Instant attendance'}</span>
+              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'الهوية الرقمية' : 'Digital ID'}</span>
+              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'ملف الطالب والتوثيق' : 'Profile & credentials'}</span>
             </div>
           </button>
 

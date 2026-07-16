@@ -35,6 +35,10 @@ export default function RepresentativeDashboard() {
   // Tab 2: Broadcasts state
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastsHistory, setBroadcastsHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedBroadcast, setSelectedBroadcast] = useState(null);
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
 
   // Tab 3: Resources state
   const [resources, setResources] = useState([]);
@@ -123,11 +127,26 @@ export default function RepresentativeDashboard() {
 
       // Also grab dynamic stats
       await fetchStats();
+      await fetchBroadcastsHistory();
     } catch (err) {
       console.error(err);
       toast.error(isAr ? 'فشل تحميل البيانات التمهيدية' : 'Failed to load initial dashboard data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBroadcastsHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await axios.get(`${API_URL}/api/rep/broadcasts`, { headers });
+      if (res.data?.success) {
+        setBroadcastsHistory(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch broadcasts history:', err);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -168,6 +187,9 @@ export default function RepresentativeDashboard() {
   useEffect(() => {
     if (activeTab === 'rescheduling') {
       fetchRescheduleHistory();
+    }
+    if (activeTab === 'broadcasts') {
+      fetchBroadcastsHistory();
     }
   }, [activeTab]);
 
@@ -277,6 +299,7 @@ export default function RepresentativeDashboard() {
         toast.success(isAr ? 'تم بث الإعلان وإشعار الطلاب بنجاح' : 'Announcement broadcasted successfully');
         setBroadcastMessage('');
         fetchStats();
+        fetchBroadcastsHistory();
       }
     } catch (err) {
       console.error(err);
@@ -570,25 +593,86 @@ export default function RepresentativeDashboard() {
 
             {/* Tab 2: Broadcast announcements */}
             {activeTab === 'broadcasts' && (
-              <form onSubmit={handleSendBroadcast} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-white/40 uppercase mb-2">
-                    {isAr ? 'نص التعميم / إرسال تنبيه منبثق' : 'Broadcast Message'}
-                  </label>
-                  <textarea
-                    required
-                    value={broadcastMessage}
-                    onChange={e => setBroadcastMessage(e.target.value)}
-                    className="cmd-input w-full h-36 p-4 text-sm font-semibold"
-                    placeholder={isAr ? 'مثال: السلام عليكم زملائي الكرام، تم تأجيل محاضرة الغد إلى الساعة العاشرة صباحاً بناءً على طلب الأستاذ.' : 'Type announcement for classmates...'}
-                  />
+              <div className="space-y-6">
+                <form onSubmit={handleSendBroadcast} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-white/40 uppercase mb-2">
+                      {isAr ? 'نص التعميم / إرسال تنبيه منبثق' : 'Broadcast Message'}
+                    </label>
+                    <textarea
+                      required
+                      value={broadcastMessage}
+                      onChange={e => setBroadcastMessage(e.target.value)}
+                      className="cmd-input w-full h-28 p-4 text-xs font-semibold"
+                      placeholder={isAr ? 'مثال: السلام عليكم زملائي الكرام، تم تأجيل محاضرة الغد إلى الساعة العاشرة صباحاً بناءً على طلب الأستاذ.' : 'Type announcement for classmates...'}
+                    />
+                  </div>
+                  <button type="submit" disabled={sendingBroadcast} className="btn-neon w-full py-3">
+                    {sendingBroadcast ? (
+                      <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                    ) : (isAr ? 'بث الإعلان وإرسال إشعار فوري للجميع' : 'Broadcast Announcement') }
+                  </button>
+                </form>
+
+                {/* تاريخ التعميمات والتحقق من الاستلام */}
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  <h4 className="text-sm font-black text-white">📢 {isAr ? 'سجل الإعلانات الموجهة للدفعة' : 'Class Announcements Log'}</h4>
+                  {loadingHistory && broadcastsHistory.length === 0 ? (
+                    <div className="flex justify-center py-6">
+                      <span className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : broadcastsHistory.length === 0 ? (
+                    <p className="text-xs text-white/40 font-semibold font-mono">{isAr ? 'لا يوجد تعميمات سابقة.' : 'No announcements broadcasted yet.'}</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {broadcastsHistory.map(b => {
+                        const total = b.recipients.length;
+                        const read = b.recipients.filter(r => r.status === 'READ').length;
+                        const delivered = b.recipients.filter(r => r.status === 'DELIVERED').length;
+                        const pending = b.recipients.filter(r => r.status === 'PENDING').length;
+
+                        return (
+                          <div key={b.broadcastId} className="p-4 bg-white/2 border border-white/5 rounded-2xl text-xs space-y-3 hover:border-white/10 transition-all">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0 flex-1 text-right">
+                                <span className="text-[9px] text-slate-500 font-mono">
+                                  {new Date(b.sentTime).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                                <p className="font-extrabold text-white mt-1 leading-relaxed line-clamp-2" dir="rtl">{b.message}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedBroadcast(b);
+                                  setIsBroadcastModalOpen(true);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-slate-955 font-black text-[10px] hover:opacity-90 transition-all whitespace-nowrap active:scale-95 shrink-0"
+                              >
+                                {isAr ? 'حالة الاستلام' : 'Delivery Status'}
+                              </button>
+                            </div>
+
+                            {/* مؤشرات قراءة الرسالة */}
+                            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                              <div className="flex items-center gap-1">
+                                <span className="text-emerald-400">✔✔</span>
+                                <span>{isAr ? 'قُرئت:' : 'Read:'} {read}/{total}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-500">✔✔</span>
+                                <span>{isAr ? 'وصلت:' : 'Delivered:'} {delivered}/{total}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-650">✔</span>
+                                <span>{isAr ? 'انتظار:' : 'Pending:'} {pending}/{total}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <button type="submit" disabled={sendingBroadcast} className="btn-neon w-full py-3.5">
-                  {sendingBroadcast ? (
-                    <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
-                  ) : (isAr ? 'بث الإعلان وإرسال إشعار فوري للجميع' : 'Broadcast Announcement') }
-                </button>
-              </form>
+              </div>
             )}
 
             {/* Tab 3: Group Resources */}
@@ -817,6 +901,128 @@ export default function RepresentativeDashboard() {
           </motion.div>
         </AnimatePresence>
       </div>
+      {/* ── Recipient Delivery Status Modal ── */}
+      {isBroadcastModalOpen && selectedBroadcast && (
+        <div className="fixed inset-0 z-[9995] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="frosted-panel w-full max-w-lg rounded-3xl border border-white/10 bg-[#121824] p-6 shadow-2xl space-y-5 text-right font-sans overflow-hidden max-h-[90vh] flex flex-col"
+            dir={isAr ? 'rtl' : 'ltr'}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-start border-b border-white/5 pb-3">
+              <div className="text-right">
+                <h3 className="text-md font-black text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] to-teal-400">
+                  {isAr ? 'تفاصيل حالة استلام الإعلان' : 'Announcement Delivery Logs'}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">
+                  {new Date(selectedBroadcast.sentTime).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBroadcastModalOpen(false);
+                  setSelectedBroadcast(null);
+                }}
+                className="h-7 w-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Announcement Message Box */}
+            <div className="p-3.5 bg-black/35 border border-white/5 rounded-2xl text-xs text-slate-200 leading-relaxed max-h-24 overflow-y-auto text-right" dir="rtl">
+              {selectedBroadcast.message}
+            </div>
+
+            {/* Recipient Categorized Statuses */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* 1. READ LIST */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+                  <span>✔✔ {isAr ? 'قرأ الإعلان' : 'Read'} ({selectedBroadcast.recipients.filter(r => r.status === 'READ').length})</span>
+                </div>
+                <div className="space-y-1.5">
+                  {selectedBroadcast.recipients.filter(r => r.status === 'READ').map(r => (
+                    <div key={r.studentId} className="flex justify-between items-center p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 text-[10px]">●</span>
+                        <span className="font-bold text-white">{r.studentName}</span>
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-mono font-semibold">
+                        {r.readAt ? new Date(r.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                  ))}
+                  {selectedBroadcast.recipients.filter(r => r.status === 'READ').length === 0 && (
+                    <p className="text-[10px] text-slate-600 font-bold italic">{isAr ? 'لم يقرأه أحد بعد' : 'No one read yet'}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. DELIVERED LIST */}
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  <span>✔✔ {isAr ? 'استلم ولم يقرأ' : 'Delivered'} ({selectedBroadcast.recipients.filter(r => r.status === 'DELIVERED').length})</span>
+                </div>
+                <div className="space-y-1.5">
+                  {selectedBroadcast.recipients.filter(r => r.status === 'DELIVERED').map(r => (
+                    <div key={r.studentId} className="flex justify-between items-center p-2 bg-white/2 border border-white/5 rounded-xl text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 text-[10px]">●</span>
+                        <span className="font-bold text-white">{r.studentName}</span>
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-mono font-semibold">
+                        {r.deliveredAt ? new Date(r.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                  ))}
+                  {selectedBroadcast.recipients.filter(r => r.status === 'DELIVERED').length === 0 && (
+                    <p className="text-[10px] text-slate-600 font-bold italic">{isAr ? 'لا يوجد مستلمين لم يقرأوا' : 'No unread deliveries'}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. PENDING LIST */}
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-600 tracking-wider">
+                  <span>✔ {isAr ? 'في الانتظار (أوفلاين)' : 'Pending (Offline)'} ({selectedBroadcast.recipients.filter(r => r.status === 'PENDING').length})</span>
+                </div>
+                <div className="space-y-1.5">
+                  {selectedBroadcast.recipients.filter(r => r.status === 'PENDING').map(r => (
+                    <div key={r.studentId} className="flex justify-between items-center p-2 bg-slate-900/30 border border-white/5 rounded-xl text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-600 text-[10px]">●</span>
+                        <span className="font-bold text-slate-400">{r.studentName}</span>
+                      </div>
+                      <span className="text-[9px] text-slate-600 font-mono font-semibold">
+                        Pending
+                      </span>
+                    </div>
+                  ))}
+                  {selectedBroadcast.recipients.filter(r => r.status === 'PENDING').length === 0 && (
+                    <p className="text-[10px] text-slate-600 font-bold italic">{isAr ? 'تلقى الجميع التنبيه' : 'All users received'}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/5 pt-3 flex justify-end">
+              <button
+                onClick={() => {
+                  setIsBroadcastModalOpen(false);
+                  setSelectedBroadcast(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-xs active:scale-95 transition-all"
+              >
+                {isAr ? 'إغلاق' : 'Close'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

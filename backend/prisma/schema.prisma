@@ -247,11 +247,13 @@ model NotificationLog {
   deviceToken  String?            // رمز الجهاز المستقبِل
   platform     String?            // Android / iOS / Web
   status       NotificationStatus
+  broadcastId  String?            // معرف البث الموحد للمجموعة
 
   @@index([studentId])
   @@index([groupId])
   @@index([sentTime])
   @@index([status])
+  @@index([broadcastId])
 }
 
 
@@ -466,30 +468,32 @@ enum PostCategory {
 }
 
 model ExchangePost {
-  id        String            @id @default(uuid())
-  title     String
-  content   String
-  category  PostCategory      @default(GENERAL)
-  groupId   Int
-  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  studentId Int
-  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  comments  ExchangeComment[]
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id          String            @id @default(uuid())
+  title       String
+  content     String
+  category    PostCategory      @default(GENERAL)
+  groupId     Int
+  group       Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentId   Int
+  student     Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  comments    ExchangeComment[]
+  isAnonymous Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@index([groupId])
   @@index([studentId])
 }
 
 model ExchangeComment {
-  id        String       @id @default(uuid())
-  postId    String
-  post      ExchangePost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  studentId Int
-  student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  content   String
-  createdAt DateTime     @default(now())
+  id          String       @id @default(uuid())
+  postId      String
+  post        ExchangePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  studentId   Int
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  content     String
+  isAnonymous Boolean      @default(false)
+  createdAt   DateTime     @default(now())
 
   @@index([postId])
   @@index([studentId])

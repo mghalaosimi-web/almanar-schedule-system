@@ -17,6 +17,24 @@ export default function NotificationCenter() {
         });
         if (res.data && res.data.success) {
           setNotifications(res.data.data);
+          
+          const undeliveredIds = res.data.data
+            .filter(n => !n.deliveredAt)
+            .map(n => n.id);
+          if (undeliveredIds.length > 0) {
+            axios.post(`${API_URL}/api/notifications/mark-delivered`, { logIds: undeliveredIds }, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            }).catch(err => console.warn('Failed to mark delivered:', err.message));
+          }
+
+          const unreadIds = res.data.data
+            .filter(n => !n.readAt)
+            .map(n => n.id);
+          if (unreadIds.length > 0) {
+            axios.post(`${API_URL}/api/notifications/mark-read`, { logIds: unreadIds }, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            }).catch(err => console.warn('Failed to mark read:', err.message));
+          }
         }
       } catch (err) {
         console.error('Failed to fetch student notifications:', err);

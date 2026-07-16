@@ -196,19 +196,26 @@ async function sendAfternoonCheckin() {
   }
 }
 
+function getYemenTime() {
+  const now = new Date();
+  const offset = 3 * 60 * 60 * 1000; // Yemen is UTC+3
+  const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+  return new Date(utc + offset);
+}
+
 async function checkUpcomingClassesAndNotify() {
   console.log('[CRON] Checking for upcoming classes starting in 30 minutes...');
   try {
-    const now = new Date();
+    const yemenNow = getYemenTime();
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const currentDayName = days[now.getDay()];
+    const currentDayName = days[yemenNow.getDay()];
 
     const schedules = await prisma.schedule.findMany({
       where: { dayOfWeek: currentDayName },
       include: { subject: true, room: true, group: true }
     });
 
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = yemenNow.getHours() * 60 + yemenNow.getMinutes();
 
     for (const schedule of schedules) {
       const [sHours, sMinutes] = schedule.startTime.split(':').map(Number);
@@ -220,7 +227,7 @@ async function checkUpcomingClassesAndNotify() {
       const diff = scheduleMinutes - currentMinutes;
       if (diff >= 24 && diff <= 31) {
         // Prevent double sending
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const oneHourAgo = new Date(yemenNow.getTime() - 60 * 60 * 1000);
         const existingLog = await prisma.notificationLog.findFirst({
           where: {
             groupId: schedule.groupId,
@@ -234,19 +241,52 @@ async function checkUpcomingClassesAndNotify() {
           const messageEn = `Reminder: Lecture ${schedule.subject.name} for group ${schedule.group.name} starts in 30 minutes (${schedule.startTime}) in Room ${schedule.room.name}.`;
           const alertMessage = `${messageAr}\n${messageEn}`;
 
-          await prisma.notificationLog.create({
-            data: {
-              groupId: schedule.groupId,
-              message: alertMessage,
-              status: 'SENT',
-              sentTime: new Date()
-            }
+          const broadcastId = require('crypto').randomUUID();
+
+          // Query all students in this group
+          const classmates = await prisma.student.findMany({
+            where: { groupId: schedule.groupId },
+            select: { id: true }
+          });
+
+          if (classmates.length > 0) {
+            await prisma.notificationLog.createMany({
+              data: classmates.map(student => ({
+                studentId: student.id,
+                groupId: schedule.groupId,
+                title: 'تذكير بمحاضرة ⏰',
+                message: alertMessage,
+                status: 'SENT',
+                broadcastId,
+                sentTime: new Date()
+              }))
+            });
+          } else {
+            await prisma.notificationLog.create({
+              data: {
+                groupId: schedule.groupId,
+                title: 'تذكير بمحاضرة ⏰',
+                message: alertMessage,
+                status: 'SENT',
+                broadcastId,
+                sentTime: new Date()
+              }
+            });
+          }
+
+          // Trigger SSE live event so online students receive it immediately
+          const { broadcastSSE } = require('./notifications');
+          broadcastSSE('BROADCAST_MESSAGE', { 
+            groupId: schedule.groupId, 
+            message: alertMessage,
+            broadcastId
           });
 
           sendPushNotification(schedule.groupId, {
             title: `تذكير بمحاضرة ⏰`,
             body: messageAr,
-            url: '/student/home'
+            url: '/student/home',
+            broadcastId
           });
 
           console.log(`[CRON] Sent 30-minute reminder for class: ${schedule.subject.name} (Group: ${schedule.group.name})`);

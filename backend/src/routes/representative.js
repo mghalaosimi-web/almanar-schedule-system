@@ -209,28 +209,119 @@ router.post('/broadcast', verifyToken, isRep, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Message is required.' });
     }
 
-    const log = await prisma.notificationLog.create({
-      data: {
-        groupId: req.user.groupId,
-        message,
-        status: 'PENDING'
-      }
+    const broadcastId = require('crypto').randomUUID();
+
+    // Query all students in this representative's group
+    const classmates = await prisma.student.findMany({
+      where: { groupId: req.user.groupId },
+      select: { id: true }
     });
 
+    let createdLog = null;
+
+    if (classmates.length > 0) {
+      // Create individual NotificationLogs for each classmate in the group
+      await prisma.notificationLog.createMany({
+        data: classmates.map(student => ({
+          studentId: student.id,
+          groupId: req.user.groupId,
+          title: '📢 تنبيه من مندوب الدفعة',
+          message,
+          status: 'SENT',
+          broadcastId
+        }))
+      });
+
+      // Fetch one log to return back to user
+      createdLog = await prisma.notificationLog.findFirst({
+        where: { broadcastId }
+      });
+    } else {
+      // Fallback: Create a single group-wide log if group has no students
+      createdLog = await prisma.notificationLog.create({
+        data: {
+          groupId: req.user.groupId,
+          title: '📢 تنبيه من مندوب الدفعة',
+          message,
+          status: 'SENT',
+          broadcastId
+        }
+      });
+    }
+
     // Trigger SSE live event
-    broadcastSSE('BROADCAST_MESSAGE', { groupId: req.user.groupId, message });
+    broadcastSSE('BROADCAST_MESSAGE', { 
+      groupId: req.user.groupId, 
+      message,
+      broadcastId
+    });
 
     // Send push notification
     sendPushNotification(req.user.groupId, {
       title: '📢 تنبيه من مندوب الدفعة',
       body: message,
-      url: '/student/home'
+      url: '/student/home',
+      broadcastId
     });
 
-    res.status(201).json({ success: true, data: log });
+    res.status(201).json({ success: true, data: createdLog });
   } catch (error) {
     console.error('[REP-API] Error sending broadcast:', error);
     res.status(500).json({ success: false, error: 'Failed to send broadcast.' });
+  }
+});
+
+// 5a. GET broadcasts sent by this representative with detailed read/delivered status
+router.get('/broadcasts', verifyToken, isRep, async (req, res) => {
+  try {
+    // Fetch all logs in this rep's group that have a broadcastId
+    const logs = await prisma.notificationLog.findMany({
+      where: {
+        groupId: req.user.groupId,
+        broadcastId: { not: null }
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            idNumber: true
+          }
+        }
+      },
+      orderBy: {
+        sentTime: 'desc'
+      }
+    });
+
+    // Group logs by broadcastId in memory
+    const broadcastsMap = {};
+    for (const log of logs) {
+      if (!log.broadcastId) continue;
+      if (!broadcastsMap[log.broadcastId]) {
+        broadcastsMap[log.broadcastId] = {
+          broadcastId: log.broadcastId,
+          message: log.message,
+          sentTime: log.sentTime,
+          recipients: []
+        };
+      }
+      broadcastsMap[log.broadcastId].recipients.push({
+        studentId: log.studentId,
+        studentName: log.student?.name || 'طالب غير مسجل',
+        idNumber: log.student?.idNumber || '—',
+        status: log.readAt ? 'READ' : (log.deliveredAt ? 'DELIVERED' : 'PENDING'),
+        deliveredAt: log.deliveredAt,
+        readAt: log.readAt
+      });
+    }
+
+    const broadcastsList = Object.values(broadcastsMap).sort((a, b) => new Date(b.sentTime) - new Date(a.sentTime));
+
+    res.status(200).json({ success: true, data: broadcastsList });
+  } catch (error) {
+    console.error('[REP-API] Error fetching broadcasts list:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch broadcasts list.' });
   }
 });
 

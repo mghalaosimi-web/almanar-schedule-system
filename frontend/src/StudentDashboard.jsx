@@ -868,19 +868,37 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleCreatePost = async (e) => {
-    e.preventDefault();
-    if (!newPostTitle.trim() || !newPostContent.trim()) {
+  const handleCreatePost = async (titleOrEvent, contentParam, categoryParam, isAnonymousParam) => {
+    let title = "";
+    let content = "";
+    let category = "GENERAL";
+    let isAnonymous = false;
+
+    if (titleOrEvent && typeof titleOrEvent.preventDefault === 'function') {
+      titleOrEvent.preventDefault();
+      title = newPostTitle;
+      content = newPostContent;
+      category = newPostCategory;
+      isAnonymous = false; // default for forum modal
+    } else {
+      title = titleOrEvent || "";
+      content = contentParam || "";
+      category = categoryParam || "GENERAL";
+      isAnonymous = !!isAnonymousParam;
+    }
+
+    if (!title.trim() || !content.trim()) {
       toast.error(isAr ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill in all fields');
-      return;
+      return false;
     }
     try {
       setPostSubmitting(true);
       const token = localStorage.getItem('manar_token');
       const res = await axios.post(`${API_URL}/api/exchange/posts`, {
-        title: newPostTitle,
-        content: newPostContent,
-        category: newPostCategory
+        title: title.trim(),
+        content: content.trim(),
+        category: category,
+        isAnonymous: isAnonymous
       }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -891,23 +909,38 @@ export default function StudentDashboard() {
         setNewPostCategory('GENERAL');
         setIsNewPostModalOpen(false);
         fetchPosts();
+        return true;
       }
+      return false;
     } catch (err) {
       console.error('Error creating post:', err);
       toast.error(isAr ? 'فشل نشر الموضوع' : 'Failed to create discussion');
+      return false;
     } finally {
       setPostSubmitting(false);
     }
   };
 
-  const handleCreateComment = async (e) => {
-    e.preventDefault();
-    if (!newCommentText.trim() || !selectedPost) return;
+  const handleCreateComment = async (textOrEvent, isAnonymousParam) => {
+    let content = "";
+    let isAnonymous = false;
+
+    if (textOrEvent && typeof textOrEvent.preventDefault === 'function') {
+      textOrEvent.preventDefault();
+      content = newCommentText;
+      isAnonymous = false; // default for form
+    } else {
+      content = textOrEvent || "";
+      isAnonymous = !!isAnonymousParam;
+    }
+
+    if (!content.trim() || !selectedPost) return false;
     try {
       setCommentSubmitting(true);
       const token = localStorage.getItem('manar_token');
       const res = await axios.post(`${API_URL}/api/exchange/posts/${selectedPost.id}/comments`, {
-        content: newCommentText
+        content: content.trim(),
+        isAnonymous: isAnonymous
       }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -915,10 +948,13 @@ export default function StudentDashboard() {
         setNewCommentText('');
         toast.success(isAr ? 'تمت إضافة تعليقك' : 'Comment added!');
         fetchPostDetails(selectedPost.id);
+        return true;
       }
+      return false;
     } catch (err) {
       console.error('Error creating comment:', err);
       toast.error(isAr ? 'فشل إضافة التعليق' : 'Failed to add comment');
+      return false;
     } finally {
       setCommentSubmitting(false);
     }
@@ -1159,7 +1195,7 @@ export default function StudentDashboard() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative overflow-hidden rounded-2xl border border-emerald-500/35 bg-emerald-950/15 backdrop-blur-md p-4 flex justify-between items-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
+              className="relative overflow-hidden rounded-2xl border border-emerald-500/35 bg-emerald-950/15 backdrop-blur-md p-4 flex justify-between items-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.12)] w-full"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-xl animate-bounce shrink-0">📸</span>
@@ -1168,16 +1204,10 @@ export default function StudentDashboard() {
                     {isAr ? 'محاضرة نشطة الآن!' : 'Active Lecture Now!'}
                   </h4>
                   <p className="text-[10px] text-slate-300 font-bold mt-0.5 truncate">
-                    {activeLectureNow.subject?.name}
+                    {activeLectureNow.subject?.name} ({(activeLectureNow.overrides?.[0]?.newRoom?.name || activeLectureNow.room?.name) || 'N/A'})
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => navigate('/student/scan')}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-1.5 text-[10px] font-black rounded-lg active:scale-95 shadow-lg shadow-emerald-500/10 whitespace-nowrap shrink-0 transition-transform"
-              >
-                {isAr ? 'تسجيل الحضور' : 'Check-in'}
-              </button>
             </motion.div>
           )}
 

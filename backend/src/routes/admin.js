@@ -2547,6 +2547,7 @@ router.post('/admin/dev/notifications', verifyToken, async (req, res) => {
     }
 
     const { sendStudentPushNotification } = require('../services/notifications');
+    const broadcastId = require('crypto').randomUUID();
     
     for (const student of targetStudents) {
       try {
@@ -2555,16 +2556,18 @@ router.post('/admin/dev/notifications', verifyToken, async (req, res) => {
             studentId: student.id,
             groupId: student.groupId,
             message,
-            status: 'SENT'
+            status: 'SENT',
+            broadcastId
           }
         });
         
-        broadcastSSE('NEW_NOTIFICATION', { studentId: student.id, message });
+        broadcastSSE('NEW_NOTIFICATION', { studentId: student.id, message, broadcastId });
         
         await sendStudentPushNotification(student.id, {
           title: 'تنبيه إداري عاجل 📢',
           body: message,
-          url: '/student/home'
+          url: '/student/home',
+          broadcastId
         });
         
         targetCount++;
