@@ -78,6 +78,20 @@ export default function Register() {
   const [selectedMajorId, setSelectedMajorId] = useState(localStorage.getItem('preselectedMajorId') || '');
   const [selectedLevelId, setSelectedLevelId] = useState('');
 
+  const [isPrefilledState, setIsPrefilledState] = useState(
+    !!(location.state?.prefilledData || (localStorage.getItem('selectedCollegeId') && localStorage.getItem('preselectedMajorId')))
+  );
+
+  const handleClearPrefilled = () => {
+    localStorage.removeItem('selectedCollegeId');
+    localStorage.removeItem('preselectedMajorId');
+    localStorage.removeItem('preselectedMajorName');
+    setSelectedMajorId('');
+    setSelectedDeptId('');
+    setIsPrefilledState(false);
+    toast.success(isAr ? 'تم إلغاء التحديد المسبق. يمكنك الآن اختيار البرنامج يدوياً.' : 'Prefill cleared. You can now select the program manually.');
+  };
+
   // Google Login Auth State
   const [googleIdToken, setGoogleIdToken] = useState(location.state?.googleIdToken || '');
   const [googleEmail, setGoogleEmail] = useState(location.state?.googleEmail || '');
@@ -158,8 +172,21 @@ export default function Register() {
       if (prefilled.collegeId) {
         localStorage.setItem('selectedCollegeId', prefilled.collegeId.toString());
       }
+      setIsPrefilledState(true);
     }
   }, [location.state]);
+
+  // Automatically resolve department from selectedMajorId
+  useEffect(() => {
+    if (selectedMajorId && activeCollege?.departments) {
+      const dept = activeCollege.departments.find(d => 
+        d.majors?.some(m => m.id === parseInt(selectedMajorId))
+      );
+      if (dept) {
+        setSelectedDeptId(dept.id.toString());
+      }
+    }
+  }, [selectedMajorId, activeCollege]);
 
   // Timer logic for OTP
   useEffect(() => {
@@ -249,15 +276,14 @@ export default function Register() {
         toast.error(isAr ? 'يرجى اختيار المستوى الدراسي' : 'Please select your academic level');
         return;
       }
-      if (location.state?.prefilledData) {
+      if (isPrefilledState) {
         setDirection(1);
         setStep(3);
         return;
       }
     }
     if (step === 2) {
-      const isPrefilled = !!location.state?.prefilledData;
-      if ((!isPrefilled && !selectedDeptId) || !selectedMajorId) {
+      if ((!isPrefilledState && !selectedDeptId) || !selectedMajorId) {
         toast.error(isAr ? 'يرجى إكمال البيانات الأكاديمية' : 'Please complete academic details');
         return;
       }
@@ -267,7 +293,7 @@ export default function Register() {
   };
 
   const prevStep = () => {
-    if (step === 3 && location.state?.prefilledData) {
+    if (step === 3 && isPrefilledState) {
       setDirection(-1);
       setStep(1);
       return;
@@ -479,6 +505,25 @@ export default function Register() {
                   {step === 2 && (isAr ? 'البرنامج الأكاديمي' : 'Academic Program')}
                   {step === 3 && (isAr ? 'تأكيد الحساب والأمان' : 'Account Security & Auth')}
                 </h1>
+                {isPrefilledState && selectedCollegeName && (
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-white/80">
+                      🏫 {selectedCollegeName}
+                    </span>
+                    {localStorage.getItem('preselectedMajorName') && (
+                      <span className="px-3 py-1.5 rounded-full bg-[var(--accent-dim)] border border-[var(--accent)]/20 text-xs font-bold text-[var(--accent)]">
+                        📖 {localStorage.getItem('preselectedMajorName')}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleClearPrefilled}
+                      className="text-[10px] font-bold text-red-400 hover:text-red-300 underline cursor-pointer ml-1"
+                    >
+                      [{isAr ? 'تغيير' : 'Change'}]
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Error Alert Panel */}
@@ -585,11 +630,11 @@ export default function Register() {
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           
-                          <div className="w-full" style={location.state?.prefilledData ? { display: 'none' } : {}}>
+                          <div className="w-full" style={isPrefilledState ? { display: 'none' } : {}}>
                             <Field label={isAr ? 'الكلية / القسم' : 'Department'}>
                               <div className="relative">
                                 <select 
-                                  required={!location.state?.prefilledData} 
+                                  required={!isPrefilledState} 
                                   value={selectedDeptId}
                                   onChange={e => setSelectedDeptId(e.target.value)}
                                   className={selectClass}
@@ -605,12 +650,12 @@ export default function Register() {
                             </Field>
                           </div>
 
-                          <div className="w-full" style={location.state?.prefilledData ? { display: 'none' } : {}}>
+                          <div className="w-full" style={isPrefilledState ? { display: 'none' } : {}}>
                             <Field label={isAr ? 'التخصص الدراسي' : 'Specialization'}>
                               <div className="relative">
                                 <select 
-                                  required={!location.state?.prefilledData} 
-                                  disabled={!selectedDeptId && !location.state?.prefilledData} 
+                                  required={!isPrefilledState} 
+                                  disabled={!selectedDeptId && !isPrefilledState} 
                                   value={selectedMajorId}
                                   onChange={e => setSelectedMajorId(e.target.value)}
                                   className={`${selectClass} disabled:opacity-30 disabled:cursor-not-allowed`}

@@ -1033,9 +1033,10 @@ router.post('/register', authLimiter, async (req, res) => {
 
     let isGoogleVerified = false;
     let verifiedEmail = email;
+    let verification = null;
 
     if (googleIdToken) {
-      const verification = await verifyGoogleToken(googleIdToken);
+      verification = await verifyGoogleToken(googleIdToken);
       if (verification.verified) {
         isGoogleVerified = true;
         verifiedEmail = verification.email;
