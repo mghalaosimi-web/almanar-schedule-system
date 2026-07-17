@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { API_URL } from './config';
+import UserDetailsModal from './components/UserDetailsModal';
 
 export default function Students() {
   const { t, i18n } = useTranslation();
@@ -17,15 +18,20 @@ export default function Students() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showUnverifiedOnly, setShowUnverifiedOnly] = useState(false);
   const [groupBy, setGroupBy] = useState('none'); // 'none', 'college', 'department', 'group'
-  // ── Cascading hierarchy filters: Major → Level → Group ──────────────────────
+  // ── Cascading hierarchy filters: Department → Major → Level → Group ────────
+  const [filterDepartment, setFilterDepartment] = useState('ALL');
   const [filterMajor, setFilterMajor] = useState('ALL');
   const [filterLevel, setFilterLevel] = useState('ALL');
   const [filterGroup, setFilterGroup] = useState('ALL');
   const [visibleCount, setVisibleCount] = useState(15);
 
+  const [detailsEmail, setDetailsEmail] = useState('');
+  const [detailsRole, setDetailsRole] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
   useEffect(() => {
     setVisibleCount(15);
-  }, [filterMajor, filterLevel, filterGroup, searchQuery, showUnverifiedOnly, groupBy]);
+  }, [filterDepartment, filterMajor, filterLevel, filterGroup, searchQuery, showUnverifiedOnly, groupBy]);
 
   // Phase 3: Reset Password States
   const [resettingId, setResettingId] = useState(null);
@@ -187,12 +193,25 @@ export default function Students() {
   };
 
   // ── Derive unique option lists from loaded data (no extra API calls) ─────────
+  const allDepartments = Array.from(
+    new Map(
+      students
+        .map(s => [s.major?.department?.id, s.major?.department])
+        .filter(([id]) => id)
+    ).values()
+  );
   const allMajors = Array.from(
-    new Map(students.map(s => [s.major?.id, s.major]).filter(([id]) => id)).values()
+    new Map(
+      students
+        .filter(s => filterDepartment === 'ALL' || String(s.major?.department?.id) === filterDepartment)
+        .map(s => [s.major?.id, s.major])
+        .filter(([id]) => id)
+    ).values()
   );
   const allLevels = Array.from(
     new Map(
       students
+        .filter(s => filterDepartment === 'ALL' || String(s.major?.department?.id) === filterDepartment)
         .filter(s => filterMajor === 'ALL' || String(s.major?.id) === filterMajor)
         .map(s => [s.level?.id, s.level])
         .filter(([id]) => id)
@@ -201,6 +220,7 @@ export default function Students() {
   const allGroups = Array.from(
     new Map(
       students
+        .filter(s => filterDepartment === 'ALL' || String(s.major?.department?.id) === filterDepartment)
         .filter(s => filterMajor === 'ALL' || String(s.major?.id) === filterMajor)
         .filter(s => filterLevel === 'ALL' || String(s.level?.id) === filterLevel)
         .map(s => [s.group?.id, s.group])
@@ -217,10 +237,11 @@ export default function Students() {
       student.idNumber.toLowerCase().includes(query)
     );
     const matchesUnverified = !showUnverifiedOnly || (student.isEmailVerified === false || student.isPhoneVerified === false);
+    const matchesDepartment = filterDepartment === 'ALL' || String(student.major?.department?.id) === filterDepartment;
     const matchesMajor = filterMajor === 'ALL' || String(student.major?.id) === filterMajor;
     const matchesLevel = filterLevel === 'ALL' || String(student.level?.id) === filterLevel;
     const matchesGroup = filterGroup === 'ALL' || String(student.group?.id) === filterGroup;
-    return matchesSearch && matchesUnverified && matchesMajor && matchesLevel && matchesGroup;
+    return matchesSearch && matchesUnverified && matchesDepartment && matchesMajor && matchesLevel && matchesGroup;
   });
 
   // Animation variants
@@ -251,12 +272,32 @@ export default function Students() {
           <p className="text-sm text-gray-400">{t('students.subtitle')}</p>
         </div>
         
-        {/* ── Cascading Hierarchy Filter: Major → Level → Group ────────────── */}
+        {/* ── Cascading Hierarchy Filter: Department → Major → Level → Group ────────────── */}
         <div className="flex flex-wrap items-center gap-2 bg-white/[0.03] border border-white/10 rounded-xl p-3">
           {/* Total counter */}
           <span className="text-[10px] font-black text-[var(--accent)] bg-[var(--accent-dim)] border border-[var(--accent-glow)] px-2.5 py-1 rounded-lg shrink-0">
             {filteredStudents.length} {isAr ? 'طالب' : 'students'}
           </span>
+
+          {/* Department filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest shrink-0">
+              {isAr ? 'القسم' : 'Department'}
+            </span>
+            <select
+              value={filterDepartment}
+              onChange={e => { setFilterDepartment(e.target.value); setFilterMajor('ALL'); setFilterLevel('ALL'); setFilterGroup('ALL'); }}
+              className="bg-white/5 border border-white/10 rounded-lg text-[11px] font-bold text-white px-2.5 py-1.5 focus:outline-none focus:border-[var(--accent)] cursor-pointer max-w-[140px] truncate"
+            >
+              <option value="ALL">{isAr ? 'كل الأقسام' : 'All Departments'}</option>
+              {allDepartments.map(d => (
+                <option key={d.id} value={String(d.id)}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chevron separator */}
+          <span className="text-slate-700 font-black text-xs">›</span>
 
           {/* Major filter */}
           <div className="flex items-center gap-1.5">
@@ -318,9 +359,9 @@ export default function Students() {
           </div>
 
           {/* Clear filters */}
-          {(filterMajor !== 'ALL' || filterLevel !== 'ALL' || filterGroup !== 'ALL') && (
+          {(filterDepartment !== 'ALL' || filterMajor !== 'ALL' || filterLevel !== 'ALL' || filterGroup !== 'ALL') && (
             <button
-              onClick={() => { setFilterMajor('ALL'); setFilterLevel('ALL'); setFilterGroup('ALL'); }}
+              onClick={() => { setFilterDepartment('ALL'); setFilterMajor('ALL'); setFilterLevel('ALL'); setFilterGroup('ALL'); }}
               className="text-[10px] font-black text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-400/40 bg-red-500/5 hover:bg-red-500/10 px-2 py-1 rounded-lg transition-all"
             >
               {isAr ? '× مسح الفلاتر' : '× Clear'}
@@ -491,38 +532,53 @@ export default function Students() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2 w-full">
-                        {/* Impersonate Button */}
+                      <div className="flex flex-col gap-2 w-full">
+                        {/* View Details Button */}
                         <button
-                          onClick={() => handleImpersonate(student)}
-                          disabled={impersonatingId !== null}
-                          className="py-2 bg-gray-900/60 hover:bg-[var(--accent)] hover:text-black text-[11px] font-extrabold rounded-lg border border-white/10 hover:border-[var(--accent)] text-[var(--accent)] transition-all duration-300 flex items-center justify-center gap-1.5"
+                          onClick={() => {
+                            setDetailsEmail(student.email);
+                            setDetailsRole('STUDENT');
+                            setShowDetailsModal(true);
+                          }}
+                          className="w-full py-2 bg-gradient-to-r from-[var(--accent)]/10 to-[var(--accent)]/5 hover:from-[var(--accent)] hover:to-[var(--accent)] hover:text-black text-[11px] font-extrabold rounded-lg border border-[var(--accent)]/30 hover:border-[var(--accent)] text-[var(--accent)] transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          {impersonatingId === student.id ? (
-                            <span className="h-3.5 w-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <>
-                              <span>🔑</span>
-                              <span className="truncate">{t('students.impersonateBtn').split(' ')[0]}</span>
-                            </>
-                          )}
+                          <span>🔍</span>
+                          <span>{isAr ? 'عرض السجل والملف بالكامل' : 'View Full Details & Record'}</span>
                         </button>
 
-                        {/* Reset Password Button */}
-                        <button
-                          onClick={() => handleResetPassword(student)}
-                          disabled={resettingId !== null}
-                          className="py-2 bg-gray-900/60 hover:bg-red-500 hover:text-white text-[11px] font-extrabold rounded-lg border border-white/10 hover:border-red-500 text-red-400 transition-all duration-300 flex items-center justify-center gap-1.5"
-                        >
-                          {resettingId === student.id ? (
-                            <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <>
-                              <span>🔄</span>
-                              <span className="truncate">{isAr ? 'إعادة ضبط' : 'Reset'}</span>
-                            </>
-                          )}
-                        </button>
+                        <div className="grid grid-cols-2 gap-2 w-full">
+                          {/* Impersonate Button */}
+                          <button
+                            onClick={() => handleImpersonate(student)}
+                            disabled={impersonatingId !== null}
+                            className="py-2 bg-gray-900/60 hover:bg-white hover:text-black text-[11px] font-extrabold rounded-lg border border-white/10 hover:border-white text-white transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {impersonatingId === student.id ? (
+                              <span className="h-3.5 w-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <span>🔑</span>
+                                <span className="truncate">{isAr ? 'محاكاة' : 'Impersonate'}</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Reset Password Button */}
+                          <button
+                            onClick={() => handleResetPassword(student)}
+                            disabled={resettingId !== null}
+                            className="py-2 bg-gray-900/60 hover:bg-red-500 hover:text-white text-[11px] font-extrabold rounded-lg border border-white/10 hover:border-red-500 text-red-400 transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {resettingId === student.id ? (
+                              <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <span>🔄</span>
+                                <span className="truncate">{isAr ? 'إعادة ضبط' : 'Reset'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                     </motion.div>
@@ -595,6 +651,16 @@ export default function Students() {
           </div>
         </div>
       )}
+
+      <UserDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        email={detailsEmail}
+        role={detailsRole}
+        API_URL={API_URL}
+        token={localStorage.getItem('manar_token')}
+        isAr={isAr}
+      />
       
     </div>
   );

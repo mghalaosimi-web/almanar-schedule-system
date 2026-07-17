@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import UserDetailsModal from '../UserDetailsModal';
 
 // ── Duration formatter ────────────────────────────────────────────────────────
 function sessionDuration(loginTime, logoutTime) {
@@ -72,7 +73,9 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   const [loading,     setLoading]     = useState(false);
   const [search,      setSearch]      = useState('');
   const [roleFilter,  setRoleFilter]  = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | ACTIVE | ENDED | REVOKED
+  const [statusFilter, statusFilterFilter] = useState('ALL'); // ALL | ACTIVE | ENDED | REVOKED
+  // rename statusFilter setting hook locally so we don't conflict with statusFilter variable
+  const setStatusFilter = statusFilterFilter;
   const [page,        setPage]        = useState(1);
   const [total,       setTotal]       = useState(0);
   const [selected,    setSelected]    = useState(new Set());
@@ -80,6 +83,36 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   const [lastRefresh, setLastRefresh] = useState(null);
   const limit = 15;
   const intervalRef = useRef(null);
+
+  const [departments, setDepartments] = useState([]);
+  const [majors, setMajors] = useState([]);
+  const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedMajor, setSelectedMajor] = useState('ALL');
+
+  const [detailsEmail, setDetailsEmail] = useState('');
+  const [detailsRole, setDetailsRole] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  useEffect(() => {
+    if (tenantFilter.collegeId) {
+      axios.get(`${API_URL}/api/departments?collegeId=${tenantFilter.collegeId}`)
+        .then(res => {
+          if (res.data?.success) setDepartments(res.data.data);
+        })
+        .catch(err => console.error('Failed to fetch departments:', err));
+
+      axios.get(`${API_URL}/api/majors?collegeId=${tenantFilter.collegeId}`)
+        .then(res => {
+          if (res.data?.success) setMajors(res.data.data);
+        })
+        .catch(err => console.error('Failed to fetch majors:', err));
+    } else {
+      setDepartments([]);
+      setMajors([]);
+      setSelectedDept('ALL');
+      setSelectedMajor('ALL');
+    }
+  }, [tenantFilter.collegeId, API_URL]);
 
   const fetchSessions = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -89,6 +122,8 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (tenantFilter.collegeId)    params.append('collegeId',    tenantFilter.collegeId);
       if (tenantFilter.universityId) params.append('universityId', tenantFilter.universityId);
+      if (selectedDept !== 'ALL') params.append('departmentId', selectedDept);
+      if (selectedMajor !== 'ALL') params.append('majorId', selectedMajor);
 
       const res = await axios.get(`${API_URL}/api/admin/dev/sessions?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -103,7 +138,7 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, search, roleFilter, statusFilter, tenantFilter, API_URL, token]);
+  }, [page, search, roleFilter, statusFilter, tenantFilter, selectedDept, selectedMajor, API_URL, token]);
 
   useEffect(() => {
     fetchSessions();
@@ -112,7 +147,7 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   }, [fetchSessions]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter, tenantFilter]);
+  useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter, tenantFilter, selectedDept, selectedMajor]);
 
   const handleRevoke = async (sessionId, email) => {
     if (!window.confirm(isAr ? `طرد ${email} فوراً؟` : `Kick out ${email} immediately?`)) return;
@@ -247,6 +282,37 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
           <option value="UNI_ADMIN">UNI_ADMIN</option>
           <option value="SUPER_ADMIN">SUPER_ADMIN</option>
         </select>
+        
+        {tenantFilter.collegeId && (
+          <>
+            {/* Department filter */}
+            <select
+              value={selectedDept}
+              onChange={e => { setSelectedDept(e.target.value); setSelectedMajor('ALL'); setPage(1); }}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/40 transition min-w-[140px] truncate"
+            >
+              <option value="ALL">{isAr ? 'كل الأقسام' : 'All Departments'}</option>
+              {departments.map(d => (
+                <option key={d.id} value={String(d.id)}>{d.name}</option>
+              ))}
+            </select>
+
+            {/* Major/Specialization filter */}
+            <select
+              value={selectedMajor}
+              onChange={e => { setSelectedMajor(e.target.value); setPage(1); }}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/40 transition min-w-[140px] truncate"
+            >
+              <option value="ALL">{isAr ? 'كل التخصصات' : 'All Specializations'}</option>
+              {majors
+                .filter(m => selectedDept === 'ALL' || String(m.departmentId) === selectedDept)
+                .map(m => (
+                  <option key={m.id} value={String(m.id)}>{m.name}</option>
+                ))}
+            </select>
+          </>
+        )}
+
         <div className="flex gap-1.5">
           {['ALL', 'ACTIVE', 'ENDED', 'REVOKED'].map(f => (
             <button
@@ -289,6 +355,7 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
               <th className="pb-3 text-left">{isAr ? 'وقت الدخول' : 'Login Time'}</th>
               <th className="pb-3 text-left">{isAr ? 'المدة' : 'Duration'}</th>
               <th className="pb-3 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+              <th className="pb-3 text-center">{isAr ? 'التفاصيل' : 'Details'}</th>
               <th className="pb-3 text-center">{isAr ? 'طرد' : 'Kick'}</th>
             </tr>
           </thead>
@@ -347,10 +414,22 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
                   </td>
                   <td className="py-3.5 text-center"><StatusDot session={s} /></td>
                   <td className="py-3.5 text-center">
+                    <button
+                      onClick={() => {
+                        setDetailsEmail(s.userEmail);
+                        setDetailsRole(s.role);
+                        setShowDetailsModal(true);
+                      }}
+                      className="px-2 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-[9px] font-bold transition cursor-pointer"
+                    >
+                      🔍 {isAr ? 'تفاصيل' : 'Details'}
+                    </button>
+                  </td>
+                  <td className="py-3.5 text-center">
                     {isActive && (
                       <button
                         onClick={() => handleRevoke(s.id, s.userEmail)}
-                        className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-[9px] font-bold transition"
+                        className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-[9px] font-bold transition cursor-pointer"
                       >
                         🔴 {isAr ? 'طرد' : 'Kick'}
                       </button>
@@ -390,6 +469,16 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
           >{isAr ? 'التالي →' : 'Next →'}</button>
         </div>
       )}
+
+      <UserDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        email={detailsEmail}
+        role={detailsRole}
+        API_URL={API_URL}
+        token={token}
+        isAr={isAr}
+      />
     </div>
   );
 }

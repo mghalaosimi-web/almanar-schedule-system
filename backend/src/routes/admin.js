@@ -2338,22 +2338,51 @@ router.get('/admin/dev/sessions', verifyToken, async (req, res) => {
     const status = req.query.status || '';
     const collegeId = req.query.collegeId ? parseInt(req.query.collegeId) : null;
     const universityId = req.query.universityId ? parseInt(req.query.universityId) : null;
+    const departmentId = req.query.departmentId ? parseInt(req.query.departmentId) : null;
+    const majorId = req.query.majorId ? parseInt(req.query.majorId) : null;
 
     let emailFilter = null;
-    if (collegeId || universityId) {
-      // Find all user emails associated with this tenant context to filter sessions
+    if (collegeId || universityId || departmentId || majorId) {
+      // Find all user emails associated with this tenant context/department/major to filter sessions
+      const studentWhere = {};
+      const lecturerWhere = {};
+      const adminWhere = {};
+
+      if (collegeId) {
+        studentWhere.collegeId = collegeId;
+        lecturerWhere.collegeId = collegeId;
+        adminWhere.collegeId = collegeId;
+      } else if (universityId) {
+        studentWhere.college = { universityId };
+        lecturerWhere.college = { universityId };
+        adminWhere.universityId = universityId;
+      }
+
+      if (majorId) {
+        studentWhere.majorId = majorId;
+      } else if (departmentId) {
+        studentWhere.major = { departmentId };
+      }
+
       const studentEmails = await prisma.student.findMany({
-        where: collegeId ? { collegeId } : { college: { universityId } },
+        where: studentWhere,
         select: { email: true }
       });
-      const lecturerEmails = await prisma.lecturer.findMany({
-        where: collegeId ? { collegeId } : { college: { universityId } },
-        select: { email: true }
-      });
-      const adminEmails = await prisma.admin.findMany({
-        where: collegeId ? { collegeId } : { universityId },
-        select: { email: true }
-      });
+
+      // Only search lecturers/admins if we aren't filtering by major/department
+      let lecturerEmails = [];
+      let adminEmails = [];
+      if (!majorId && !departmentId) {
+        lecturerEmails = await prisma.lecturer.findMany({
+          where: lecturerWhere,
+          select: { email: true }
+        });
+        adminEmails = await prisma.admin.findMany({
+          where: adminWhere,
+          select: { email: true }
+        });
+      }
+
       emailFilter = [
         ...studentEmails.map(s => s.email),
         ...lecturerEmails.map(l => l.email),
@@ -2439,6 +2468,133 @@ router.post('/admin/dev/sessions/revoke', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Revoke session error:', error);
     res.status(500).json({ success: false, error: 'Failed to revoke session: ' + error.message });
+  }
+});
+
+// 6b. GET /api/admin/users/details
+router.get('/admin/users/details', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+    const { email, role } = req.query;
+    if (!email || !role) {
+      return res.status(400).json({ success: false, error: 'Email and role are required' });
+    }
+
+    const adminScope = getModelScope(req, 'Student');
+
+    let userProfile = null;
+    let sessionLogs = [];
+    let extraData = {};
+
+    // Fetch sessions from SessionLog
+    sessionLogs = await prisma.sessionLog.findMany({
+      where: { userEmail: email },
+      orderBy: { loginTime: 'desc' },
+      take: 30
+    });
+
+    if (role === 'STUDENT') {
+      userProfile = await prisma.student.findFirst({
+        where: { email, ...adminScope },
+        include: {
+          major: { include: { department: true } },
+          level: true,
+          group: true,
+          college: true
+        }
+      });
+
+      if (userProfile) {
+        // Fetch student attendance records
+        const attendances = await prisma.attendanceRecord.findMany({
+          where: { studentId: userProfile.id },
+          include: {
+            schedule: {
+              include: { subject: true, room: true }
+            }
+          },
+          orderBy: { date: 'desc' },
+          take: 30
+        });
+
+        // Fetch student completed goals
+        const goals = await prisma.studentGoalCompletion.findMany({
+          where: { studentId: userProfile.id },
+          include: {
+            academicGoal: {
+              include: { subject: true }
+            }
+          },
+          orderBy: { completedAt: 'desc' },
+          take: 30
+        });
+
+        // Fetch notifications
+        const notifications = await prisma.notificationLog.findMany({
+          where: {
+            OR: [
+              { studentId: userProfile.id },
+              { groupId: userProfile.groupId, studentId: null }
+            ]
+          },
+          orderBy: { sentTime: 'desc' },
+          take: 30
+        });
+
+        extraData = { attendances, goals, notifications };
+      }
+    } else if (role === 'LECTURER') {
+      const lecScope = getModelScope(req, 'Lecturer');
+      userProfile = await prisma.lecturer.findFirst({
+        where: { email, ...lecScope },
+        include: { college: true }
+      });
+
+      if (userProfile) {
+        const schedules = await prisma.schedule.findMany({
+          where: { lecturerId: userProfile.id },
+          include: { subject: true, room: true, group: true },
+          orderBy: [
+            { dayOfWeek: 'asc' },
+            { startTime: 'asc' }
+          ]
+        });
+
+        const requests = await prisma.rescheduleRequest.findMany({
+          where: { lecturerId: userProfile.id },
+          include: {
+            schedule: { include: { subject: true } },
+            newRoom: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20
+        });
+
+        extraData = { schedules, requests };
+      }
+    } else {
+      // For admins (SUPER_ADMIN, UNI_ADMIN, COLLEGE_ADMIN)
+      userProfile = await prisma.admin.findFirst({
+        where: { email },
+        include: { college: true, university: true }
+      });
+    }
+
+    if (!userProfile) {
+      return res.status(404).json({ success: false, error: 'User profile not found in scoped records' });
+    }
+
+    res.status(200).json({
+      success: true,
+      profile: userProfile,
+      sessions: sessionLogs,
+      extra: extraData
+    });
+  } catch (error) {
+    console.error('[API] Fetch user details error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch user details: ' + error.message });
   }
 });
 

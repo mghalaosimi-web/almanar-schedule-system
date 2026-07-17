@@ -37,7 +37,7 @@ try {
   console.warn('[PWA] registerSW failed (possibly in dev mode):', e);
 }
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '425434500913-1sg4gbku0f29rjuf1u8j7cc0haf9vfpq.apps.googleusercontent.com';
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '425434500913-qd4j47g4pf11dq8plpr8c7n4s9mi5q84.apps.googleusercontent.com';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
