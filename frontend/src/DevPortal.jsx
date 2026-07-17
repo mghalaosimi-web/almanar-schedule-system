@@ -94,9 +94,126 @@ export default function DevPortal() {
   const isAr = i18n.language === 'ar';
   const token = localStorage.getItem('manar_token');
 
+  // Passcode Lock State
+  const [isUnlocked, setIsUnlocked] = useState(sessionStorage.getItem('manar_dev_unlocked') === 'true');
+  const [passcode, setPasscode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [passcodeError, setPasscodeError] = useState('');
+
+  const handleVerifyPasscode = async (e) => {
+    e.preventDefault();
+    setVerifying(true);
+    setPasscodeError('');
+    try {
+      const res = await axios.post(`${API_URL}/api/admin/dev/verify-key`, 
+        { passcode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.success) {
+        sessionStorage.setItem('manar_dev_unlocked', 'true');
+        setIsUnlocked(true);
+        toast.success(isAr ? 'تم فتح الوصول بنجاح' : 'Access granted successfully');
+      }
+    } catch (err) {
+      setPasscodeError(err.response?.data?.error || (isAr ? 'رمز المرور غير صحيح' : 'Incorrect passcode'));
+      toast.error(isAr ? 'فشل التحقق من رمز المرور' : 'Passcode verification failed');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   // Sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [activeTab, setActiveTab]             = useState('telemetry');
+
+  if (!isUnlocked) {
+    return (
+      <div 
+        dir={isAr ? 'rtl' : 'ltr'} 
+        className="min-h-screen w-full bg-[var(--bg-primary)] text-slate-100 flex items-center justify-center p-6 relative overflow-hidden font-sans"
+      >
+        {/* Glow ambient background orbs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-25 bg-cyan-500/20 animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-15 bg-purple-500/20 animate-pulse" style={{ animationDelay: '2.5s' }} />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', duration: 0.6 }}
+          className="w-full max-w-md bg-black/45 border border-white/10 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl relative overflow-hidden text-center"
+        >
+          {/* Top glowing bar */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-500 via-[var(--accent)] to-purple-600 animate-pulse" />
+          
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-3xl mb-6 shadow-inner animate-bounce" style={{ animationDuration: '3s' }}>
+            🔒
+          </div>
+
+          <h2 className="text-xl font-black text-white tracking-wider mb-2 uppercase">
+            {isAr ? 'بوابة العبور الآمنة للمطور' : 'Developer Gateway'}
+          </h2>
+          <p className="text-xs text-white/50 leading-relaxed mb-6">
+            {isAr 
+              ? 'مطلوب إدخال رمز التحقق الأمني الخاص بالمطور لفتح مركز التحكم والتشخيص.' 
+              : 'Passcode authorization is required to access the developer control center.'}
+          </p>
+
+          <form onSubmit={handleVerifyPasscode} className="space-y-4">
+            <div className="space-y-1 text-right" dir={isAr ? 'rtl' : 'ltr'}>
+              <input 
+                type="password"
+                required
+                value={passcode}
+                onChange={e => {
+                  setPasscode(e.target.value);
+                  setPasscodeError('');
+                }}
+                placeholder="••••••••••••"
+                className="w-full text-center px-5 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all duration-200 text-lg tracking-[0.25em] font-mono"
+                autoFocus
+              />
+            </div>
+
+            {passcodeError && (
+              <motion.p 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-xs text-red-400 font-bold flex items-center justify-center gap-1.5"
+              >
+                <span>⚠️</span> {passcodeError}
+              </motion.p>
+            )}
+
+            <button
+              type="submit"
+              disabled={verifying}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-black hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all text-xs uppercase tracking-widest disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {verifying ? (
+                <span className="h-4.5 w-4.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>{isAr ? 'تحقق وعبور' : 'Authorize & Enter'}</span>
+                  <span>⚡</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Cancel & return */}
+          <div className="mt-6 pt-4 border-t border-white/5">
+            <button
+              type="button"
+              onClick={() => window.location.href = '/admin/overview'}
+              className="text-xs font-bold text-white/40 hover:text-white transition-colors duration-200 cursor-pointer"
+            >
+              {isAr ? '← إلغاء والعودة للوحة الرئيسية' : '← Cancel & Go Back'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Global context (multi-tenant selector)
   const [tenantContext, setTenantContext] = useState({ id: 'ALL', type: 'ALL', label: 'All Tenants' });

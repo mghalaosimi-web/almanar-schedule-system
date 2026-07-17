@@ -420,8 +420,8 @@ router.post('/google', authLimiter, async (req, res) => {
       });
     }
     if (!user) {
-      user = await prisma.student.findUnique({
-        where: { email },
+      user = await prisma.student.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
         include: { group: true }
       });
       if (user && googleId && !user.googleId) {
@@ -549,8 +549,8 @@ router.post('/google-login', authLimiter, async (req, res) => {
       });
     }
     if (!student) {
-      student = await prisma.student.findUnique({
-        where: { email }
+      student = await prisma.student.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } }
       });
       if (student && googleId && !student.googleId) {
         student = await prisma.student.update({
@@ -673,8 +673,8 @@ router.post('/link-google', authLimiter, async (req, res) => {
 
     const { googleId } = verification;
 
-    let student = await prisma.student.findUnique({
-      where: { email }
+    let student = await prisma.student.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } }
     });
 
     if (!student) {
@@ -1088,7 +1088,9 @@ router.post('/register', authLimiter, async (req, res) => {
       resolvedLevelId = level.id;
     }
 
-    const existingStudent = await prisma.student.findUnique({ where: { email: verifiedEmail } });
+    const existingStudent = await prisma.student.findFirst({
+      where: { email: { equals: verifiedEmail, mode: 'insensitive' } }
+    });
     if (existingStudent) {
       return res.status(400).json({ success: false, error: 'Email address is already registered' });
     }

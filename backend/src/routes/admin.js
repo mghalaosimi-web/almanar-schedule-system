@@ -1852,6 +1852,20 @@ router.post('/admin/upload-exams', verifyToken, async (req, res) => {
   }
 });
 
+// Global developer routes check
+router.use('/admin/dev', verifyToken, isSuperAdmin);
+router.use('/dev', verifyToken, isSuperAdmin);
+
+// Verification endpoint for Developer Passcode
+router.post('/admin/dev/verify-key', (req, res) => {
+  const { passcode } = req.body;
+  const devKey = process.env.DEV_PORTAL_KEY || 'almanar-dev-passcode-2026';
+  if (passcode === devKey) {
+    return res.status(200).json({ success: true });
+  }
+  return res.status(401).json({ success: false, error: 'رمز مرور المطور غير صحيح' });
+});
+
 // ── DEV PORTAL INSTITUTION HIERARCHY MANAGEMENT ───────────────────────
 
 // 1. GET /api/admin/dev/tree - Fetch governorates, universities, colleges, departments, and majors

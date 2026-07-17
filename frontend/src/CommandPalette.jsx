@@ -60,6 +60,13 @@ export default function CommandPalette() {
     }
   };
 
+  const userJson = localStorage.getItem('manar_user');
+  let user = null;
+  if (userJson) {
+    try { user = JSON.parse(userJson); } catch {}
+  }
+  const isDeveloper = user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com');
+
   // Navigational shortcuts
   const navigationItems = [
     { name: '📖 دليل المستخدم / Instructions', subtitle: 'كيفية استخدام بوابة الطالب خطوة بخطوة', action: '/instructions' },
@@ -67,8 +74,8 @@ export default function CommandPalette() {
     { name: '📅 عرض جدول المحاضرات الأسبوعي', subtitle: 'الانتقال إلى لوحة العرض الرئيسية', action: '/' },
     { name: '🖨️ تصدير / طباعة الجدول الدراسي', subtitle: 'تحميل ملف PDF أو إرسال للطابعة', action: 'print' },
     { name: '🎨 تغيير مظهر التطبيق (Theme)', subtitle: 'التبديل بين الثيمات المتاحة', action: '/settings' },
-    { name: '👑 God Mode — لوحة المطور', subtitle: 'صلاحيات المسؤول الخارق (SUPER_ADMIN فقط)', action: '/admin/god-mode' },
-    { name: '⌨️ Dev Portal — بيئة التطوير', subtitle: 'التيرمنال الداخلي ومقاييس النظام', action: '/admin/dev-portal' },
+    isDeveloper && { name: '👑 God Mode — لوحة المطور', subtitle: 'صلاحيات المسؤول الخارق (SUPER_ADMIN فقط)', action: '/admin/god-mode' },
+    isDeveloper && { name: '⌨️ Dev Portal — بيئة التطوير', subtitle: 'التيرمنال الداخلي ومقاييس النظام', action: '/admin/dev-portal' },
     { 
       name: '🚪 تسجيل الخروج من الحساب', 
       subtitle: 'إنهاء الجلسة الحالية', 
@@ -78,7 +85,7 @@ export default function CommandPalette() {
         navigate('/login');
       } 
     }
-  ];
+  ].filter(Boolean);
 
   // Filter schedules and static navigation
   const filteredNav = navigationItems.filter(item => 

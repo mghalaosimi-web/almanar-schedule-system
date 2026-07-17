@@ -899,7 +899,7 @@ function AppLayout() {
               {navLink('/admin/groups',    '👥', isAr ? 'إدارة الشعب' : 'Group Management')}
               {navLink('/admin/students',  '🎓', isAr ? 'سجل الطلاب' : 'Students Database')}
               {navLink('/admin/logs',      '📜', isAr ? 'سجلات النظام' : 'System Logs')}
-              {user?.role === 'SUPER_ADMIN' && (
+              {user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com') && (
                 <>
                   {navLink('/admin/dev-portal', '⌨️', isAr ? 'بوابة المطورين' : 'Dev Portal', '#60c4ff')}
                   <button
@@ -960,7 +960,7 @@ function AppLayout() {
             <Route path="/admin/logs"       element={<SystemLog />} />
             <Route path="/admin/god-mode"   element={<Navigate to="/admin/dev-portal" replace />} />
             <Route path="/super-admin/dashboard" element={<Navigate to="/admin/dev-portal" replace />} />
-            <Route path="/admin/dev-portal" element={user?.role === 'SUPER_ADMIN' ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
+            <Route path="/admin/dev-portal" element={user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com') ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
             <Route path="/admin/instructions" element={<Instructions />} />
             <Route path="*" element={<Navigate to="/admin/overview" replace />} />
           </Routes>

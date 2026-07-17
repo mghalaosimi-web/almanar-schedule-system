@@ -1,8 +1,11 @@
 const express = require('express');
 const { prisma } = require('../db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, isSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Global developer database routes check
+router.use('/admin/dev/db', verifyToken, isSuperAdmin);
 
 // Helper: Ensure user is SUPER_ADMIN
 const requireSuperAdmin = (req, res, next) => {
