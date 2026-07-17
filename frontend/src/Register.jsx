@@ -297,6 +297,9 @@ export default function Register() {
 
     setLoading(true);
     setError(null);
+    window.dispatchEvent(new CustomEvent('large-operation-start', {
+      detail: { message: isAr ? 'جاري إنشاء الحساب والتحقق الأمني...' : 'Creating account & checking security...' }
+    }));
     try {
       const payload = {
         fullName,
@@ -338,6 +341,7 @@ export default function Register() {
       fetchCaptcha();
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('large-operation-end'));
     }
   };
 

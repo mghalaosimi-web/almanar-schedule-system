@@ -74,6 +74,7 @@ model Group {
   examSchedules    ExamSchedule[]
   resources        GroupResource[]
   exchangePosts    ExchangePost[]
+  academicGoals    AcademicGoal[]
   collegeId        Int
   college          College           @relation(fields: [collegeId], references: [id])
 
@@ -111,6 +112,7 @@ model Student {
   exchangePosts      ExchangePost[]
   exchangeComments   ExchangeComment[]
   feedbacks          Feedback[]
+  goalCompletions    StudentGoalCompletion[]
   createdAt          DateTime           @default(now())
 
   @@index([collegeId])
@@ -126,6 +128,7 @@ model Subject {
   type      SubjectType
   schedules Schedule[]
   examSchedules ExamSchedule[]
+  academicGoals AcademicGoal[]
   collegeId Int
   college   College     @relation(fields: [collegeId], references: [id])
 
@@ -564,6 +567,51 @@ model BlockedIP {
 
   @@index([ip])
 }
+
+enum GoalType {
+  ASSIGNMENT
+  PROJECT
+  EXAM
+  ACHIEVEMENT
+}
+
+model AcademicGoal {
+  id          Int                     @id @default(autoincrement())
+  title       String
+  description String?
+  type        GoalType                @default(ASSIGNMENT)
+  dueDate     DateTime?
+  weekNumber  Int?                    // e.g. 1 for week 1
+  
+  subjectId   Int
+  subject     Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  groupId     Int?
+  group       Group?                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  completions StudentGoalCompletion[]
+  
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([subjectId])
+  @@index([groupId])
+}
+
+model StudentGoalCompletion {
+  id             Int          @id @default(autoincrement())
+  studentId      Int
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicGoalId Int
+  academicGoal   AcademicGoal @relation(fields: [academicGoalId], references: [id], onDelete: Cascade)
+  completedAt    DateTime     @default(now())
+  status         String       @default("COMPLETED") // "COMPLETED" or other custom status
+
+  @@unique([studentId, academicGoalId])
+  @@index([studentId])
+  @@index([academicGoalId])
+}
+
 
 
 

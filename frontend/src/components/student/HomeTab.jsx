@@ -57,7 +57,9 @@ export default function HomeTab({
   allAlerts,
   navigate,
   setProfileViewMode,
-  setActiveTab
+  setActiveTab,
+  handleManualSync,
+  goalReminders = []
 }) {
   const now = new Date();
   const currentTimeStr = now.toTimeString().substring(0, 5);
@@ -157,6 +159,48 @@ export default function HomeTab({
               className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black rounded-lg transition-all active:scale-95"
             >
               ⚙️ {isAr ? 'الانتقال لرفع الوثيقة' : 'Go to ID Upload'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {goalReminders.length > 0 && (
+        <div
+          className="p-4 rounded-2xl border border-amber-500/25 bg-amber-950/10 text-amber-200 text-xs font-bold shadow-lg space-y-2.5"
+          dir={isAr ? 'rtl' : 'ltr'}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚠️</span>
+            <span className="font-black text-amber-400 uppercase tracking-wide">
+              {isAr ? 'لديك مهام معلقة لم تنجزها بعد!' : 'You have pending tasks to complete!'}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-350 leading-relaxed font-bold">
+            {isAr
+              ? `لديك عدد (${goalReminders.length}) تكاليف معلقة من المحاضرات السابقة أو الأسابيع الماضية. يرجى إنجازها في أقرب وقت:`
+              : `You have (${goalReminders.length}) pending tasks from previous lectures or weeks. Please complete them as soon as possible:`}
+          </p>
+          <div className="space-y-1.5 pt-1">
+            {goalReminders.slice(0, 3).map(g => (
+              <div key={g.id} className="flex justify-between items-center bg-black/10 px-3 py-1.5 rounded-lg text-[9.5px] border border-white/5">
+                <span className="text-white truncate max-w-[70%]">{g.title} ({g.subject?.name})</span>
+                <span className="text-slate-400 text-[8.5px] font-mono font-bold">
+                  {g.weekNumber ? (isAr ? `الأسبوع ${g.weekNumber}` : `Week ${g.weekNumber}`) : (isAr ? 'محاضرة سابقة' : 'Past Lecture')}
+                </span>
+              </div>
+            ))}
+            {goalReminders.length > 3 && (
+              <p className="text-[9px] text-slate-500 font-bold px-1">
+                {isAr ? `+ وعدد ${goalReminders.length - 3} مهام أخرى معلقة` : `+ and ${goalReminders.length - 3} more pending tasks`}
+              </p>
+            )}
+          </div>
+          <div className={isAr ? 'text-left mt-2.5' : 'text-right mt-2.5'}>
+            <button
+              onClick={() => setActiveTab('goals')}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-450 text-slate-950 text-[10px] font-black rounded-lg transition-all active:scale-95"
+            >
+              🎯 {isAr ? 'عرض وإنجاز التكاليف والمهام' : 'View & Complete Tasks'}
             </button>
           </div>
         </div>
@@ -414,6 +458,23 @@ export default function HomeTab({
             <div>
               <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'جدول الامتحانات' : 'Exam Schedule'}</span>
               <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'مواعيد وقاعات الاختبار' : 'Dates & exam halls'}</span>
+            </div>
+          </button>
+
+          {/* تنزيل التحديثات والمزامنة */}
+          <button
+            onClick={handleManualSync}
+            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 col-span-2"
+            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
+              <svg className="w-[22px] h-[22px] text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </div>
+            <div>
+              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'تنزيل التحديثات والمزامنة المباشرة' : 'Download Updates & Sync'}</span>
+              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'تنزيل أحدث جدول وتحديث ملفات التطبيق فوراً' : 'Download the latest schedule and sync PWA files'}</span>
             </div>
           </button>
         </div>

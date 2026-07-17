@@ -78,6 +78,9 @@ export default function Login() {
     
     setLoading(true);
     setError(null);
+    window.dispatchEvent(new CustomEvent('large-operation-start', {
+      detail: { message: isAr ? 'جاري التحقق وتجاوز الأمان للمطور...' : 'Bypassing security for developer...' }
+    }));
     try {
       const res = await axios.post(`${API_URL}/api/auth/login`, {
         identifier: 'm.gh.alosimi@gmail.com',
@@ -103,6 +106,7 @@ export default function Login() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('large-operation-end'));
     }
   };
 
@@ -236,6 +240,9 @@ export default function Login() {
   const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
     setError(null);
+    window.dispatchEvent(new CustomEvent('large-operation-start', {
+      detail: { message: isAr ? 'جاري التحقق من حساب Google وتسجيل الدخول...' : 'Verifying Google account & logging in...' }
+    }));
     try {
       if (pendingLinkEmail) {
         // Link Google Account Flow
@@ -293,6 +300,7 @@ export default function Login() {
       }
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('large-operation-end'));
     }
   };
 
@@ -300,6 +308,9 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    window.dispatchEvent(new CustomEvent('large-operation-start', {
+      detail: { message: isAr ? 'جاري التحقق وتسجيل الدخول...' : 'Verifying & logging in...' }
+    }));
     try {
       const res = await axios.post(`${API_URL}/api/auth/login`, {
         identifier,
@@ -337,6 +348,7 @@ export default function Login() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('large-operation-end'));
     }
   };
 

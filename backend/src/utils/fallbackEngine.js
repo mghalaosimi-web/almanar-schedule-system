@@ -196,6 +196,8 @@ function getListForModel(modelName, meta, schedules) {
   if (norm === 'auditlog') return loadLogs('audit');
   if (norm === 'notificationlog') return loadLogs('notification');
   if (norm === 'reschedulerequest') return loadLogs('reschedule_request');
+  if (norm === 'academicgoal') return loadLogs('academic_goal');
+  if (norm === 'studentgoalcompletion') return loadLogs('student_goal_completion');
   return [];
 }
 
@@ -435,8 +437,10 @@ function executeWrite(modelName, action, args) {
       }
       list.push(newRecord);
       fs.writeFileSync(filePath, JSON.stringify(list, null, 2), 'utf8');
-    } else if (['sessionlog', 'auditlog', 'notificationlog', 'reschedulerequest'].includes(norm)) {
-      const type = norm.replace('log', '').replace('request', '_request');
+    } else if (['sessionlog', 'auditlog', 'notificationlog', 'reschedulerequest', 'academicgoal', 'studentgoalcompletion'].includes(norm)) {
+      const type = norm === 'academicgoal' ? 'academic_goal' :
+                   norm === 'studentgoalcompletion' ? 'student_goal_completion' :
+                   norm.replace('log', '').replace('request', '_request');
       const list = loadLogs(type);
       list.push(newRecord);
       saveLogs(type, list);
@@ -515,6 +519,11 @@ function executeWrite(modelName, action, args) {
     } else if (norm === 'group') {
       const list = loadEntityList('groups', getGroups).filter(item => !matchesCriteria(item, where));
       saveEntityList('groups', list);
+      return { success: true };
+    } else if (['academicgoal', 'studentgoalcompletion'].includes(norm)) {
+      const type = norm === 'academicgoal' ? 'academic_goal' : 'student_goal_completion';
+      const list = loadLogs(type).filter(item => !matchesCriteria(item, where));
+      saveLogs(type, list);
       return { success: true };
     }
   }

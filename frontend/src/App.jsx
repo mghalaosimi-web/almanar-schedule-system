@@ -6,6 +6,7 @@ import axios from 'axios';
 import { API_URL } from './config';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
+import ProgressLoader from './components/ProgressLoader';
 
 // Shared layout controls & modal
 import Logo from './Logo';
@@ -74,10 +75,41 @@ const PageLoader = () => {
   );
 };
 
-// Global Axios Interceptor for License Revocation
-axios.interceptors.response.use(
-  (response) => response,
+// Global Axios Interceptors for loaders and license checks
+let activeRequests = 0;
+
+const dispatchRequestStart = () => {
+  activeRequests++;
+  if (activeRequests === 1) {
+    window.dispatchEvent(new CustomEvent('axios-request-start'));
+  }
+};
+
+const dispatchRequestEnd = () => {
+  activeRequests = Math.max(0, activeRequests - 1);
+  if (activeRequests === 0) {
+    window.dispatchEvent(new CustomEvent('axios-request-end'));
+  }
+};
+
+axios.interceptors.request.use(
+  (config) => {
+    dispatchRequestStart();
+    return config;
+  },
   (error) => {
+    dispatchRequestEnd();
+    return Promise.reject(error);
+  }
+);
+
+axios.interceptors.response.use(
+  (response) => {
+    dispatchRequestEnd();
+    return response;
+  },
+  (error) => {
+    dispatchRequestEnd();
     if (error.response && error.response.status === 403 && error.response.data?.error === 'LICENSE_REVOKED') {
       localStorage.removeItem('manar_token');
       localStorage.removeItem('manar_user');
@@ -1219,6 +1251,7 @@ export default function App() {
           </React.Suspense>
         </ErrorBoundary>
         <CommandPalette />
+        <ProgressLoader />
         <Toaster
           position="top-right"
           toastOptions={{

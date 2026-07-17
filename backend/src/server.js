@@ -27,6 +27,7 @@ const publicRouter = require('./routes/public');
 const representativeRouter = require('./routes/representative');
 const exchangeRouter = require('./routes/exchange');
 const databaseRouter = require('./routes/database');
+const goalsRouter = require('./routes/goals');
 
 const { activityLogger } = require('./middleware/activityLogger');
 const { requestLoggerMiddleware } = require('./middleware/requestLogger');
@@ -143,6 +144,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/rep', representativeRouter);
 app.use('/api/exchange', exchangeRouter);
 app.use('/api', databaseRouter);
+app.use('/api/goals', goalsRouter);
 
 // Self-healing database check & migrations
 async function runStartupMigrations() {

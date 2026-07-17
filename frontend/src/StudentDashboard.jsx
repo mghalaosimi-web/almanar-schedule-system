@@ -26,6 +26,7 @@ import ScheduleTab from './components/student/ScheduleTab';
 import AlertsTab from './components/student/AlertsTab';
 import ProfileTab from './components/student/ProfileTab';
 import ExchangeHubTab from './components/student/ExchangeHubTab';
+import GoalsTab from './components/student/GoalsTab';
 
 const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const SCHED_DAYS = ['SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'];
@@ -211,6 +212,11 @@ export default function StudentDashboard() {
   const [subjectStats, setSubjectStats] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [alertFilter, setAlertFilter] = useState('All');
+  
+  // Goals and Reminders states
+  const [studentGoals, setStudentGoals] = useState([]);
+  const [studentGoalsLoading, setStudentGoalsLoading] = useState(false);
+  const [goalReminders, setGoalReminders] = useState([]);
 
   // حالات ملتقى الشعبة والنقاشات (Exchange Hub)
   const [posts, setPosts] = useState([]);
@@ -428,7 +434,7 @@ export default function StudentDashboard() {
         : `${API_URL}/api/groups`;
 
       // تنفيذ استعلامات متوازية لتقليل زمن الاستجابة الكلي (Latency)
-      const [schedRes, groupsRes, statsRes, notifRes, subjectStatsRes, settingsRes] = await Promise.all([
+      const [schedRes, groupsRes, statsRes, notifRes, subjectStatsRes, settingsRes, goalsRes] = await Promise.all([
         axios.get(schedulesUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} }),
         axios.get(groupsUrl).catch(() => null),
         axios.get(`${API_URL}/api/student/attendance/stats`, {
@@ -440,7 +446,10 @@ export default function StudentDashboard() {
         axios.get(`${API_URL}/api/student/attendance-stats`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).catch(() => null),
-        axios.get(`${API_URL}/api/auth/system/settings`).catch(() => null)
+        axios.get(`${API_URL}/api/auth/system/settings`).catch(() => null),
+        axios.get(`${API_URL}/api/goals`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).catch(() => null)
       ]);
 
       if (settingsRes?.data?.success) {
@@ -516,6 +525,11 @@ export default function StudentDashboard() {
         setNotifications(notifRes.data.data);
         localStorage.setItem('cached_student_notifications', JSON.stringify(notifRes.data.data));
       }
+
+      if (goalsRes?.data?.success) {
+        setStudentGoals(goalsRes.data.data);
+      }
+      fetchGoalsReminders();
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       const cached = localStorage.getItem('cached_student_schedules');
@@ -831,6 +845,59 @@ export default function StudentDashboard() {
     toast.success(isAr ? 'جاري التحقق من وجود تحديثات...' : 'Checking for updates...', { icon: '🔄' });
   };
 
+  const handleManualSync = async () => {
+    window.dispatchEvent(new CustomEvent('large-operation-start', { 
+      detail: { 
+        message: isAr ? 'جاري تنزيل التحديث والمزامنة...' : 'Downloading update & syncing...' 
+      } 
+    }));
+    
+    try {
+      await fetchData(true);
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.update().catch(err => console.warn('SW update error:', err));
+        }
+      }
+      toast.success(isAr ? 'تم تحديث البيانات بنجاح!' : 'Data successfully updated!');
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل تحديث البيانات' : 'Failed to update data');
+    } finally {
+      window.dispatchEvent(new CustomEvent('large-operation-end'));
+    }
+  };
+
+  const fetchGoalsReminders = () => {
+    const token = localStorage.getItem('manar_token');
+    if (!token) return;
+    axios.get(`${API_URL}/api/goals/reminders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      if (res.data?.success) {
+        setGoalReminders(res.data.data);
+      }
+    }).catch(err => {
+      console.warn('[Reminders] Failed to fetch reminders:', err.message);
+    });
+  };
+
+  const handleToggleGoal = async (goalId) => {
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/goals/${goalId}/toggle`, {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.success) {
+        setStudentGoals(prev => prev.map(g => g.id === goalId ? { ...g, completed: res.data.completed } : g));
+        fetchGoalsReminders();
+      }
+    } catch (err) {
+      toast.error(isAr ? 'فشل تحديث حالة المهمة.' : 'Failed to update task state.');
+    }
+  };
+
   // ── معالجات ملتقى النقاشات والشعبة (Exchange Hub APIs) ──
   const fetchPosts = async () => {
     try {
@@ -1101,6 +1168,13 @@ export default function StudentDashboard() {
         showAvatar: false
       };
     }
+    if (activeTab === 'goals') {
+      return {
+        title: isAr ? 'التكاليف والمهام الأكاديمية' : 'Tasks & Academic Goals',
+        subtitle: isAr ? 'تتبع التكاليف، المشاريع، ومواعيد الاختبارات والإنجازات' : 'Track assignments, exams, and cohort milestones',
+        showAvatar: false
+      };
+    }
     if (activeTab === 'exams') {
       return {
         title: isAr ? 'جدول الامتحانات' : 'Exam Schedule',
@@ -1178,6 +1252,15 @@ export default function StudentDashboard() {
               </div>
             )}
             <button
+              onClick={handleManualSync}
+              className="btn-ghost p-2 border border-slate-800 hover:border-[var(--accent)] rounded-lg shrink-0 flex items-center justify-center"
+              title={isAr ? 'تحديث التطبيق والبيانات' : 'Update App & Data'}
+            >
+              <svg className="w-4 h-4 text-slate-400 hover:text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+            <button
               onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
               className="btn-ghost px-2.5 py-1 text-[9px] font-black uppercase border border-slate-800 hover:border-[var(--accent)] rounded-lg shrink-0"
             >
@@ -1246,6 +1329,8 @@ export default function StudentDashboard() {
                     navigate={navigate}
                     setProfileViewMode={setProfileViewMode}
                     setActiveTab={setActiveTab}
+                    handleManualSync={handleManualSync}
+                    goalReminders={goalReminders}
                   />
                 )}
 
@@ -1266,8 +1351,19 @@ export default function StudentDashboard() {
                       getActiveDay={getActiveDay}
                       getActiveStartTime={getActiveStartTime}
                       getActiveEndTime={getActiveEndTime}
+                      goals={studentGoals}
                     />
                   )
+                )}
+
+                {/* 2.5 تبويب التكاليف والمهام الأكاديمية */}
+                {activeTab === 'goals' && (
+                  <GoalsTab
+                    isAr={isAr}
+                    goals={studentGoals}
+                    goalsLoading={studentGoalsLoading}
+                    onToggleGoal={handleToggleGoal}
+                  />
                 )}
 
                 {/* 3. تبويب جدول الامتحانات */}
@@ -1384,6 +1480,21 @@ export default function StudentDashboard() {
                 <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
                   <path d="M6 6h10M6 10h10" />
+                </svg>
+              )
+            },
+            {
+              id: 'goals',
+              label: isAr ? 'المهام' : 'Tasks',
+              iconActive: (
+                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.082l3.75-5.25z" clipRule="evenodd" />
+                </svg>
+              ),
+              iconInactive: (
+                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="m9 12 2 2 4-4" />
                 </svg>
               )
             },

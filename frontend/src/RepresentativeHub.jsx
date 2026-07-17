@@ -54,6 +54,15 @@ export default function RepresentativeHub() {
   const [pastLogsAttendance, setPastLogsAttendance] = useState([]);
   const [pastLogsLoading, setPastLogsLoading] = useState(false);
   
+  // Goals & Tasks states
+  const [goals, setGoals] = useState([]);
+  const [goalsLoading, setGoalsLoading] = useState(false);
+  const [goalTitle, setGoalTitle] = useState('');
+  const [goalDescription, setGoalDescription] = useState('');
+  const [goalType, setGoalType] = useState('ASSIGNMENT');
+  const [goalDueDate, setGoalDueDate] = useState('');
+  const [goalWeekNumber, setGoalWeekNumber] = useState('');
+  const [goalSubjectId, setGoalSubjectId] = useState('');
 
   // ── Offline-First Engine ──────────────────────────────────────────
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -214,6 +223,10 @@ export default function RepresentativeHub() {
         setResourcesLoading(false);
       });
     }
+
+    if (subView === 'goals') {
+      fetchGoals();
+    }
   }, [subView, token]);
 
   const handleApproveStudent = async (studentId) => {
@@ -250,6 +263,71 @@ export default function RepresentativeHub() {
       toast.error(err.response?.data?.error || (isAr ? 'فشل حذف الحساب.' : 'Failed to delete account.'));
     } finally {
       setSubmittingAction(null);
+    }
+  };
+
+  const fetchGoals = () => {
+    setGoalsLoading(true);
+    axios.get(`${API_URL}/api/goals`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      if (res.data?.success) {
+        setGoals(res.data.data);
+      }
+    }).catch(err => {
+      console.error('Failed to fetch goals', err);
+    }).finally(() => {
+      setGoalsLoading(false);
+    });
+  };
+
+  const handleCreateGoal = async (e) => {
+    e.preventDefault();
+    if (!goalTitle || !goalType || !goalSubjectId) {
+      toast.error(isAr ? 'الرجاء ملء الحقول الإجبارية.' : 'Please fill required fields.');
+      return;
+    }
+    setCohortLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/goals/rep`, {
+        title: goalTitle,
+        description: goalDescription,
+        type: goalType,
+        dueDate: goalDueDate || null,
+        weekNumber: goalWeekNumber || null,
+        subjectId: goalSubjectId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        toast.success(isAr ? 'تمت إضافة الهدف/التكليف وإشعار الدفعة بنجاح!' : 'Goal created and cohort notified!');
+        setGoalTitle('');
+        setGoalDescription('');
+        setGoalType('ASSIGNMENT');
+        setGoalDueDate('');
+        setGoalWeekNumber('');
+        setGoalSubjectId('');
+        fetchGoals();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || (isAr ? 'فشل إضافة الهدف.' : 'Failed to create goal.'));
+    } finally {
+      setCohortLoading(false);
+    }
+  };
+
+  const handleDeleteGoal = async (goalId) => {
+    if (!window.confirm(isAr ? 'هل أنت متأكد من حذف هذا الهدف/التكليف؟' : 'Are you sure you want to delete this goal/task?')) return;
+    try {
+      const res = await axios.delete(`${API_URL}/api/goals/rep/${goalId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم حذف الهدف بنجاح.' : 'Goal deleted successfully.');
+        setGoals(prev => prev.filter(g => g.id !== goalId));
+      }
+    } catch (err) {
+      toast.error(isAr ? 'فشل حذف الهدف.' : 'Failed to delete goal.');
     }
   };
 
@@ -541,6 +619,13 @@ export default function RepresentativeHub() {
           showAvatar: false
         };
       case 'tasks':
+        if (subView === 'goals') {
+          return {
+            title: isAr ? 'إدارة التكاليف والأهداف' : 'Academic Goals & Tasks',
+            subtitle: isAr ? 'إضافة وتتبع التكاليف، المشاريع، الاختبارات والإنجازات' : 'Set and monitor class tasks, exams, and milestones',
+            showAvatar: false
+          };
+        }
         if (subView === 'approvals') {
           return {
             title: isAr ? 'توثيق الحسابات والقبول' : 'Student Verifications',
@@ -1285,6 +1370,185 @@ export default function RepresentativeHub() {
       );
     }
 
+    if (subView === 'goals') {
+      const uniqueSubjects = [];
+      const seenSubjectIds = new Set();
+      schedules.forEach(s => {
+        if (s.subject && !seenSubjectIds.has(s.subject.id)) {
+          seenSubjectIds.add(s.subject.id);
+          uniqueSubjects.push(s.subject);
+        }
+      });
+
+      return (
+        <div className="space-y-6">
+          {renderBackButton()}
+
+          <form onSubmit={handleCreateGoal} className="space-y-4">
+            <div className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  {isAr ? 'اختر المقرر الدراسي *' : 'Select Course Subject *'}
+                </label>
+                <select
+                  required
+                  value={goalSubjectId}
+                  onChange={e => setGoalSubjectId(e.target.value)}
+                  className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none w-full cursor-pointer h-12"
+                >
+                  <option value="" disabled>{isAr ? '-- اختر المقرر --' : '-- Select Subject --'}</option>
+                  {uniqueSubjects.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  {isAr ? 'عنوان الهدف أو التكليف *' : 'Goal / Assignment Title *'}
+                </label>
+                <input
+                  type="text" required value={goalTitle} onChange={e => setGoalTitle(e.target.value)}
+                  className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none w-full h-12"
+                  placeholder={isAr ? 'مثال: حل شيت الاحتمالات الأول' : 'e.g., Solve Probability Sheet 1'}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  {isAr ? 'نوع الهدف الأكاديمي *' : 'Academic Goal Type *'}
+                </label>
+                <select
+                  required
+                  value={goalType}
+                  onChange={e => setGoalType(e.target.value)}
+                  className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none w-full cursor-pointer h-12"
+                >
+                  <option value="ASSIGNMENT">📝 {isAr ? 'تكليف دراسي (Assignment)' : 'Assignment'}</option>
+                  <option value="PROJECT">📁 {isAr ? 'مشروع عملي (Project)' : 'Project'}</option>
+                  <option value="EXAM">📅 {isAr ? 'موعد اختبار (Exam)' : 'Exam'}</option>
+                  <option value="ACHIEVEMENT">🎉 {isAr ? 'إنجاز / هدف عام (Achievement)' : 'Achievement'}</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {isAr ? 'تاريخ التسليم / الموعد' : 'Due Date'}
+                  </label>
+                  <input
+                    type="date" value={goalDueDate} onChange={e => setGoalDueDate(e.target.value)}
+                    className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-3 py-2.5 focus:outline-none w-full h-10"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {isAr ? 'رقم الأسبوع' : 'Week Number'}
+                  </label>
+                  <input
+                    type="number" min="1" max="16" value={goalWeekNumber} onChange={e => setGoalWeekNumber(e.target.value)}
+                    className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-3 py-2.5 focus:outline-none w-full h-10"
+                    placeholder={isAr ? 'مثال: 1' : 'e.g., 1'}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  {isAr ? 'تفاصيل إضافية أو وصف للهدف' : 'Additional Description'}
+                </label>
+                <textarea
+                  value={goalDescription}
+                  onChange={e => setGoalDescription(e.target.value)}
+                  className="bg-slate-950 text-xs font-semibold text-white border border-white/10 rounded-xl p-3 focus:outline-none w-full h-20"
+                  placeholder={isAr ? 'اكتب شروط التكليف أو أرقام التمارين المطلوبة...' : 'Type specific exercises or requirements...'}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={cohortLoading}
+              className="w-full py-3.5 bg-amber-500 hover:bg-amber-450 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] flex justify-center items-center h-12"
+            >
+              {cohortLoading ? (
+                <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+              ) : (isAr ? 'نشر الهدف وإشعار الدفعة' : 'Create & Notify Cohort')}
+            </button>
+          </form>
+
+          {/* Goals list */}
+          <div className="pt-6 border-t border-white/5 space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+              🎯 {isAr ? 'أهداف وتكاليف الدفعة الحالية' : 'Cohort Goals & Tasks'}
+            </h4>
+            
+            {goalsLoading ? (
+              <div className="flex justify-center py-10">
+                <span className="h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : goals.length === 0 ? (
+              <p className="text-[10px] text-slate-500 font-bold">{isAr ? 'لا يوجد أهداف أو تكاليف معلنة حالياً.' : 'No goals or tasks declared yet.'}</p>
+            ) : (
+              <div className="space-y-3">
+                {goals.map(g => {
+                  const typeColors = {
+                    ASSIGNMENT: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                    PROJECT: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                    EXAM: 'bg-red-500/10 text-red-400 border-red-500/20',
+                    ACHIEVEMENT: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  };
+                  const typeLabel = {
+                    ASSIGNMENT: isAr ? 'تكليف' : 'Assignment',
+                    PROJECT: isAr ? 'مشروع' : 'Project',
+                    EXAM: isAr ? 'اختبار' : 'Exam',
+                    ACHIEVEMENT: isAr ? 'إنجاز' : 'Achievement'
+                  }[g.type] || g.type;
+
+                  return (
+                    <div key={g.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-2.5 shadow-sm text-xs">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${typeColors[g.type] || ''}`}>
+                              {typeLabel}
+                            </span>
+                            <span className="text-[9px] text-amber-400 font-bold">
+                              {g.subject?.name}
+                            </span>
+                            {g.weekNumber && (
+                              <span className="text-[9px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded font-mono">
+                                W{g.weekNumber}
+                              </span>
+                            )}
+                          </div>
+                          <h5 className="font-extrabold text-white mt-1.5 text-sm">{g.title}</h5>
+                          {g.description && <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">{g.description}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteGoal(g.id)}
+                          className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500 hover:text-white text-red-400 transition-all shrink-0 cursor-pointer"
+                          title={isAr ? 'حذف الهدف' : 'Delete Goal'}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[9px] font-mono text-slate-500 font-bold">
+                        <span>📅 {isAr ? 'تسليم:' : 'Due:'} {g.dueDate ? new Date(g.dueDate).toLocaleDateString() : (isAr ? 'بدون' : 'None')}</span>
+                        <span>{isAr ? 'مضاف:' : 'Added:'} {new Date(g.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         
@@ -1325,6 +1589,13 @@ export default function RepresentativeHub() {
               title: isAr ? 'توزيع وتسكين الشعب' : 'Group Assignment',
               desc: isAr ? 'تسكين الدفعة في الشعب' : 'Assign classmates to groups',
               color: 'text-cyan-400 border-cyan-500/10 hover:border-cyan-500/30'
+            },
+            {
+              id: 'goals',
+              icon: '🎯',
+              title: isAr ? 'إدارة التكاليف والأهداف' : 'Academic Goals & Tasks',
+              desc: isAr ? 'إضافة وتتبع التكاليف والاختبارات والمشاريع' : 'Manage cohort tasks, exams & projects',
+              color: 'text-amber-400 border-amber-500/10 hover:border-amber-500/30'
             },
             {
               id: 'feedback',

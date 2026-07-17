@@ -41,7 +41,8 @@ export default function ScheduleTab({
   setSimulatorEnd,
   getActiveDay,
   getActiveStartTime,
-  getActiveEndTime
+  getActiveEndTime,
+  goals = []
 }) {
   // ── الحالات المحلية لتبويب الجدول ──
   const [scheduleViewMode, setScheduleViewMode] = useState('daily'); // 'daily' | 'weekly'
@@ -232,6 +233,23 @@ export default function ScheduleTab({
                               👥 {sharedWithText}
                             </div>
                           )}
+
+                          {(() => {
+                            const pendingLectureGoals = goals.filter(g => g.subjectId === lec.subjectId && !g.completed);
+                            if (pendingLectureGoals.length > 0) {
+                              return (
+                                <div className="mt-1.5 pt-1.5 border-t border-white/5 space-y-1">
+                                  {pendingLectureGoals.map(g => (
+                                    <div key={g.id} className="text-[9px] text-rose-450 font-black leading-normal flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                                      <span>⚠️</span>
+                                      <span className="truncate">{g.title}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       );
                     })}
@@ -340,6 +358,22 @@ export default function ScheduleTab({
                               <div className="mt-1.5 text-[9px] text-amber-300 font-black leading-normal flex items-center gap-1">
                                 <span>👥</span>
                                 <span>{shText}</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {(() => {
+                          const pendingLectureGoals = goals.filter(g => g.subjectId === lec.subjectId && !g.completed);
+                          if (pendingLectureGoals.length > 0) {
+                            return (
+                              <div className="mt-2 space-y-1">
+                                {pendingLectureGoals.map(g => (
+                                  <div key={g.id} className="text-[9px] text-rose-450 font-black leading-normal flex items-center gap-1 bg-red-500/10 px-2.5 py-1 rounded border border-red-500/20 w-max max-w-full">
+                                    <span>⚠️</span>
+                                    <span className="truncate">{g.title}</span>
+                                  </div>
+                                ))}
                               </div>
                             );
                           }
