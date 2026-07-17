@@ -20,7 +20,23 @@ initStorage();
 function loadPatches() {
   try {
     const content = fs.readFileSync(PATCHES_FILE, 'utf8');
-    return JSON.parse(content);
+    const patches = JSON.parse(content);
+    
+    // Resolve dynamic path adjustments for this local machine
+    const rootPath = path.resolve(__dirname, '../..');
+    return patches.map(patch => {
+      if (patch.filePath && !fs.existsSync(patch.filePath)) {
+        // e.g. path contains backend/src/...
+        const match = patch.filePath.match(/[\\/]backend[\\/](src[\\/].*)$/i);
+        if (match) {
+          const adjusted = path.join(rootPath, match[1]);
+          if (fs.existsSync(adjusted)) {
+            patch.filePath = adjusted;
+          }
+        }
+      }
+      return patch;
+    });
   } catch (err) {
     return [];
   }
@@ -47,17 +63,23 @@ function parseErrorStack(stack) {
     if (line.includes('node_modules') || line.includes('internal/')) continue;
     
     // Match absolute paths in parenthesized expressions, or plain paths
-    // e.g. "at f:\manar-schedule-system\universities\almanar-college\backend\src\routes\admin.js:3472:20"
-    // or "at Object.boot (F:\manar-schedule-system\universities\almanar-college\backend\src\server.js:220:11)"
     const match = line.match(/(?:at\s+.*?\s+\()?([a-zA-Z]:\\[^\s\)]+|[^\s\)]+):(\d+):(\d+)\)?/);
     if (match) {
       const filePath = match[1];
       const lineNo = parseInt(match[2]);
       const colNo = parseInt(match[3]);
       
-      // Verify it's within the almanar backend directory
-      if (filePath.includes('almanar-college') && fs.existsSync(filePath)) {
+      const backendRoot = path.resolve(__dirname, '../..');
+      if (fs.existsSync(filePath)) {
         return { filePath, lineNo, colNo };
+      }
+      
+      const relMatch = filePath.match(/[\\/]backend[\\/](src[\\/].*)$/i);
+      if (relMatch) {
+        const adjusted = path.join(backendRoot, relMatch[1]);
+        if (fs.existsSync(adjusted)) {
+          return { filePath: adjusted, lineNo, colNo };
+        }
       }
     }
   }
