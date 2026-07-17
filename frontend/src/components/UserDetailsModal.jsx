@@ -84,6 +84,7 @@ export default function UserDetailsModal({ isOpen, onClose, email, role, API_URL
   const tabs = [
     { id: 'profile', labelAr: 'الملف الشخصي', labelEn: 'Profile' },
     { id: 'sessions', labelAr: 'سجل الجلسات', labelEn: 'Sessions Log' },
+    { id: 'activity', labelAr: 'سجل العمليات والنشاط', labelEn: 'Activity Timeline' },
   ];
 
   if (role === 'STUDENT') {
@@ -334,6 +335,72 @@ export default function UserDetailsModal({ isOpen, onClose, email, role, API_URL
                             })}
                           </tbody>
                         </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── ACTIVITY TIMELINE TAB ── */}
+                {activeTab === 'activity' && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">
+                      {isAr ? 'سجل العمليات والنشاط التفصيلي' : 'Detailed User Activity Timeline'}
+                    </h4>
+
+                    {(!data?.auditLogs || data.auditLogs.length === 0) ? (
+                      <p className="text-slate-500 text-center py-6">
+                        {isAr ? 'لا توجد سجلات عمليات أو نشاط مسجلة لهذا الحساب' : 'No recorded activity logs found for this account'}
+                      </p>
+                    ) : (
+                      <div className="relative border-s border-white/10 ms-4 space-y-6 py-2">
+                        {data.auditLogs.map((log) => {
+                          // Format details if it exists
+                          let detailsStr = '';
+                          if (log.details) {
+                            try {
+                              detailsStr = typeof log.details === 'object' 
+                                ? JSON.stringify(log.details, null, 2) 
+                                : String(log.details);
+                            } catch (e) {
+                              detailsStr = '';
+                            }
+                          }
+
+                          return (
+                            <div key={log.id} className="relative ps-6">
+                              {/* Icon Dot */}
+                              <div className="absolute -left-[9px] top-1.5 h-4.5 w-4.5 rounded-full border border-slate-950 bg-slate-900 flex items-center justify-center text-[10px] text-[var(--accent)] font-bold shadow shadow-[var(--accent)]/10">
+                                🔧
+                              </div>
+
+                              <div className="p-4 bg-white/[0.015] border border-white/5 rounded-2xl space-y-1.5">
+                                <div className="flex flex-wrap justify-between items-start gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black tracking-wider text-[9px] font-mono uppercase">
+                                      {log.action}
+                                    </span>
+                                    <span className="text-xs font-bold text-white">
+                                      {log.entityType} ({log.entityId || 'N/A'})
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
+                                    <span>🌐 {log.ipAddress}</span>
+                                    <span>·</span>
+                                    <span>{new Date(log.timestamp).toLocaleString()}</span>
+                                  </div>
+                                </div>
+
+                                {detailsStr && detailsStr !== '{}' && (
+                                  <div className="bg-black/35 border border-white/5 rounded-lg p-2.5 mt-2 overflow-x-auto max-h-[120px] scrollbar-thin">
+                                    <code className="text-[10px] font-mono text-slate-400 whitespace-pre-wrap leading-normal block">
+                                      {detailsStr}
+                                    </code>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

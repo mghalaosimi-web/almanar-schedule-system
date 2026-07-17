@@ -2471,7 +2471,177 @@ router.post('/admin/dev/sessions/revoke', verifyToken, async (req, res) => {
   }
 });
 
-// 6b. GET /api/admin/users/details
+// 6b. GET /api/admin/users/indexed-directory
+router.get('/admin/users/indexed-directory', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const role = req.query.role || 'ALL'; // ALL | STUDENT | LECTURER | ADMIN
+    const departmentId = req.query.departmentId ? parseInt(req.query.departmentId) : null;
+    const majorId = req.query.majorId ? parseInt(req.query.majorId) : null;
+    const search = req.query.search ? String(req.query.search).trim() : '';
+    const collegeId = req.query.collegeId ? parseInt(req.query.collegeId) : null;
+
+    let collegeFilter = {};
+    if (req.user.role !== 'SUPER_ADMIN') {
+      collegeFilter = { collegeId: req.user.collegeId };
+    } else if (collegeId) {
+      collegeFilter = { collegeId };
+    }
+
+    const usersList = [];
+
+    // 1. Fetch Students
+    if (role === 'ALL' || role === 'STUDENT') {
+      const studentWhere = { ...collegeFilter };
+      if (majorId) {
+        studentWhere.majorId = majorId;
+      } else if (departmentId) {
+        studentWhere.major = { departmentId };
+      }
+      if (search) {
+        studentWhere.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const students = await prisma.student.findMany({
+        where: studentWhere,
+        include: { major: { include: { department: true } }, level: true, group: true },
+        orderBy: { name: 'asc' }
+      });
+
+      students.forEach(s => {
+        usersList.push({
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          phone: s.phone,
+          role: 'STUDENT',
+          department: s.major?.department?.name || 'N/A',
+          major: s.major?.name || 'N/A',
+          level: s.level?.name || 'N/A',
+          group: s.group?.name || 'N/A',
+          collegeId: s.collegeId
+        });
+      });
+    }
+
+    // 2. Fetch Lecturers
+    if ((role === 'ALL' || role === 'LECTURER') && !majorId && !departmentId) {
+      const lecturerWhere = { ...collegeFilter };
+      if (search) {
+        lecturerWhere.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const lecturers = await prisma.lecturer.findMany({
+        where: lecturerWhere,
+        orderBy: { name: 'asc' }
+      });
+
+      lecturers.forEach(l => {
+        usersList.push({
+          id: l.id,
+          name: l.name,
+          email: l.email,
+          phone: l.phone,
+          role: 'LECTURER',
+          department: 'N/A',
+          major: 'N/A',
+          level: 'N/A',
+          group: 'N/A',
+          collegeId: l.collegeId
+        });
+      });
+    }
+
+    // 3. Fetch Admins
+    if ((role === 'ALL' || role === 'ADMIN') && !majorId && !departmentId) {
+      const adminWhere = {};
+      if (req.user.role !== 'SUPER_ADMIN') {
+        adminWhere.collegeId = req.user.collegeId;
+      } else if (collegeId) {
+        adminWhere.collegeId = collegeId;
+      }
+      if (search) {
+        adminWhere.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const admins = await prisma.admin.findMany({
+        where: adminWhere,
+        orderBy: { name: 'asc' }
+      });
+
+      admins.forEach(a => {
+        usersList.push({
+          id: a.id,
+          name: a.name,
+          email: a.email,
+          phone: null,
+          role: a.role,
+          department: 'N/A',
+          major: 'N/A',
+          level: 'N/A',
+          group: 'N/A',
+          collegeId: a.collegeId
+        });
+      });
+    }
+
+    // For each user in usersList, fetch session counts and audit counts in memory
+    const enrichedUsers = [];
+    if (usersList.length > 0) {
+      const emails = usersList.map(u => u.email);
+
+      const [activeSessions, allSessions, auditLogs] = await Promise.all([
+        prisma.sessionLog.groupBy({
+          by: ['userEmail'],
+          where: { userEmail: { in: emails }, logoutTime: null, isRevoked: false },
+          _count: { id: true }
+        }),
+        prisma.sessionLog.groupBy({
+          by: ['userEmail'],
+          where: { userEmail: { in: emails } },
+          _count: { id: true }
+        }),
+        prisma.auditLog.groupBy({
+          by: ['userEmail'],
+          where: { userEmail: { in: emails } },
+          _count: { id: true }
+        })
+      ]);
+
+      const activeSessionsMap = new Map(activeSessions.map(item => [item.userEmail, item._count.id]));
+      const allSessionsMap = new Map(allSessions.map(item => [item.userEmail, item._count.id]));
+      const auditLogsMap = new Map(auditLogs.map(item => [item.userEmail, item._count.id]));
+
+      usersList.forEach(u => {
+        enrichedUsers.push({
+          ...u,
+          activeSessionsCount: activeSessionsMap.get(u.email) || 0,
+          totalSessionsCount: allSessionsMap.get(u.email) || 0,
+          totalActivitiesCount: auditLogsMap.get(u.email) || 0
+        });
+      });
+    }
+
+    res.status(200).json({ success: true, data: enrichedUsers });
+  } catch (error) {
+    console.error('[API] Indexed directory fetch error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch indexed directory: ' + error.message });
+  }
+});
+
+// 6c. GET /api/admin/users/details
 router.get('/admin/users/details', verifyToken, async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
@@ -2493,6 +2663,13 @@ router.get('/admin/users/details', verifyToken, async (req, res) => {
       where: { userEmail: email },
       orderBy: { loginTime: 'desc' },
       take: 30
+    });
+
+    // Fetch audit logs (what they did)
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { userEmail: email },
+      orderBy: { timestamp: 'desc' },
+      take: 50
     });
 
     if (role === 'STUDENT') {
@@ -2590,6 +2767,7 @@ router.get('/admin/users/details', verifyToken, async (req, res) => {
       success: true,
       profile: userProfile,
       sessions: sessionLogs,
+      auditLogs: auditLogs,
       extra: extraData
     });
   } catch (error) {
