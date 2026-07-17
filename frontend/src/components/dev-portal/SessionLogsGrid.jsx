@@ -96,6 +96,7 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   const [activeGridTab, setActiveGridTab] = useState('directory');
   const [directoryUsers, setDirectoryUsers] = useState([]);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
+  const [shouldFetch, setShouldFetch] = useState(false);
 
   const fetchDirectory = useCallback(async () => {
     setLoadingDirectory(true);
@@ -122,10 +123,15 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   }, [roleFilter, selectedDept, selectedMajor, search, tenantFilter.collegeId, API_URL, token, isAr]);
 
   useEffect(() => {
-    if (activeGridTab === 'directory') {
+    if (activeGridTab === 'directory' && shouldFetch) {
       fetchDirectory();
     }
-  }, [activeGridTab, fetchDirectory, roleFilter, selectedDept, selectedMajor, search]);
+  }, [activeGridTab, fetchDirectory, shouldFetch]);
+
+  // Reset shouldFetch when filter selections change to save bandwidth
+  useEffect(() => {
+    setShouldFetch(false);
+  }, [roleFilter, selectedDept, selectedMajor, search, statusFilter]);
 
   useEffect(() => {
     if (tenantFilter.collegeId) {
@@ -175,10 +181,12 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
   }, [page, search, roleFilter, statusFilter, tenantFilter, selectedDept, selectedMajor, API_URL, token]);
 
   useEffect(() => {
-    fetchSessions();
-    intervalRef.current = setInterval(() => fetchSessions(true), 8000);
-    return () => clearInterval(intervalRef.current);
-  }, [fetchSessions]);
+    if (shouldFetch) {
+      fetchSessions();
+      intervalRef.current = setInterval(() => fetchSessions(true), 8000);
+      return () => clearInterval(intervalRef.current);
+    }
+  }, [fetchSessions, shouldFetch]);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter, tenantFilter, selectedDept, selectedMajor]);
@@ -387,7 +395,52 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
         </div>
       </div>
 
-      {activeGridTab === 'directory' ? (
+      {/* Scoped load action buttons */}
+      <div className="flex gap-2.5 mb-6">
+        <button
+          onClick={() => {
+            setShouldFetch(true);
+            if (activeGridTab === 'directory') {
+              setTimeout(() => fetchDirectory(), 50);
+            } else {
+              setTimeout(() => fetchSessions(), 50);
+            }
+          }}
+          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-450 hover:to-teal-450 text-black font-black rounded-xl text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-500/15 cursor-pointer"
+        >
+          🔍 {isAr ? 'جلب البيانات الفني' : 'Load Scoped Data'}
+        </button>
+        <button
+          onClick={() => {
+            setRoleFilter('ALL');
+            setSelectedDept('ALL');
+            setSelectedMajor('ALL');
+            setSearch('');
+            setShouldFetch(true);
+            setTimeout(() => {
+              if (activeGridTab === 'directory') fetchDirectory();
+              else fetchSessions();
+            }, 50);
+          }}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs transition cursor-pointer"
+        >
+          🌐 {isAr ? 'عرض الكل' : 'Show All'}
+        </button>
+      </div>
+
+      {!shouldFetch ? (
+        <div className="text-center py-16 border border-white/5 bg-slate-950/20 rounded-2xl flex flex-col items-center justify-center gap-4">
+          <div className="text-4xl">📡</div>
+          <div className="space-y-1">
+            <h4 className="font-bold text-white text-sm">{isAr ? 'توفير استهلاك البيانات نشط' : 'Bandwidth Saving Active'}</h4>
+            <p className="text-slate-500 text-[11px] max-w-md mx-auto leading-relaxed">
+              {isAr 
+                ? 'الرجاء تحديد معايير التصفية المطلوبة أعلاه ثم الضغط على "جلب البيانات الفني" لبدء العرض وتجنب استهلاك الإنترنت.' 
+                : 'Please select filter criteria above and click "Load Scoped Data" to fetch directory or traffic.'}
+            </p>
+          </div>
+        </div>
+      ) : activeGridTab === 'directory' ? (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
