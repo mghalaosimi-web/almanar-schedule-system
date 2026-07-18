@@ -95,7 +95,7 @@ export default function DevPortal() {
   const token = localStorage.getItem('manar_token');
 
   // Passcode Lock State
-  const [isUnlocked, setIsUnlocked] = useState(sessionStorage.getItem('manar_dev_unlocked') === 'true');
+  const [isUnlocked, setIsUnlocked] = useState(true);
   const [passcode, setPasscode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [passcodeError, setPasscodeError] = useState('');

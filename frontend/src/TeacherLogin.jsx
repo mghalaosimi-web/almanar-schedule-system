@@ -223,12 +223,18 @@ export default function TeacherLogin() {
     }
   }, [navigate]);
 
-  // Discreet Developer login prefill helper
+  // Auto-trigger Secure Developer passcode modal if dev parameters present
   React.useEffect(() => {
-    const isDev = new URLSearchParams(window.location.search).get('dev') === 'true';
+    const params = new URLSearchParams(window.location.search);
+    const isDev = params.get('dev') === 'true' || params.get('devModal') === 'true';
     if (isDev) {
-      setIdentifier('m.gh.alosimi@gmail.com');
-      setPassword('708090');
+      setShowDevModal(true);
+      // Clean up the URL search params so it doesn't reopen if refreshed
+      params.delete('dev');
+      params.delete('devModal');
+      const cleanSearch = params.toString();
+      const newUrl = window.location.pathname + (cleanSearch ? `?${cleanSearch}` : '');
+      window.history.replaceState({}, '', newUrl);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [window.location.search]);
@@ -741,6 +747,7 @@ export default function TeacherLogin() {
                 <div className="space-y-2">
                   <input
                     type="password"
+                    autoComplete="one-time-code"
                     maxLength={10}
                     required
                     value={devCode}

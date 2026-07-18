@@ -13,7 +13,12 @@ export default function DevSignature({ centered = true }) {
   // Hidden developer login trigger
   const handleDevTrigger = () => {
     setIsOpen(false);
-    navigate('/login?tab=FACULTY&dev=true');
+    const currentPath = window.location.pathname;
+    if (currentPath === '/teacher-login') {
+      navigate('/teacher-login?devModal=true');
+    } else {
+      navigate('/login?devModal=true');
+    }
   };
 
   const avatarClicks = useRef(0);

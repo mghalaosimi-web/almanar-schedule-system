@@ -621,7 +621,7 @@ export default function PublicLandingWizard() {
     devTapTimer.current = setTimeout(() => { devTapCount.current = 0; }, 2000);
     if (devTapCount.current >= 10) {
       devTapCount.current = 0;
-      navigate('/login?tab=FACULTY&dev=true');
+      navigate('/login?devModal=true');
     }
   };
 
