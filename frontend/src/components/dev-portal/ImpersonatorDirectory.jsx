@@ -20,6 +20,10 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
   const [detailsRole, setDetailsRole] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+
   // Real blocked IPs fetched from backend firewall
   const [blockedIPs, setBlockedIPs] = useState([]);
   const [loadingFirewall, setLoadingFirewall] = useState(false);
@@ -48,10 +52,13 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
       .catch(err => console.error('Failed to fetch majors:', err));
   }, [API_URL, token]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (targetPage = 1) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        limit: String(limit)
+      });
       if (selectedRole !== 'ALL') params.append('role', selectedRole);
       if (selectedDept !== 'ALL') params.append('departmentId', selectedDept);
       if (selectedMajor !== 'ALL') params.append('majorId', selectedMajor);
@@ -62,6 +69,7 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
       });
       if (res.data?.success) {
         setUsers(res.data.data);
+        setTotal(res.data.total || 0);
       }
     } catch (err) {
       toast.error(isAr ? 'فشل تحميل قائمة المحاكاة الإدارية' : 'Failed to fetch users list');
@@ -72,13 +80,14 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
 
   useEffect(() => {
     if (shouldFetch) {
-      fetchUsers();
+      fetchUsers(page);
     }
-  }, [shouldFetch, fetchUsers]);
+  }, [shouldFetch, page, fetchUsers]);
 
-  // Reset shouldFetch when filters change to save bandwidth
+  // Reset shouldFetch and page when filters change to save bandwidth
   useEffect(() => {
     setShouldFetch(false);
+    setPage(1);
   }, [selectedRole, selectedDept, selectedMajor, search]);
 
   const handleSimulate = async (user) => {
@@ -247,6 +256,33 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
             ))
           )}
         </div>
+
+        {/* Directory Pagination Controls */}
+        {shouldFetch && total > limit && (
+          <div className="flex justify-between items-center mt-5 pt-4 border-t border-slate-800/60 text-xs text-slate-400">
+            <div>
+              {isAr
+                ? `عرض ${(page - 1) * limit + 1}-${Math.min(page * limit, total)} من أصل ${total} مستخدم`
+                : `Showing ${(page - 1) * limit + 1}-${Math.min(page * limit, total)} of ${total} users`}
+            </div>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1 || loading}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isAr ? 'السابق ‹' : '‹ Prev'}
+              </button>
+              <button
+                disabled={page * limit >= total || loading}
+                onClick={() => setPage(p => p + 1)}
+                className="px-3 py-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isAr ? 'التالي ›' : 'Next ›'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cyber Security Watch (1 share) */}
