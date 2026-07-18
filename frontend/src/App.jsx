@@ -255,6 +255,42 @@ function AppLayout() {
   const [tenants, setTenants] = useState([]);
 
   const isAr = i18n.language === 'ar';
+  const token = localStorage.getItem('manar_token');
+
+  // Admin secure gateway passcode lock
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(sessionStorage.getItem('manar_admin_unlocked') === 'true');
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminVerifying, setAdminVerifying] = useState(false);
+  const [adminPasscodeError, setAdminPasscodeError] = useState('');
+
+  const handleVerifyAdminPasscode = async (e) => {
+    e.preventDefault();
+    setAdminVerifying(true);
+    setAdminPasscodeError('');
+    try {
+      const res = await axios.post(`${API_URL}/api/admin/dev/verify-key`, 
+        { passcode: adminPasscode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.success) {
+        sessionStorage.setItem('manar_admin_unlocked', 'true');
+        setIsAdminUnlocked(true);
+        toast.success(isAr ? 'تم فتح لوحة التحكم بنجاح' : 'Admin Panel unlocked successfully');
+      }
+    } catch (err) {
+      setAdminPasscodeError(err.response?.data?.error || (isAr ? 'رمز المرور غير صحيح' : 'Incorrect passcode'));
+      toast.error(isAr ? 'فشل التحقق من رمز المرور' : 'Passcode verification failed');
+    } finally {
+      setAdminVerifying(false);
+    }
+  };
+
+  const handleAdminCancel = () => {
+    localStorage.removeItem('manar_token');
+    localStorage.removeItem('manar_user');
+    localStorage.removeItem('student_profile');
+    navigate('/login');
+  };
 
   const handleLogoClick = () => {
     const token = localStorage.getItem('manar_token');
@@ -627,7 +663,6 @@ function AppLayout() {
   const isStudentPath = path.startsWith('/student');
   const isLecturerPath = path.startsWith('/lecturer');
 
-  const token = localStorage.getItem('manar_token');
   const userJson = localStorage.getItem('manar_user');
   let user = null;
   if (userJson) {
@@ -754,6 +789,96 @@ function AppLayout() {
   if (isAdminPath) {
     if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && user.role !== 'COLLEGE_ADMIN' && user.role !== 'UNI_ADMIN')) {
       return <Navigate to="/login" replace />;
+    }
+
+    if (!isAdminUnlocked) {
+      return (
+        <div 
+          dir={isAr ? 'rtl' : 'ltr'} 
+          className="min-h-screen w-full bg-[var(--bg-primary)] text-slate-100 flex items-center justify-center p-6 relative overflow-hidden font-sans"
+        >
+          {/* Glow ambient background orbs */}
+          <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-25 bg-cyan-500/20 animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-15 bg-purple-500/20 animate-pulse" style={{ animationDelay: '2.5s' }} />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: 'spring', duration: 0.6 }}
+            className="w-full max-w-md bg-black/45 border border-white/10 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl relative overflow-hidden text-center"
+          >
+            {/* Top glowing bar */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-500 via-[var(--accent)] to-purple-600 animate-pulse" />
+            
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-3xl mb-6 shadow-inner animate-bounce" style={{ animationDuration: '3s' }}>
+              🔒
+            </div>
+
+            <h2 className="text-xl font-black text-white tracking-wider mb-2 uppercase">
+              {isAr ? 'بوابة العبور الآمنة للمسؤول' : 'Admin Secure Gateway'}
+            </h2>
+            <p className="text-xs text-white/50 leading-relaxed mb-6">
+              {isAr 
+                ? 'مطلوب إدخال رمز التحقق الأمني لفتح لوحة التحكم والتشخيص.' 
+                : 'Passcode authorization is required to access the admin command center.'}
+            </p>
+
+            <form onSubmit={handleVerifyAdminPasscode} className="space-y-4">
+              <div className="space-y-1 text-right" dir={isAr ? 'rtl' : 'ltr'}>
+                <input 
+                  type="password"
+                  autoComplete="one-time-code"
+                  required
+                  value={adminPasscode}
+                  onChange={e => {
+                    setAdminPasscode(e.target.value);
+                    setAdminPasscodeError('');
+                  }}
+                  placeholder="••••••••••••"
+                  className="w-full text-center px-5 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/20 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all duration-200 text-lg tracking-[0.25em] font-mono"
+                  autoFocus
+                />
+              </div>
+
+              {adminPasscodeError && (
+                <motion.p 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="text-xs text-red-400 font-bold flex items-center justify-center gap-1.5"
+                >
+                  <span>⚠️</span> {adminPasscodeError}
+                </motion.p>
+              )}
+
+              <button
+                type="submit"
+                disabled={adminVerifying}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-black hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all text-xs uppercase tracking-widest disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {adminVerifying ? (
+                  <span className="h-4.5 w-4.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>{isAr ? 'تحقق وعبور' : 'Authorize & Enter'}</span>
+                    <span>⚡</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Cancel & return */}
+            <div className="mt-6 pt-4 border-t border-white/5">
+              <button
+                type="button"
+                onClick={handleAdminCancel}
+                className="text-xs font-bold text-white/40 hover:text-white transition-colors duration-200 cursor-pointer"
+              >
+                {isAr ? '← إلغاء وتسجيل الخروج' : '← Cancel & Logout'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      );
     }
 
     const isAr = i18n.language === 'ar';
