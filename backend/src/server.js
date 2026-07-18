@@ -19,8 +19,9 @@ const { prisma } = require('./db');
 const { initializeCronJobs } = require('./services/cron');
 
 // Routers
-const authRouter = require('./routes/auth');
+const authRouter = require('./routes/auth'); // → routes/auth/index.js
 const adminRouter = require('./routes/admin');
+const devPortalRouter = require('./routes/devPortal');
 const studentRouter = require('./routes/student');
 const lecturerRouter = require('./routes/lecturer');
 const publicRouter = require('./routes/public');
@@ -138,6 +139,7 @@ app.get('/api/health', (req, res) => {
 // Register modular routers
 app.use('/api/auth', authRouter);
 app.use('/api', adminRouter);
+app.use('/api', devPortalRouter);
 app.use('/api', studentRouter);
 app.use('/api', lecturerRouter);
 app.use('/api/public', publicRouter);
