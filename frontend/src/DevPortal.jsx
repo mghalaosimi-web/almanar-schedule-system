@@ -124,6 +124,7 @@ export default function DevPortal() {
 
   // Sidebar
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [sidebarOpen, setSidebarOpen]         = useState(false); // Mobile overlay
   const [activeTab, setActiveTab]             = useState('telemetry');
 
   if (!isUnlocked) {
@@ -341,16 +342,46 @@ export default function DevPortal() {
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[var(--bg-primary)] text-slate-100 flex overflow-hidden font-sans">
 
+      {/* ── Mobile Hamburger Button ── */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-slate-800/90 backdrop-blur border border-white/10 rounded-xl text-white shadow-xl"
+        aria-label="Open sidebar"
+      >
+        ☰
+      </button>
+
+      {/* ── Mobile Overlay Backdrop ── */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/70 z-40 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Collapsible Cyber Sidebar ── */}
       <motion.div
         animate={{ width: sidebarExpanded ? 260 : 70 }}
-        className="bg-black/40 border-r border-white/5 backdrop-blur-xl min-h-screen flex flex-col shrink-0 transition-all duration-300 relative z-30"
+        className={`
+          bg-black/40 border-r border-white/5 backdrop-blur-xl min-h-screen flex flex-col shrink-0 transition-all duration-300 relative z-50
+          fixed md:relative
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${isAr ? 'right-0 border-l border-r-0' : 'left-0'}
+        `}
+        style={{ transition: 'width 0.3s, transform 0.3s' }}
       >
         <button
-          onClick={() => setSidebarExpanded(!sidebarExpanded)}
-          className="absolute top-4 -left-3 w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-750 flex items-center justify-center text-xs text-white shadow-xl cursor-pointer z-40"
+          onClick={() => { setSidebarExpanded(!sidebarExpanded); setSidebarOpen(false); }}
+          className="absolute top-4 -left-3 w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-750 flex items-center justify-center text-xs text-white shadow-xl cursor-pointer z-40 hidden md:flex"
         >
           {sidebarExpanded ? '‹' : '›'}
+        </button>
+        {/* Mobile close button inside sidebar */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="md:hidden absolute top-4 right-3 w-7 h-7 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xs text-white z-50"
+        >
+          ✕
         </button>
 
         {/* Brand */}
@@ -575,7 +606,7 @@ export default function DevPortal() {
                           { k: 'PLATFORM',    v: telemetry?.server?.platform ?? '...' },
                           { k: 'ARCH',        v: telemetry?.server?.arch ?? '...' },
                           { k: 'NODE',        v: telemetry?.server?.nodeVersion ?? '...' },
-                          { k: 'ENV',         v: 'PRODUCTION', color: 'text-[var(--accent)]' },
+                          { k: 'ENV', v: (import.meta.env.MODE || 'development').toUpperCase(), color: import.meta.env.MODE === 'production' ? 'text-[var(--accent)]' : 'text-amber-400' },
                         ].map(s => (
                           <div key={s.k} className="flex justify-between border-b border-white/5 pb-2 last:border-0 last:pb-0">
                             <span className="text-white/40">{s.k}:</span>

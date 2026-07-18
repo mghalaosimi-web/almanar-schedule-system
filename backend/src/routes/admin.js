@@ -1857,9 +1857,14 @@ router.use('/admin/dev', verifyToken, isSuperAdmin);
 router.use('/dev', verifyToken, isSuperAdmin);
 
 // Verification endpoint for Developer Passcode
-router.post('/admin/dev/verify-key', (req, res) => {
+// SECURITY: requires valid SUPER_ADMIN JWT + DB-verified developer identity
+router.post('/admin/dev/verify-key', verifyToken, isSuperAdmin, (req, res) => {
   const { passcode } = req.body;
-  const devKey = process.env.DEV_PORTAL_KEY || 'almanar-dev-passcode-2026';
+  const devKey = process.env.DEV_PORTAL_KEY;
+  if (!devKey) {
+    console.error('[DevPortal] DEV_PORTAL_KEY is not set in environment variables.');
+    return res.status(503).json({ success: false, error: 'Developer portal key not configured on server.' });
+  }
   if (passcode === devKey) {
     return res.status(200).json({ success: true });
   }
@@ -3929,6 +3934,17 @@ router.post('/admin/dev/sql-query', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Dangerous keyword detected. Only READ-ONLY operations are allowed.' });
     }
 
+    // Guard against EXPLAIN queries (can be used for heavy analysis / info disclosure)
+    if (/^\s*explain\b/i.test(sql)) {
+      return res.status(400).json({ success: false, error: 'EXPLAIN queries are not permitted in read-only terminal.' });
+    }
+
+    // Guard against deeply nested CTEs that can exhaust server memory
+    const cteDepth = (sql.match(/\bWITH\b/gi) || []).length;
+    if (cteDepth > 3) {
+      return res.status(400).json({ success: false, error: 'Query complexity limit exceeded. Maximum 3 CTE (WITH) levels allowed.' });
+    }
+
     // Log in audit log
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     await prisma.auditLog.create({
@@ -3986,6 +4002,41 @@ router.post('/admin/dev/ai-insights/generate', verifyToken, async (req, res) => 
   } catch (error) {
     console.error('[API] Trigger AI insights generation error:', error);
     res.status(500).json({ success: false, error: 'AI Insights generation failed: ' + error.message });
+  }
+});
+
+// GET Real-time System Vitals (Node.js process metrics)
+router.get('/admin/dev/system-vitals', verifyToken, isSuperAdmin, (req, res) => {
+  try {
+    const mem    = process.memoryUsage();
+    const uptime = Math.floor(process.uptime());
+    const hours  = Math.floor(uptime / 3600);
+    const mins   = Math.floor((uptime % 3600) / 60);
+    const secs   = uptime % 60;
+
+    res.json({
+      success: true,
+      data: {
+        nodeVersion:    process.version,
+        platform:       process.platform,
+        arch:           process.arch,
+        env:            process.env.NODE_ENV || 'development',
+        uptimeSeconds:  uptime,
+        uptimeFormatted: `${hours}h ${mins}m ${secs}s`,
+        memHeapUsedMB:  Math.round(mem.heapUsed  / 1024 / 1024),
+        memHeapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+        memRssMB:       Math.round(mem.rss       / 1024 / 1024),
+        memExternalMB:  Math.round(mem.external  / 1024 / 1024),
+        jwtAlgorithm:   'HMAC-SHA256 (HS256)',
+        passwordHash:   'bcrypt (cost=10)',
+        transport:      'TLS 1.3 / HTTPS',
+        sessionExpiry:  '90d (JWT) / 24h (Impersonate)',
+        pid:            process.pid,
+      }
+    });
+  } catch (error) {
+    console.error('[API] System vitals error:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve system vitals' });
   }
 });
 

@@ -1,5 +1,19 @@
 const jwt = require('jsonwebtoken');
 
+// ── Super Admin Verification Cache (TTL: 5 minutes) ──────────────────────────
+// Eliminates the DB query on every /admin/dev/* request.
+// Cache entry: { valid: boolean, expiresAt: number (unix ms) }
+const superAdminCache = new Map();
+const SUPER_ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Periodic cleanup to prevent memory leaks (runs every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of superAdminCache.entries()) {
+    if (val.expiresAt < now) superAdminCache.delete(key);
+  }
+}, SUPER_ADMIN_CACHE_TTL);
+
 async function verifyToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
@@ -79,18 +93,54 @@ async function isSuperAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'SUPER_ADMIN') {
     return res.status(403).json({ success: false, error: 'Forbidden: Super Admin access required' });
   }
+
+  // ── Check cache first to avoid DB query on every request ─────────────────
+  const cached = superAdminCache.get(req.user.id);
+  if (cached && cached.expiresAt > Date.now()) {
+    if (cached.valid) return next();
+    return res.status(403).json({ success: false, error: 'Forbidden: Restricted to developer only' });
+  }
+
+  // ── Cache miss: validate against DB ──────────────────────────────────────
   try {
     const { prisma } = require('../db');
     const admin = await prisma.admin.findUnique({
-      where: { id: req.user.id }
+      where: { id: req.user.id },
+      select: { email: true }
     });
-    if (!admin || (admin.email !== 'developer@mghal.com' && admin.email !== 'm.gh.alosimi@gmail.com')) {
+
+    // Developer emails stored in env — never hardcoded
+    const allowedEmails = [
+      process.env.SUPER_ADMIN_EMAIL_1 || 'developer@mghal.com',
+      process.env.SUPER_ADMIN_EMAIL_2 || 'm.gh.alosimi@gmail.com'
+    ];
+
+    const isValid = admin && allowedEmails.includes(admin.email);
+
+    // Store result in cache with TTL
+    superAdminCache.set(req.user.id, {
+      valid: !!isValid,
+      expiresAt: Date.now() + SUPER_ADMIN_CACHE_TTL
+    });
+
+    if (!isValid) {
       return res.status(403).json({ success: false, error: 'Forbidden: Restricted to developer only' });
     }
     next();
   } catch (error) {
+    console.error('[isSuperAdmin] DB verification error:', error.message);
     return res.status(500).json({ success: false, error: 'Authorization verification failed' });
   }
 }
 
-module.exports = { verifyToken, verifyAdmin, isSuperAdmin };
+/**
+ * Immediately invalidates a super admin's cached authorization.
+ * Call this on force-logout or session revocation.
+ * @param {number} userId
+ */
+function invalidateSuperAdminCache(userId) {
+  superAdminCache.delete(userId);
+  console.log(`[isSuperAdmin] Cache invalidated for userId: ${userId}`);
+}
+
+module.exports = { verifyToken, verifyAdmin, isSuperAdmin, invalidateSuperAdminCache };

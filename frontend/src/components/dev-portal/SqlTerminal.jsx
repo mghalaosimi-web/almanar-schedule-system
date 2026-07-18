@@ -3,6 +3,29 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// ── SQL Syntax Highlighter (no external libs) ─────────────────────────────────
+function applySqlHighlight(sql) {
+  if (!sql) return '';
+  // Escape HTML first to prevent XSS from user input
+  const escaped = sql
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return escaped
+    // Comments (must come first)
+    .replace(/(--[^\n]*)/g, '<span class="text-slate-500 italic">$1</span>')
+    // Single-quoted strings
+    .replace(/('(?:[^'\\]|\\.)*')/g, '<span class="text-amber-400">$1</span>')
+    // Numbers
+    .replace(/\b(\d+)\b/g, '<span class="text-purple-400">$1</span>')
+    // SQL keywords
+    .replace(
+      /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|OFFSET|AND|OR|NOT|AS|WITH|DISTINCT|COUNT|SUM|AVG|MAX|MIN|IN|IS|NULL|LIKE|BETWEEN|UNION|ALL|EXISTS|CASE|WHEN|THEN|ELSE|END|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|DROP|ALTER|TABLE|INDEX|VIEW|FUNCTION|PROCEDURE|TRIGGER|RETURNS|RETURN|BEGIN|COMMIT|ROLLBACK|TRANSACTION|PRIMARY|KEY|FOREIGN|REFERENCES|UNIQUE|DEFAULT|CONSTRAINT|CASCADE|SERIAL|VARCHAR|INTEGER|TEXT|BOOLEAN|TIMESTAMP|DATE|FLOAT)\b/gi,
+      '<span class="text-blue-400 font-semibold">$&</span>'
+    );
+}
+
 const PRESETS = [
   {
     nameAr: 'أكثر 10 مستخدمين تسجيلاً للدخول',
@@ -191,12 +214,21 @@ export default function SqlTerminal({ API_URL, token, isAr }) {
               </span>
             </div>
 
-            <textarea
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="SELECT * FROM ... LIMIT 10;"
-              className="w-full h-40 bg-slate-950 border border-slate-800 focus:border-slate-700 rounded-xl p-4 font-mono text-xs text-emerald-400 placeholder-emerald-900 focus:outline-none focus:ring-0 leading-relaxed"
-            />
+            <div className="relative">
+              {/* Highlighted preview layer */}
+              <div
+                className="absolute inset-0 w-full h-40 bg-transparent rounded-xl p-4 font-mono text-xs leading-relaxed pointer-events-none overflow-hidden whitespace-pre-wrap break-words"
+                dangerouslySetInnerHTML={{ __html: applySqlHighlight(query) }}
+              />
+              {/* Editable textarea on top (transparent text so highlight shows) */}
+              <textarea
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="SELECT * FROM ... LIMIT 10;"
+                spellCheck={false}
+                className="relative w-full h-40 bg-slate-950 border border-slate-800 focus:border-slate-700 rounded-xl p-4 font-mono text-xs text-transparent caret-emerald-400 placeholder-emerald-900/60 focus:outline-none focus:ring-0 leading-relaxed resize-none"
+              />
+            </div>
 
             <div className="flex justify-end gap-2.5 mt-3">
               <button

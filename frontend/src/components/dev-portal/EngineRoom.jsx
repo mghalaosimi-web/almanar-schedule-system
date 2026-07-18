@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -89,12 +89,25 @@ function KillSwitchModal({ onConfirm, onCancel, isAr }) {
 
 // ── Main EngineRoom ───────────────────────────────────────────────────────────
 export default function EngineRoom({ API_URL, token, initialSettings, isAr }) {
-  const [settings, setSettings]     = useState(initialSettings || {});
-  const [loading, setLoading]       = useState({});
+  const [settings, setSettings]   = useState(initialSettings || {});
+  const [loading, setLoading]     = useState({});
   const [purgeInput, setPurgeInput] = useState('');
-  const [purging, setPurging]       = useState(false);
-  const [showKill, setShowKill]     = useState(false);
-  const [killing, setKilling]       = useState(false);
+  const [purging, setPurging]     = useState(false);
+  const [showKill, setShowKill]   = useState(false);
+  const [killing, setKilling]     = useState(false);
+
+  // Real system vitals from backend
+  const [vitals, setVitals]           = useState(null);
+  const [loadingVitals, setLoadingVitals] = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API_URL}/api/admin/dev/system-vitals`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => { if (res.data?.success) setVitals(res.data.data); })
+      .catch(err => console.error('[EngineRoom] Failed to load system vitals:', err))
+      .finally(() => setLoadingVitals(false));
+  }, [API_URL, token]);
 
   const toggleSetting = async (key, currentValue) => {
     setLoading(prev => ({ ...prev, [key]: true }));
@@ -456,15 +469,19 @@ export default function EngineRoom({ API_URL, token, initialSettings, isAr }) {
           <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 shadow-2xl font-mono text-[10px] text-slate-400">
             <h4 className="text-xs font-bold text-white mb-4 flex items-center gap-1.5">
               <span>🛡️</span>
-              {isAr ? 'Watchtower — تشفير وحماية' : 'Watchtower Cryptography & Keys'}
+              {isAr ? 'Watchtower — بيانات الخادم الحقيقية' : 'Watchtower — Live Server Metrics'}
+              {loadingVitals && <span className="ml-auto text-[9px] animate-pulse text-slate-500">loading...</span>}
             </h4>
             <div className="space-y-3">
               {[
-                { k: 'JWT SECRET HASH', v: 'VERIFIED (HMAC-SHA256)',      color: 'text-emerald-400' },
-                { k: 'VAPID PUBLIC KEY', v: 'MIIBIjANBgkqhkiG9w0BAQ... (MASKED)', color: 'text-slate-300' },
-                { k: 'PASSWORD HASHING', v: 'BCRYPT (SALT_ROUNDS = 10)',  color: 'text-slate-300' },
-                { k: 'TRANSPORT',       v: 'TLS 1.3 / HTTPS',            color: 'text-emerald-400' },
-                { k: 'SESSION TOKENS',  v: 'RS256 · 7d expiry',           color: 'text-sky-400' },
+                { k: 'JWT ALGORITHM',    v: vitals?.jwtAlgorithm   || '—',  color: 'text-emerald-400' },
+                { k: 'PASSWORD HASHING', v: vitals?.passwordHash   || '—',  color: 'text-slate-300' },
+                { k: 'TRANSPORT',        v: vitals?.transport       || '—',  color: 'text-emerald-400' },
+                { k: 'SESSION EXPIRY',   v: vitals?.sessionExpiry  || '—',  color: 'text-sky-400' },
+                { k: 'NODE VERSION',     v: vitals?.nodeVersion    || '—',  color: 'text-purple-400' },
+                { k: 'SERVER ENV',       v: vitals?.env ? vitals.env.toUpperCase() : '—', color: vitals?.env === 'production' ? 'text-emerald-400' : 'text-amber-400' },
+                { k: 'HEAP USED',        v: vitals ? `${vitals.memHeapUsedMB}MB / ${vitals.memHeapTotalMB}MB` : '—', color: 'text-sky-400' },
+                { k: 'SERVER UPTIME',    v: vitals?.uptimeFormatted || '—',  color: 'text-slate-300' },
               ].map(row => (
                 <div key={row.k} className="flex justify-between border-b border-slate-800/60 pb-2.5 last:border-0 last:pb-0">
                   <span className="text-slate-500">{row.k}:</span>

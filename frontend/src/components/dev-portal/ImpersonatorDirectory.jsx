@@ -20,22 +20,33 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
   const [detailsRole, setDetailsRole] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  // Mock list of blocked IPs & cyber threats
-  const blockedIPs = [
-    { ip: '198.51.100.42', reason: 'Brute-force attempts on student login', blockedAt: '2026-07-03' },
-    { ip: '203.0.113.88', reason: 'SQL Injection signature detected on /reschedule', blockedAt: '2026-07-02' }
-  ];
+  // Real blocked IPs fetched from backend firewall
+  const [blockedIPs, setBlockedIPs] = useState([]);
+  const [loadingFirewall, setLoadingFirewall] = useState(false);
 
   useEffect(() => {
-    // Fetch departments and majors for filtering
-    axios.get(`${API_URL}/api/departments`)
+    // Fetch real blocked IPs from firewall endpoint
+    setLoadingFirewall(true);
+    axios.get(`${API_URL}/api/admin/dev/firewall/blocked`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => { if (res.data?.success) setBlockedIPs(res.data.data); })
+      .catch(err => console.error('Failed to fetch firewall data:', err))
+      .finally(() => setLoadingFirewall(false));
+
+    // Fetch departments and majors for filtering — with auth headers
+    axios.get(`${API_URL}/api/departments`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => { if (res.data?.success) setDepartments(res.data.data); })
       .catch(err => console.error('Failed to fetch departments:', err));
 
-    axios.get(`${API_URL}/api/majors`)
+    axios.get(`${API_URL}/api/majors`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => { if (res.data?.success) setMajors(res.data.data); })
       .catch(err => console.error('Failed to fetch majors:', err));
-  }, [API_URL]);
+  }, [API_URL, token]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -267,15 +278,28 @@ export default function ImpersonatorDirectory({ API_URL, token, onImpersonate, i
           <h4 className="text-xs font-bold text-white mb-4 flex items-center gap-1.5">
             <span>🛡️</span>
             {isAr ? 'العناوين المحظورة (Blocked IPs)' : 'Intrusion Blocked IPs'}
+            <span className="ml-auto text-[9px] text-slate-500 font-mono">
+              {loadingFirewall ? '⏳' : `${blockedIPs.length} IP${blockedIPs.length !== 1 ? 's' : ''}`}
+            </span>
           </h4>
           <div className="space-y-4">
-            {blockedIPs.map((ip, i) => (
-              <div key={i} className="p-3 bg-slate-950/60 border border-slate-850 rounded-xl space-y-1">
+            {loadingFirewall ? (
+              <div className="text-center py-4 text-xs text-slate-500 animate-pulse">
+                {isAr ? 'جاري تحميل جدار الحماية...' : 'Loading firewall data...'}
+              </div>
+            ) : blockedIPs.length === 0 ? (
+              <div className="text-center py-4 text-xs text-slate-600">
+                {isAr ? '✅ لا توجد عناوين محظورة حالياً' : '✅ No IPs are currently blocked'}
+              </div>
+            ) : blockedIPs.map((ip, i) => (
+              <div key={ip.id || i} className="p-3 bg-slate-950/60 border border-slate-850 rounded-xl space-y-1">
                 <div className="flex justify-between items-center text-[10px] font-bold">
                   <span className="text-rose-400 font-mono">{ip.ip}</span>
-                  <span className="text-slate-500 font-mono">{ip.blockedAt}</span>
+                  <span className="text-slate-500 font-mono">
+                    {ip.blockedAt ? new Date(ip.blockedAt).toLocaleDateString() : '—'}
+                  </span>
                 </div>
-                <p className="text-[9px] text-slate-400 leading-normal">{ip.reason}</p>
+                <p className="text-[9px] text-slate-400 leading-normal">{ip.reason || (isAr ? 'بدون سبب محدد' : 'No reason specified')}</p>
               </div>
             ))}
           </div>

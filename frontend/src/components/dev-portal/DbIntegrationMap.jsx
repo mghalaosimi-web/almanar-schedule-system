@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import axios from 'axios';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast' ;
 
-export default function DbIntegrationMap({ API_URL, token, isAr }) {
+const DbIntegrationMap = memo(function DbIntegrationMap({ API_URL, token, isAr }) {
   const [colleges, setColleges] = useState([]);
   const [selectedCollegeId, setSelectedCollegeId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -449,4 +449,6 @@ CREATE TABLE IF NOT EXISTS "SeatAllocation" (
 
     </div>
   );
-}
+});
+
+export default DbIntegrationMap;

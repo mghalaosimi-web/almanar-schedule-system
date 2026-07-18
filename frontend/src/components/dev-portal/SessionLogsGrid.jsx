@@ -68,7 +68,7 @@ function StatsStrip({ sessions, isAr }) {
 }
 
 // ── Main SessionLogsGrid ──────────────────────────────────────────────────────
-export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {} }) {
+const SessionLogsGrid = React.memo(function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {} }) {
   const [sessions,    setSessions]    = useState([]);
   const [loading,     setLoading]     = useState(false);
   const [search,      setSearch]      = useState('');
@@ -135,13 +135,17 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
 
   useEffect(() => {
     if (tenantFilter.collegeId) {
-      axios.get(`${API_URL}/api/departments?collegeId=${tenantFilter.collegeId}`)
+      axios.get(`${API_URL}/api/departments?collegeId=${tenantFilter.collegeId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
         .then(res => {
           if (res.data?.success) setDepartments(res.data.data);
         })
         .catch(err => console.error('Failed to fetch departments:', err));
 
-      axios.get(`${API_URL}/api/majors?collegeId=${tenantFilter.collegeId}`)
+      axios.get(`${API_URL}/api/majors?collegeId=${tenantFilter.collegeId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
         .then(res => {
           if (res.data?.success) setMajors(res.data.data);
         })
@@ -152,7 +156,7 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
       setSelectedDept('ALL');
       setSelectedMajor('ALL');
     }
-  }, [tenantFilter.collegeId, API_URL]);
+  }, [tenantFilter.collegeId, API_URL, token]);
 
   const fetchSessions = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -665,4 +669,15 @@ export default function SessionLogsGrid({ API_URL, token, isAr, tenantFilter = {
       />
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparator: only re-render when these specific props change
+  return (
+    prevProps.token === nextProps.token &&
+    prevProps.isAr  === nextProps.isAr  &&
+    prevProps.API_URL === nextProps.API_URL &&
+    prevProps.tenantFilter?.collegeId    === nextProps.tenantFilter?.collegeId &&
+    prevProps.tenantFilter?.universityId === nextProps.tenantFilter?.universityId
+  );
+});
+
+export default SessionLogsGrid;
