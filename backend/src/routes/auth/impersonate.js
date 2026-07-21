@@ -1,4 +1,4 @@
-﻿const express   = require('express');
+const express   = require('express');
 const jwt       = require('jsonwebtoken');
 const bcrypt    = require('bcryptjs');
 const { prisma } = require('../../db');
@@ -32,7 +32,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
 
       // Impersonation log
       try {
-        const { recordImpersonate } = require('../services/sessionTracker');
+        const { recordImpersonate } = require('../../services/sessionTracker');
         recordImpersonate(req.user.name, req.user.email, student.name, student.email, 'STUDENT');
       } catch (e) {}
 
@@ -77,7 +77,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
 
       // Impersonation log
       try {
-        const { recordImpersonate } = require('../services/sessionTracker');
+        const { recordImpersonate } = require('../../services/sessionTracker');
         recordImpersonate(req.user.name, req.user.email, lecturer.name, lecturer.email, 'LECTURER');
       } catch (e) {}
 
@@ -117,7 +117,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
 
       // Impersonation log
       try {
-        const { recordImpersonate } = require('../services/sessionTracker');
+        const { recordImpersonate } = require('../../services/sessionTracker');
         recordImpersonate(req.user.name, req.user.email, admin.name, admin.email, admin.role);
       } catch (e) {}
 
@@ -160,7 +160,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
 // PATCH [SEC]: We strip 'deactivatedColleges' from the public response — that list is
 // operational/internal data that must NOT be disclosed to unauthenticated callers.
 router.get('/system/settings', (req, res) => {
-  const systemSettings = require('../services/systemSettings');
+  const systemSettings = require('../../services/systemSettings');
   const allSettings = systemSettings.getAll();
   // eslint-disable-next-line no-unused-vars
   const { deactivatedColleges, ...publicSettings } = allSettings;
@@ -170,7 +170,7 @@ router.get('/system/settings', (req, res) => {
 // 10. POST /api/auth/logout
 router.post('/logout', verifyToken, (req, res) => {
   try {
-    const { recordLogout } = require('../services/sessionTracker');
+    const { recordLogout } = require('../../services/sessionTracker');
     recordLogout(req.user);
   } catch (e) {}
   res.status(200).json({ success: true, message: 'Logged out successfully' });

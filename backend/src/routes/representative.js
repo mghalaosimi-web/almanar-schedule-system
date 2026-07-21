@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification, sendStudentPushNotification } = require('../services/notifications');
@@ -613,5 +614,38 @@ router.post('/students/:id/reject', verifyToken, isRep, async (req, res) => {
   }
 });
 
+// 13. POST /attendance/qr-token - Generate dynamic QR token for class check-in
+router.post('/attendance/qr-token', verifyToken, isRep, async (req, res) => {
+  try {
+    const { scheduleId } = req.body;
+    if (!scheduleId) {
+      return res.status(400).json({ success: false, error: 'scheduleId is required' });
+    }
+
+    // Verify schedule belongs to representative's group
+    const schedule = await prisma.schedule.findFirst({
+      where: {
+        id: parseInt(scheduleId),
+        groupId: req.user.groupId
+      }
+    });
+
+    if (!schedule) {
+      return res.status(404).json({ success: false, error: 'Schedule slot not found or unauthorized.' });
+    }
+
+    // Sign the token
+    const token = jwt.sign(
+      { role: 'ATTENDANCE_QR', scheduleId: schedule.id },
+      process.env.JWT_SECRET || 'manar_secret_key',
+      { expiresIn: '15m' }
+    );
+
+    res.status(200).json({ success: true, token });
+  } catch (error) {
+    console.error('[REP-API] Error generating QR token:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate QR token.' });
+  }
+});
 
 module.exports = router;

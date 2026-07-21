@@ -42,11 +42,21 @@ async function sendPushNotification(groupId, payload) {
     if (groupId) {
       subscriptions = await prisma.pushSubscription.findMany({
         where: {
-          student: { groupId: parseInt(groupId) }
+          student: { 
+            groupId: parseInt(groupId),
+            isFocusing: false
+          }
         }
       });
     } else {
-      subscriptions = await prisma.pushSubscription.findMany();
+      subscriptions = await prisma.pushSubscription.findMany({
+        where: {
+          OR: [
+            { studentId: null },
+            { student: { isFocusing: false } }
+          ]
+        }
+      });
     }
 
     console.log(`[PUSH] Found ${subscriptions.length} active subscription(s) to notify.`);
@@ -81,6 +91,15 @@ async function sendPushNotification(groupId, payload) {
 async function sendStudentPushNotification(studentId, payload) {
   console.log(`[PUSH] Dispatching push notification to student ${studentId}...`);
   try {
+    const student = await prisma.student.findUnique({
+      where: { id: parseInt(studentId) },
+      select: { isFocusing: true }
+    });
+    if (student?.isFocusing) {
+      console.log(`[PUSH] Student ${studentId} is focusing. Muting push notification.`);
+      return;
+    }
+
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { studentId: parseInt(studentId) }
     });

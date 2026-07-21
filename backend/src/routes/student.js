@@ -677,24 +677,73 @@ router.get('/student/settings', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Student not found' });
     }
 
+    // Check and update daily streak
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const lastLoginStr = student.lastLoginDate ? new Date(student.lastLoginDate).toISOString().split('T')[0] : null;
+
+    let updatedStreak = student.streak;
+    let updatedXp = student.xp;
+    let shouldUpdate = false;
+
+    if (!lastLoginStr) {
+      updatedStreak = 1;
+      updatedXp += 15; // Daily check-in XP
+      shouldUpdate = true;
+    } else if (lastLoginStr !== todayStr) {
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      if (lastLoginStr === yesterdayStr) {
+        updatedStreak += 1;
+      } else {
+        updatedStreak = 1; // reset streak
+      }
+      updatedXp += 15; // Daily check-in XP
+      shouldUpdate = true;
+    }
+
+    let finalStudent = student;
+    if (shouldUpdate) {
+      finalStudent = await prisma.student.update({
+        where: { id: student.id },
+        data: {
+          streak: updatedStreak,
+          xp: updatedXp,
+          lastLoginDate: now
+        },
+        include: {
+          major: {
+            include: { department: true }
+          },
+          level: true,
+          group: true
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: {
-        id: student.id,
-        name: student.name,
-        email: student.email,
-        phone: student.phone,
-        idPhotoUrl: student.idPhotoUrl,
-        groupId: student.groupId,
-        groupName: student.group ? student.group.name : '',
-        majorId: student.majorId,
-        majorName: student.major ? student.major.name : '',
-        departmentName: student.major?.department ? student.major.department.name : '',
-        levelId: student.levelId,
-        levelName: student.level ? student.level.name : '',
-        isEmailVerified: student.isEmailVerified,
-        isPhoneVerified: student.isPhoneVerified,
-        isRepresentative: student.isRepresentative
+        id: finalStudent.id,
+        name: finalStudent.name,
+        email: finalStudent.email,
+        phone: finalStudent.phone,
+        idPhotoUrl: finalStudent.idPhotoUrl,
+        groupId: finalStudent.groupId,
+        groupName: finalStudent.group ? finalStudent.group.name : '',
+        majorId: finalStudent.majorId,
+        majorName: finalStudent.major ? finalStudent.major.name : '',
+        departmentName: finalStudent.major?.department ? finalStudent.major.department.name : '',
+        levelId: finalStudent.levelId,
+        levelName: finalStudent.level ? finalStudent.level.name : '',
+        isEmailVerified: finalStudent.isEmailVerified,
+        isPhoneVerified: finalStudent.isPhoneVerified,
+        isRepresentative: finalStudent.isRepresentative,
+        xp: finalStudent.xp,
+        streak: finalStudent.streak,
+        isFocusing: finalStudent.isFocusing
       }
     });
   } catch (error) {
@@ -1102,5 +1151,239 @@ router.get('/student/:id', verifyToken, studentController.getStudentById);
 
 // PUT /api/student/:id - Modify user-specific data with isolation
 router.put('/student/:id', verifyToken, studentController.updateStudentById);
+
+// ── STUDENT TASKS & FOCUS MODE ENDPOINTS ───────────────────
+
+// 1. GET /api/student/tasks/all - Fetch both academic goals and personal tasks
+router.get('/student/tasks/all', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    // Fetch personal tasks
+    const personalTasks = await prisma.studentTask.findMany({
+      where: { studentId: req.user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Fetch academic goals for the student's group
+    let academicGoals = [];
+    if (student.groupId) {
+      academicGoals = await prisma.academicGoal.findMany({
+        where: { groupId: student.groupId },
+        include: {
+          completions: {
+            where: { studentId: req.user.id }
+          },
+          subject: true
+        },
+        orderBy: { dueDate: 'asc' }
+      });
+    }
+
+    // Map academic goals to look like tasks
+    const mappedAcademicGoals = academicGoals.map(goal => ({
+      id: `goal-${goal.id}`,
+      goalId: goal.id,
+      title: goal.title,
+      dueDate: goal.dueDate,
+      completed: goal.completions.length > 0,
+      category: 'ASSIGNMENT', // Academic goals act as assignment tasks
+      subjectName: goal.subject?.name,
+      createdAt: goal.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        personal: personalTasks,
+        academic: mappedAcademicGoals
+      }
+    });
+  } catch (error) {
+    console.error('[API] Error fetching student tasks:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tasks' });
+  }
+});
+
+// 2. POST /api/student/tasks - Create a new personal task
+router.post('/student/tasks', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const { title, dueDate, category } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Task title is required' });
+    }
+
+    const task = await prisma.studentTask.create({
+      data: {
+        studentId: req.user.id,
+        title: title.trim(),
+        dueDate: dueDate ? new Date(dueDate) : null,
+        category: category || 'PERSONAL',
+        completed: false
+      }
+    });
+
+    res.status(201).json({ success: true, data: task });
+  } catch (error) {
+    console.error('[API] Error creating personal task:', error);
+    res.status(500).json({ success: false, error: 'Failed to create task' });
+  }
+});
+
+// 3. PUT /api/student/tasks/:id - Toggle task completion / update task
+router.put('/api/student/tasks/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const taskId = req.params.id;
+
+    // Handle academic goals completion
+    if (taskId.startsWith('goal-')) {
+      const goalId = parseInt(taskId.replace('goal-', ''));
+      const { completed } = req.body;
+
+      if (completed) {
+        // Mark as completed in StudentGoalCompletion
+        const completion = await prisma.studentGoalCompletion.upsert({
+          where: {
+            studentId_academicGoalId: {
+              studentId: req.user.id,
+              academicGoalId: goalId
+            }
+          },
+          update: {},
+          create: {
+            studentId: req.user.id,
+            academicGoalId: goalId,
+            status: 'COMPLETED'
+          }
+        });
+
+        // Award +50 XP
+        await prisma.student.update({
+          where: { id: req.user.id },
+          data: { xp: { increment: 50 } }
+        });
+
+        return res.status(200).json({ success: true, data: completion, xpAwarded: 50 });
+      } else {
+        // Delete completion
+        await prisma.studentGoalCompletion.deleteMany({
+          where: {
+            studentId: req.user.id,
+            academicGoalId: goalId
+          }
+        });
+
+        return res.status(200).json({ success: true, message: 'Academic goal completion removed' });
+      }
+    }
+
+    // Handle personal tasks
+    const task = await prisma.studentTask.findFirst({
+      where: { id: taskId, studentId: req.user.id }
+    });
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    const { completed, title, dueDate, category } = req.body;
+    const isNowCompleted = completed !== undefined ? completed : task.completed;
+    
+    // Award +50 XP if toggled from incomplete to complete
+    let xpAwarded = 0;
+    if (isNowCompleted && !task.completed) {
+      xpAwarded = 50;
+      await prisma.student.update({
+        where: { id: req.user.id },
+        data: { xp: { increment: 50 } }
+      });
+    }
+
+    const updatedTask = await prisma.studentTask.update({
+      where: { id: taskId },
+      data: {
+        title: title !== undefined ? title.trim() : task.title,
+        dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : task.dueDate,
+        category: category !== undefined ? category : task.category,
+        completed: isNowCompleted
+      }
+    });
+
+    res.status(200).json({ success: true, data: updatedTask, xpAwarded });
+  } catch (error) {
+    console.error('[API] Error updating task:', error);
+    res.status(500).json({ success: false, error: 'Failed to update task' });
+  }
+});
+
+// 4. DELETE /api/student/tasks/:id - Delete a personal task
+router.delete('/api/student/tasks/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const taskId = req.params.id;
+    if (taskId.startsWith('goal-')) {
+      return res.status(400).json({ success: false, error: 'Cannot delete academic goals assigned to group' });
+    }
+
+    const task = await prisma.studentTask.findFirst({
+      where: { id: taskId, studentId: req.user.id }
+    });
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    await prisma.studentTask.delete({
+      where: { id: taskId }
+    });
+
+    res.status(200).json({ success: true, message: 'Task deleted successfully' });
+  } catch (error) {
+    console.error('[API] Error deleting task:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete task' });
+  }
+});
+
+// 5. PUT /api/student/focus - Toggle focus mode status
+router.put('/api/student/focus', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const { isFocusing } = req.body;
+
+    const student = await prisma.student.update({
+      where: { id: req.user.id },
+      data: { isFocusing: !!isFocusing }
+    });
+
+    res.status(200).json({ success: true, data: { isFocusing: student.isFocusing } });
+  } catch (error) {
+    console.error('[API] Error updating focus status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update focus status' });
+  }
+});
 
 module.exports = router;

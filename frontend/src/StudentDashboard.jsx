@@ -253,7 +253,7 @@ export default function StudentDashboard() {
   // تهيئة وتجهيز ملف بيانات الطالب المحتفظ بها
   const getInitialProfile = () => {
     const userJson = localStorage.getItem('manar_user');
-    let base = { name: 'Student', email: '', phone: '', idPhotoUrl: '', department: '', level: '', groupId: 1, groupName: 'Group A', isRepresentative: false };
+    let base = { name: 'Student', email: '', phone: '', idPhotoUrl: '', department: '', level: '', groupId: 1, groupName: 'Group A', isRepresentative: false, xp: 350, streak: 7, isFocusing: false };
     if (userJson) {
       try {
         const u = JSON.parse(userJson);
@@ -417,7 +417,10 @@ export default function StudentDashboard() {
           levelId: s.levelId,
           isEmailVerified: s.isEmailVerified !== undefined ? s.isEmailVerified : p.isEmailVerified,
           isPhoneVerified: s.isPhoneVerified !== undefined ? s.isPhoneVerified : p.isPhoneVerified,
-          isRepresentative: s.isRepresentative !== undefined ? s.isRepresentative : p.isRepresentative
+          isRepresentative: s.isRepresentative !== undefined ? s.isRepresentative : p.isRepresentative,
+          xp: s.xp !== undefined ? s.xp : p.xp,
+          streak: s.streak !== undefined ? s.streak : p.streak,
+          isFocusing: s.isFocusing !== undefined ? s.isFocusing : p.isFocusing
         }));
       }
 
@@ -447,7 +450,7 @@ export default function StudentDashboard() {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).catch(() => null),
         axios.get(`${API_URL}/api/auth/system/settings`).catch(() => null),
-        axios.get(`${API_URL}/api/goals`, {
+        axios.get(`${API_URL}/api/student/tasks/all`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).catch(() => null)
       ]);
@@ -527,7 +530,26 @@ export default function StudentDashboard() {
       }
 
       if (goalsRes?.data?.success) {
-        setStudentGoals(goalsRes.data.data);
+        const { personal, academic } = goalsRes.data.data;
+        const mappedPersonal = (personal || []).map(t => ({
+          id: t.id,
+          title: t.title,
+          description: '',
+          dueDate: t.dueDate,
+          completed: t.completed,
+          type: t.category || 'PERSONAL',
+          isPersonal: true
+        }));
+        const mappedAcademic = (academic || []).map(g => ({
+          id: g.id,
+          title: g.title,
+          description: '',
+          dueDate: g.dueDate,
+          completed: g.completed,
+          type: g.category || 'ASSIGNMENT',
+          subject: { name: g.subjectName }
+        }));
+        setStudentGoals([...mappedPersonal, ...mappedAcademic]);
       }
       fetchGoalsReminders();
     } catch (err) {
@@ -886,15 +908,66 @@ export default function StudentDashboard() {
   const handleToggleGoal = async (goalId) => {
     try {
       const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/goals/${goalId}/toggle`, {}, {
+      const goal = studentGoals.find(g => g.id === goalId);
+      if (!goal) return;
+
+      const res = await axios.put(`${API_URL}/api/student/tasks/${goalId}`, {
+        completed: !goal.completed
+      }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (res.data?.success) {
-        setStudentGoals(prev => prev.map(g => g.id === goalId ? { ...g, completed: res.data.completed } : g));
-        fetchGoalsReminders();
+        toast.success(isAr ? 'تم تحديث حالة المهمة!' : 'Task updated successfully!');
+        if (res.data.xpAwarded) {
+          toast.success(isAr ? `🏆 حصلت على +${res.data.xpAwarded} نقطة XP!` : `🏆 Earned +${res.data.xpAwarded} XP!`, { icon: '✨' });
+        }
+        fetchData(true);
       }
     } catch (err) {
+      console.error(err);
       toast.error(isAr ? 'فشل تحديث حالة المهمة.' : 'Failed to update task state.');
+    }
+  };
+
+  const handleAddPersonalTask = async (title, dueDate, category) => {
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/tasks`, {
+        title,
+        dueDate,
+        category
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم إضافة المهمة الشخصية!' : 'Personal task added successfully!');
+        fetchData(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error creating personal task:', err);
+      toast.error(isAr ? 'فشل إضافة المهمة.' : 'Failed to add task.');
+      return false;
+    }
+  };
+
+  const handleDeletePersonalTask = async (taskId) => {
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.delete(`${API_URL}/api/student/tasks/${taskId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم حذف المهمة!' : 'Task deleted successfully!');
+        fetchData(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      toast.error(isAr ? 'فشل حذف المهمة.' : 'Failed to delete task.');
+      return false;
     }
   };
 
@@ -1363,6 +1436,10 @@ export default function StudentDashboard() {
                     goals={studentGoals}
                     goalsLoading={studentGoalsLoading}
                     onToggleGoal={handleToggleGoal}
+                    onAddPersonalTask={handleAddPersonalTask}
+                    onDeletePersonalTask={handleDeletePersonalTask}
+                    profile={profile}
+                    setProfile={setProfile}
                   />
                 )}
 

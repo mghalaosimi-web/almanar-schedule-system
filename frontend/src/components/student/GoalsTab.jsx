@@ -1,8 +1,102 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+import { API_URL } from '../../config';
 
-export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal }) {
+export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAddPersonalTask, onDeletePersonalTask, profile, setProfile }) {
   const [filterType, setFilterType] = useState('ALL');
+
+  const [focusActive, setFocusActive] = useState(() => localStorage.getItem('manar_focus_mode') === 'active');
+  const [timeLeft, setTimeLeft] = useState(1500); // 25 mins
+
+  useEffect(() => {
+    let interval = null;
+    if (focusActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setFocusActive(false);
+            localStorage.removeItem('manar_focus_mode');
+            axios.put(`${API_URL}/api/student/focus`, { isFocusing: false }, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('manar_token')}` }
+            }).then(() => {
+              if (setProfile) setProfile(p => ({ ...p, isFocusing: false }));
+            }).catch(e => console.warn(e));
+            toast.success(isAr ? '🏆 انتهت جلسة التركيز بنجاح! طاب مجهودك.' : '🏆 Focus session finished successfully! Great job.');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (!focusActive) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [focusActive, timeLeft, isAr, setProfile]);
+
+  const handleToggleFocus = async () => {
+    const nextState = !focusActive;
+    setFocusActive(nextState);
+    if (nextState) {
+      setTimeLeft(1500);
+      localStorage.setItem('manar_focus_mode', 'active');
+      try {
+        const token = localStorage.getItem('manar_token');
+        await axios.put(`${API_URL}/api/student/focus`, { isFocusing: true }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (setProfile) {
+          setProfile(p => ({ ...p, isFocusing: true }));
+        }
+        toast.success(isAr ? '📴 تم تفعيل وضع التركيز وكتم الإشعارات' : '📴 Focus mode activated, notifications muted');
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      localStorage.removeItem('manar_focus_mode');
+      try {
+        const token = localStorage.getItem('manar_token');
+        await axios.put(`${API_URL}/api/student/focus`, { isFocusing: false }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (setProfile) {
+          setProfile(p => ({ ...p, isFocusing: false }));
+        }
+        toast(isAr ? '🔙 تم إلغاء وضع التركيز واستئناف الإشعارات' : '🔙 Focus mode stopped, notifications resumed');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Add Task Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('PERSONAL');
+  const [addingTask, setAddingTask] = useState(false);
+
+  const handleAddTaskSubmit = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    setAddingTask(true);
+    const success = await onAddPersonalTask(newTaskTitle, newTaskDueDate || null, newTaskCategory);
+    setAddingTask(false);
+    if (success) {
+      setNewTaskTitle('');
+      setNewTaskDueDate('');
+      setNewTaskCategory('PERSONAL');
+      setIsAddModalOpen(false);
+    }
+  };
 
   // Calculate stats
   const totalCount = goals.length;
@@ -50,6 +144,31 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal }) {
 
   return (
     <div className="space-y-5">
+      {/* ── Focus Mode (Pomodoro) ── */}
+      <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 p-4 rounded-3xl mb-5 flex items-center justify-between relative overflow-hidden">
+        <div className="absolute -left-5 -top-5 text-red-500/10 text-6xl"><i className="ph-fill ph-timer"></i></div>
+        <div className="relative z-10">
+          <h3 className="font-bold text-sm text-red-400 mb-1 flex items-center gap-1">
+            <i className="ph-fill ph-brain"></i> {isAr ? 'وضع التركيز (بومودورو)' : 'Focus Mode (Pomodoro)'}
+          </h3>
+          <p className="text-[10px] text-[#94a3b8]">
+            {focusActive 
+              ? (isAr ? `⏱️ متبقي ${formatTime(timeLeft)} دقيقة` : `⏱️ ${formatTime(timeLeft)} remaining`)
+              : (isAr ? 'اكتم الإشعارات وابدأ المذاكرة' : 'Mute notifications and start focusing')}
+          </p>
+        </div>
+        <button 
+          onClick={handleToggleFocus}
+          className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-[0_0_15px_rgba(239,68,68,0.2)] active:scale-90 transition-transform ${
+            focusActive 
+              ? 'bg-red-500 text-white border border-red-400' 
+              : 'bg-red-500/20 text-red-400 border border-red-500/50'
+          }`}
+        >
+          <i className={`ph-fill ${focusActive ? 'ph-square' : 'ph-play'}`}></i>
+        </button>
+      </div>
+
       {/* ── 1. Progress Metric Card ── */}
       <div 
         className="relative overflow-hidden rounded-[24px] p-5 border border-white/5 bg-slate-900/60 shadow-xl"
@@ -133,6 +252,14 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal }) {
           );
         })}
       </div>
+
+      {/* ── Add Personal Task Button ── */}
+      <button 
+        onClick={() => setIsAddModalOpen(true)}
+        className="w-full bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/30 border-dashed rounded-2xl py-3 flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform hover:bg-[#f59e0b]/20"
+      >
+        <i className="ph-bold ph-plus"></i> {isAr ? 'إضافة مهمة شخصية' : 'Add Personal Task'}
+      </button>
 
       {/* ── 3. Goals Checklist ── */}
       <div className="space-y-3">
@@ -231,6 +358,16 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal }) {
                         <span>
                           📅 {isAr ? 'تاريخ التسليم:' : 'Due Date:'} {goal.dueDate ? new Date(goal.dueDate).toLocaleDateString() : (isAr ? 'مفتوح' : 'Open')}
                         </span>
+                        {goal.isPersonal && (
+                          <button
+                            type="button"
+                            onClick={() => onDeletePersonalTask(goal.id)}
+                            className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                            title={isAr ? 'حذف المهمة' : 'Delete Task'}
+                          >
+                            <i className="ph ph-trash text-sm"></i>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -240,6 +377,86 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal }) {
           </div>
         )}
       </div>
+
+      {/* ── Add Personal Task Modal ── */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#1e293b] border border-slate-700/50 rounded-3xl p-6 w-full max-w-sm text-white shadow-2xl relative"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5 font-sans">
+                  📝 {isAr ? 'إضافة مهمة شخصية' : 'Add Personal Task'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleAddTaskSubmit} className="space-y-4 font-sans text-right">
+                <div className="space-y-1">
+                  <label className="block text-xs text-[#94a3b8]">
+                    {isAr ? 'عنوان المهمة' : 'Task Title'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500 text-right"
+                    placeholder={isAr ? 'مثال: تسليم بحث التفاعل البشري' : 'e.g. Turn in HCI Research'}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs text-[#94a3b8]">
+                    {isAr ? 'تاريخ التسليم (اختياري)' : 'Due Date (Optional)'}
+                  </label>
+                  <input
+                    type="date"
+                    value={newTaskDueDate}
+                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs text-[#94a3b8]">
+                    {isAr ? 'الفئة' : 'Category'}
+                  </label>
+                  <select
+                    value={newTaskCategory}
+                    onChange={(e) => setNewTaskCategory(e.target.value)}
+                    className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 text-right"
+                  >
+                    <option value="PERSONAL">{isAr ? 'شخصية' : 'Personal'}</option>
+                    <option value="ASSIGNMENT">{isAr ? 'تكليف' : 'Assignment'}</option>
+                    <option value="PROJECT">{isAr ? 'مشروع' : 'Project'}</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={addingTask}
+                  className="w-full bg-[#f59e0b] hover:bg-[#f59e0b]/90 text-[#0b1120] py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-50 mt-2"
+                >
+                  {addingTask 
+                    ? (isAr ? 'جاري الإضافة...' : 'Adding...') 
+                    : (isAr ? 'إضافة المهمة' : 'Add Task')}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

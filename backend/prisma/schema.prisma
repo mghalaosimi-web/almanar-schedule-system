@@ -84,36 +84,42 @@ model Group {
 }
 
 model Student {
-  id               Int                @id @default(autoincrement())
-  name             String
-  email            String             @unique
-  idNumber         String             @unique
-  idPhotoUrl       String?
-  phone            String             @unique
-  isEmailVerified  Boolean            @default(true)
-  isPhoneVerified  Boolean            @default(false)
-  isRepresentative Boolean            @default(false)
-  password         String?
-  googleId         String?            @unique
-  collegeId        Int
-  college          College            @relation(fields: [collegeId], references: [id])
-  majorId          Int
-  major            Major              @relation(fields: [majorId], references: [id])
-  levelId          Int
-  level            Level              @relation(fields: [levelId], references: [id])
-  groupId          Int?
-  group            Group?             @relation(fields: [groupId], references: [id])
-  notificationLogs   NotificationLog[]
-  verificationCodes  VerificationCode[]
-  pushSubscriptions  PushSubscription[]
-  attendanceRecords  AttendanceRecord[]
-  attendances        Attendance[]
-  seatAllocations    SeatAllocation[]
-  exchangePosts      ExchangePost[]
-  exchangeComments   ExchangeComment[]
-  feedbacks          Feedback[]
-  goalCompletions    StudentGoalCompletion[]
-  createdAt          DateTime           @default(now())
+  id                Int                     @id @default(autoincrement())
+  name              String
+  email             String                  @unique
+  idNumber          String                  @unique
+  idPhotoUrl        String?
+  phone             String                  @unique
+  isEmailVerified   Boolean                 @default(true)
+  isPhoneVerified   Boolean                 @default(false)
+  isRepresentative  Boolean                 @default(false)
+  password          String?
+  googleId          String?                 @unique
+  collegeId         Int
+  college           College                 @relation(fields: [collegeId], references: [id])
+  majorId           Int
+  major             Major                   @relation(fields: [majorId], references: [id])
+  levelId           Int
+  level             Level                   @relation(fields: [levelId], references: [id])
+  groupId           Int?
+  group             Group?                  @relation(fields: [groupId], references: [id])
+  xp                Int                     @default(350)
+  streak            Int                     @default(7)
+  lastLoginDate     DateTime?
+  isFocusing        Boolean                 @default(false)
+  pollVotes         PollVote[]
+  tasks             StudentTask[]
+  notificationLogs  NotificationLog[]
+  verificationCodes VerificationCode[]
+  pushSubscriptions PushSubscription[]
+  attendanceRecords AttendanceRecord[]
+  attendances       Attendance[]
+  seatAllocations   SeatAllocation[]
+  exchangePosts     ExchangePost[]
+  exchangeComments  ExchangeComment[]
+  feedbacks         Feedback[]
+  goalCompletions   StudentGoalCompletion[]
+  createdAt         DateTime                @default(now())
 
   @@index([collegeId])
   @@index([majorId])
@@ -122,29 +128,29 @@ model Student {
 }
 
 model Subject {
-  id        Int         @id @default(autoincrement())
-  name      String
-  code      String      @unique
-  type      SubjectType
-  schedules Schedule[]
+  id            Int            @id @default(autoincrement())
+  name          String
+  code          String         @unique
+  type          SubjectType
+  schedules     Schedule[]
   examSchedules ExamSchedule[]
   academicGoals AcademicGoal[]
-  collegeId Int
-  college   College     @relation(fields: [collegeId], references: [id])
+  collegeId     Int
+  college       College        @relation(fields: [collegeId], references: [id])
 
   @@index([collegeId])
 }
 
 model Room {
-  id                 Int                @id @default(autoincrement())
-  name               String             @unique
+  id                 Int                 @id @default(autoincrement())
+  name               String              @unique
   capacity           Int
   schedules          Schedule[]
   overrides          ScheduleOverride[]
   rescheduleRequests RescheduleRequest[]
   examSchedules      ExamSchedule[]
   collegeId          Int
-  college            College            @relation(fields: [collegeId], references: [id])
+  college            College             @relation(fields: [collegeId], references: [id])
 
   @@index([collegeId])
 }
@@ -178,7 +184,7 @@ model RescheduleRequest {
   schedule     Schedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   lecturerId   Int
   lecturer     Lecturer      @relation(fields: [lecturerId], references: [id])
-  requestType  String        // 'CANCEL' or 'RESCHEDULE'
+  requestType  String // 'CANCEL' or 'RESCHEDULE'
   newDayOfWeek DayOfWeek?
   newStartTime String?
   newEndTime   String?
@@ -194,16 +200,16 @@ model RescheduleRequest {
 }
 
 model Schedule {
-  id                 Int                @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
   subjectId          Int
-  subject            Subject            @relation(fields: [subjectId], references: [id])
+  subject            Subject             @relation(fields: [subjectId], references: [id])
   roomId             Int
-  room               Room               @relation(fields: [roomId], references: [id])
+  room               Room                @relation(fields: [roomId], references: [id])
   lecturerName       String
   lecturerId         Int?
-  lecturer           Lecturer?          @relation(fields: [lecturerId], references: [id])
+  lecturer           Lecturer?           @relation(fields: [lecturerId], references: [id])
   groupId            Int
-  group              Group              @relation(fields: [groupId], references: [id])
+  group              Group               @relation(fields: [groupId], references: [id])
   dayOfWeek          DayOfWeek
   startTime          String
   endTime            String
@@ -212,7 +218,7 @@ model Schedule {
   attendanceRecords  AttendanceRecord[]
   attendances        Attendance[]
   collegeId          Int
-  college            College            @relation(fields: [collegeId], references: [id])
+  college            College             @relation(fields: [collegeId], references: [id])
 
   @@index([groupId])
   @@index([collegeId])
@@ -237,20 +243,20 @@ model ScheduleOverride {
 }
 
 model NotificationLog {
-  id           Int                @id @default(autoincrement())
-  studentId    Int?
-  student      Student?           @relation(fields: [studentId], references: [id])
-  groupId      Int?
-  group        Group?             @relation(fields: [groupId], references: [id])
-  title        String?            // عنوان الإشعار
-  message      String
-  sentTime     DateTime           @default(now())
-  deliveredAt  DateTime?          // وقت استلام الجهاز للإشعار
-  readAt       DateTime?          // وقت فتح الطالب للإشعار
-  deviceToken  String?            // رمز الجهاز المستقبِل
-  platform     String?            // Android / iOS / Web
-  status       NotificationStatus
-  broadcastId  String?            // معرف البث الموحد للمجموعة
+  id          Int                @id @default(autoincrement())
+  studentId   Int?
+  student     Student?           @relation(fields: [studentId], references: [id])
+  groupId     Int?
+  group       Group?             @relation(fields: [groupId], references: [id])
+  title       String? // عنوان الإشعار
+  message     String
+  sentTime    DateTime           @default(now())
+  deliveredAt DateTime? // وقت استلام الجهاز للإشعار
+  readAt      DateTime? // وقت فتح الطالب للإشعار
+  deviceToken String? // رمز الجهاز المستقبِل
+  platform    String? // Android / iOS / Web
+  status      NotificationStatus
+  broadcastId String? // معرف البث الموحد للمجموعة
 
   @@index([studentId])
   @@index([groupId])
@@ -258,7 +264,6 @@ model NotificationLog {
   @@index([status])
   @@index([broadcastId])
 }
-
 
 enum AdminRole {
   SUPER_ADMIN
@@ -346,8 +351,8 @@ model ExamSchedule {
   groupId         Int
   group           Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
   date            DateTime
-  startTime       String           // e.g. "09:00"
-  endTime         String           // e.g. "11:00"
+  startTime       String // e.g. "09:00"
+  endTime         String // e.g. "11:00"
   seatAllocations SeatAllocation[]
   collegeId       Int
   college         College          @relation(fields: [collegeId], references: [id])
@@ -363,8 +368,8 @@ model SeatAllocation {
   student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   examScheduleId Int
   examSchedule   ExamSchedule @relation(fields: [examScheduleId], references: [id], onDelete: Cascade)
-  seatNumber     String       // e.g. "Seat 1", "Seat 2"
-  
+  seatNumber     String // e.g. "Seat 1", "Seat 2"
+
   @@unique([studentId, examScheduleId])
   @@unique([examScheduleId, seatNumber])
 }
@@ -414,12 +419,12 @@ model College {
 model Attendance {
   id           String   @id @default(uuid())
   date         DateTime @default(now())
-  status       String   // "PRESENT", "ABSENT", "EXCUSED"
+  status       String // "PRESENT", "ABSENT", "EXCUSED"
   studentId    Int
   student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   scheduleId   Int
   schedule     Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  recordedById Int      // ID of the representative who took attendance
+  recordedById Int // ID of the representative who took attendance
 
   // Performance indexes: speed up per-student and per-schedule attendance queries
   @@index([studentId])
@@ -427,40 +432,40 @@ model Attendance {
 }
 
 model GroupResource {
-  id           String   @id @default(uuid())
-  title        String
-  url          String
-  groupId      Int
-  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  postedById   Int
-  createdAt    DateTime @default(now())
+  id         String   @id @default(uuid())
+  title      String
+  url        String
+  groupId    Int
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  postedById Int
+  createdAt  DateTime @default(now())
 
   @@index([groupId, createdAt])
 }
 
 model TenantConfig {
-  id                  String      @id @default(uuid())
-  universityId        Int?        @unique
-  university          University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  collegeId           Int?        @unique
-  college             College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
-  
+  id           String      @id @default(uuid())
+  universityId Int?        @unique
+  university   University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  collegeId    Int?        @unique
+  college      College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
   // Customization & Branding
-  themeColor          String?     // Hex color
-  logoUrl             String?     // Custom logo url
-  customDomain        String?     // Custom subdomain/domain
-  databaseUrl         String?     // Encrypted connection string (PostgreSQL URI)
-  
+  themeColor   String? // Hex color
+  logoUrl      String? // Custom logo url
+  customDomain String? // Custom subdomain/domain
+  databaseUrl  String? // Encrypted connection string (PostgreSQL URI)
+
   // Licensing & Dynamic DB Integration
-  whitelabelKey       String?     @unique // Secure generated hash for licensing
-  databaseUrlOverride String?     // Direct connection string override for tenant
-  isLicenseActive     Boolean     @default(true) // Global kill-switch for this tenant
-  
+  whitelabelKey       String? @unique // Secure generated hash for licensing
+  databaseUrlOverride String? // Direct connection string override for tenant
+  isLicenseActive     Boolean @default(true) // Global kill-switch for this tenant
+
   // Feature Flags
-  enabledFeatures     Json        @default("{}") // JSON config: {"qrAttendance": true, etc.}
-  
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  enabledFeatures Json @default("{}") // JSON config: {"qrAttendance": true, etc.}
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum PostCategory {
@@ -468,6 +473,7 @@ enum PostCategory {
   RESOURCE
   HELP
   GENERAL
+  POLL
 }
 
 model ExchangePost {
@@ -481,6 +487,7 @@ model ExchangePost {
   student     Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
   comments    ExchangeComment[]
   isAnonymous Boolean           @default(false)
+  poll        Poll?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -496,11 +503,35 @@ model ExchangeComment {
   student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   content     String
   isAnonymous Boolean      @default(false)
+  isVerified  Boolean      @default(false)
   createdAt   DateTime     @default(now())
 
   @@index([postId])
   @@index([studentId])
 }
+
+model Poll {
+  id        String       @id @default(uuid())
+  question  String
+  options   String[]
+  postId    String       @unique
+  post      ExchangePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  votes     PollVote[]
+  createdAt DateTime     @default(now())
+}
+
+model PollVote {
+  id        Int      @id @default(autoincrement())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  studentId Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  optionIdx Int
+  createdAt DateTime @default(now())
+
+  @@unique([pollId, studentId])
+}
+
 model Feedback {
   id        Int      @id @default(autoincrement())
   studentId Int
@@ -509,6 +540,19 @@ model Feedback {
   category  String?
   rating    Int?
   createdAt DateTime @default(now())
+
+  @@index([studentId])
+}
+
+model StudentTask {
+  id        String    @id @default(uuid())
+  studentId Int
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  category  String    @default("PERSONAL") // "ASSIGNMENT", "PROJECT", "PERSONAL"
+  createdAt DateTime  @default(now())
 
   @@index([studentId])
 }
@@ -576,23 +620,23 @@ enum GoalType {
 }
 
 model AcademicGoal {
-  id          Int                     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
   description String?
-  type        GoalType                @default(ASSIGNMENT)
+  type        GoalType  @default(ASSIGNMENT)
   dueDate     DateTime?
-  weekNumber  Int?                    // e.g. 1 for week 1
-  
-  subjectId   Int
-  subject     Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  
-  groupId     Int?
-  group       Group?                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  
+  weekNumber  Int? // e.g. 1 for week 1
+
+  subjectId Int
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  groupId Int?
+  group   Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
   completions StudentGoalCompletion[]
-  
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([subjectId])
   @@index([groupId])
@@ -611,7 +655,3 @@ model StudentGoalCompletion {
   @@index([studentId])
   @@index([academicGoalId])
 }
-
-
-
-

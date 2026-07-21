@@ -31,6 +31,11 @@ router.get('/posts', verifyToken, async (req, res) => {
             isRepresentative: true
           }
         },
+        poll: {
+          include: {
+            votes: true
+          }
+        },
         _count: {
           select: { comments: true }
         }
@@ -58,7 +63,17 @@ router.get('/posts', verifyToken, async (req, res) => {
           idPhotoUrl: null,
           isRepresentative: false,
           isAnonymous: true
-        } : post.student
+        } : post.student,
+        poll: post.poll ? {
+          id: post.poll.id,
+          question: post.poll.question,
+          options: post.poll.options,
+          votes: post.poll.votes.map(v => ({
+            studentId: v.studentId,
+            optionIdx: v.optionIdx
+          })),
+          votedOptionIdx: post.poll.votes.find(v => v.studentId === req.user.id)?.optionIdx
+        } : null
       };
     });
 
@@ -76,7 +91,7 @@ router.post('/posts', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Access denied. Student account required.' });
     }
 
-    const { title, content, category, isAnonymous } = req.body;
+    const { title, content, category, isAnonymous, question, options } = req.body;
     if (!title || !content) {
       return res.status(400).json({ success: false, error: 'Title and content are required' });
     }
@@ -90,8 +105,21 @@ router.post('/posts', verifyToken, async (req, res) => {
     }
 
     // Verify category matches enum
-    const allowedCategories = ['QUESTION', 'RESOURCE', 'HELP', 'GENERAL'];
+    const allowedCategories = ['QUESTION', 'RESOURCE', 'HELP', 'GENERAL', 'POLL'];
     const postCategory = allowedCategories.includes(category) ? category : 'GENERAL';
+
+    let pollData = undefined;
+    if (postCategory === 'POLL') {
+      if (!question || !Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ success: false, error: 'Poll category requires a question and at least 2 options.' });
+      }
+      pollData = {
+        create: {
+          question: question.trim(),
+          options: options.map(o => o.trim())
+        }
+      };
+    }
 
     const post = await prisma.exchangePost.create({
       data: {
@@ -100,7 +128,8 @@ router.post('/posts', verifyToken, async (req, res) => {
         category: postCategory,
         groupId: student.groupId,
         studentId: student.id,
-        isAnonymous: !!isAnonymous
+        isAnonymous: !!isAnonymous,
+        poll: pollData
       },
       include: {
         student: {
@@ -109,6 +138,11 @@ router.post('/posts', verifyToken, async (req, res) => {
             name: true,
             idPhotoUrl: true,
             isRepresentative: true
+          }
+        },
+        poll: {
+          include: {
+            votes: true
           }
         },
         _count: {
@@ -135,7 +169,14 @@ router.post('/posts', verifyToken, async (req, res) => {
         idPhotoUrl: null,
         isRepresentative: false,
         isAnonymous: true
-      } : post.student
+      } : post.student,
+      poll: post.poll ? {
+        id: post.poll.id,
+        question: post.poll.question,
+        options: post.poll.options,
+        votes: [],
+        votedOptionIdx: null
+      } : null
     };
 
     res.status(201).json({ success: true, data: responseData });
@@ -179,6 +220,11 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
             name: true,
             idPhotoUrl: true,
             isRepresentative: true
+          }
+        },
+        poll: {
+          include: {
+            votes: true
           }
         },
         comments: {
@@ -225,6 +271,16 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
         isRepresentative: false,
         isAnonymous: true
       } : post.student,
+      poll: post.poll ? {
+        id: post.poll.id,
+        question: post.poll.question,
+        options: post.poll.options,
+        votes: post.poll.votes.map(v => ({
+          studentId: v.studentId,
+          optionIdx: v.optionIdx
+        })),
+        votedOptionIdx: post.poll.votes.find(v => v.studentId === req.user.id)?.optionIdx
+      } : null,
       comments: (post.comments || []).map(comment => {
         const isCommentMine = comment.studentId === req.user.id;
         return {
@@ -233,6 +289,7 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
           content: comment.content,
           createdAt: comment.createdAt,
           isAnonymous: comment.isAnonymous,
+          isVerified: comment.isVerified,
           isMine: isCommentMine,
           studentId: comment.isAnonymous ? null : comment.studentId,
           student: comment.isAnonymous ? {
@@ -419,6 +476,147 @@ router.delete('/comments/:commentId', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Error deleting comment:', error);
     res.status(500).json({ success: false, error: 'Failed to delete comment' });
+  }
+});
+
+// 7. POST /api/exchange/posts/:postId/poll/vote - Vote on a poll
+router.post('/posts/:postId/poll/vote', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    const { postId } = req.params;
+    const { optionIdx } = req.body;
+
+    if (optionIdx === undefined || optionIdx === null) {
+      return res.status(400).json({ success: false, error: 'Option index is required' });
+    }
+
+    const post = await prisma.exchangePost.findUnique({
+      where: { id: postId },
+      include: { poll: { include: { votes: true } } }
+    });
+
+    if (!post || !post.poll) {
+      return res.status(404).json({ success: false, error: 'Poll not found for this post' });
+    }
+
+    // Check if user already voted
+    const alreadyVoted = post.poll.votes.some(v => v.studentId === req.user.id);
+    if (alreadyVoted) {
+      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+    }
+
+    // Verify option index is valid
+    if (optionIdx < 0 || optionIdx >= post.poll.options.length) {
+      return res.status(400).json({ success: false, error: 'Invalid option selected' });
+    }
+
+    // Record vote
+    const vote = await prisma.pollVote.create({
+      data: {
+        pollId: post.poll.id,
+        studentId: req.user.id,
+        optionIdx: parseInt(optionIdx)
+      }
+    });
+
+    // Fetch updated poll with all votes
+    const updatedPoll = await prisma.poll.findUnique({
+      where: { id: post.poll.id },
+      include: { votes: true }
+    });
+
+    // SSE Broadcast updated poll
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_POLL_VOTED', {
+        groupId: post.groupId,
+        postId,
+        poll: {
+          id: updatedPoll.id,
+          question: updatedPoll.question,
+          options: updatedPoll.options,
+          votes: updatedPoll.votes.map(v => ({
+            studentId: v.studentId,
+            optionIdx: v.optionIdx
+          }))
+        }
+      });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast poll vote:', e.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        pollId: updatedPoll.id,
+        votes: updatedPoll.votes.map(v => ({
+          studentId: v.studentId,
+          optionIdx: v.optionIdx
+        })),
+        votedOptionIdx: parseInt(optionIdx)
+      }
+    });
+  } catch (error) {
+    console.error('[API] Error voting on poll:', error);
+    res.status(500).json({ success: false, error: 'Failed to vote on poll' });
+  }
+});
+
+// 8. PUT /api/exchange/comments/:commentId/verify - Toggle verified answer badge
+router.put('/comments/:commentId/verify', verifyToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { isVerified } = req.body;
+
+    const comment = await prisma.exchangeComment.findUnique({
+      where: { id: commentId },
+      include: { post: true }
+    });
+
+    if (!comment) {
+      return res.status(404).json({ success: false, error: 'Comment not found' });
+    }
+
+    // Verify requester is a representative or admin
+    if (req.user.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({ where: { id: req.user.id } });
+      if (!student || !student.isRepresentative) {
+        return res.status(403).json({ success: false, error: 'Access denied. Representative privileges required.' });
+      }
+      // Ensure the representative belongs to the same group as the post
+      if (student.groupId !== comment.post.groupId) {
+        return res.status(403).json({ success: false, error: 'Access denied. You can only verify comments in your own group.' });
+      }
+    } else if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Access denied. Representative or Admin privileges required.' });
+    }
+
+    // Toggle verified status
+    const updatedComment = await prisma.exchangeComment.update({
+      where: { id: commentId },
+      data: { isVerified: isVerified !== undefined ? !!isVerified : !comment.isVerified }
+    });
+
+    // SSE Broadcast updated comment
+    try {
+      const { broadcastSSE } = require('../services/notifications');
+      broadcastSSE('EXCHANGE_COMMENT_VERIFIED', {
+        groupId: comment.post.groupId,
+        postId: comment.postId,
+        commentId: comment.id,
+        isVerified: updatedComment.isVerified
+      });
+    } catch (e) {
+      console.error('[SSE] Failed to broadcast comment verification:', e.message);
+    }
+
+    res.status(200).json({ success: true, data: updatedComment });
+  } catch (error) {
+    console.error('[API] Error verifying comment:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify comment' });
   }
 });
 

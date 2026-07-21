@@ -12,6 +12,95 @@ export default function RepresentativeDashboard() {
   const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'broadcasts', 'resources', 'rescheduling'
   const [loading, setLoading] = useState(true);
 
+  // QR Attendance code states
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [selectedQRScheduleId, setSelectedQRScheduleId] = useState('');
+  const [generatedQRToken, setGeneratedQRToken] = useState('');
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+
+  // Poll creation states
+  const [isPollModalOpen, setIsPollModalOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [isSubmittingPoll, setIsSubmittingPoll] = useState(false);
+
+  const handleOpenQRModal = () => {
+    if (schedules.length > 0) {
+      setSelectedQRScheduleId(schedules[0].id.toString());
+    }
+    setGeneratedQRToken('');
+    setIsQRModalOpen(true);
+  };
+
+  const handleGenerateQR = async () => {
+    if (!selectedQRScheduleId) return;
+    setIsGeneratingQR(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/rep/attendance/qr-token`, {
+        scheduleId: parseInt(selectedQRScheduleId)
+      }, { headers });
+      if (res.data?.success) {
+        setGeneratedQRToken(res.data.token);
+        toast.success(isAr ? 'تم توليد رمز الحضور بنجاح!' : 'QR attendance token generated!');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل توليد رمز QR' : 'Failed to generate QR token');
+    } finally {
+      setIsGeneratingQR(false);
+    }
+  };
+
+  const handleOpenPollModal = () => {
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setIsPollModalOpen(true);
+  };
+
+  const handleAddPollOption = () => {
+    setPollOptions([...pollOptions, '']);
+  };
+
+  const handleRemovePollOption = (idx) => {
+    if (pollOptions.length <= 2) return;
+    setPollOptions(pollOptions.filter((_, i) => i !== idx));
+  };
+
+  const handlePollOptionChange = (idx, value) => {
+    const updated = [...pollOptions];
+    updated[idx] = value;
+    setPollOptions(updated);
+  };
+
+  const handleCreatePollSubmit = async (e) => {
+    e.preventDefault();
+    if (!pollQuestion.trim()) return;
+    const filteredOptions = pollOptions.filter(o => o.trim() !== '');
+    if (filteredOptions.length < 2) {
+      toast.error(isAr ? 'يرجى إدخال خيارين على الأقل' : 'Please input at least 2 options');
+      return;
+    }
+    setIsSubmittingPoll(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/exchange/posts`, {
+        title: isAr ? 'استبيان الدفعة 📊' : 'Cohort Poll 📊',
+        content: pollQuestion,
+        category: 'POLL',
+        question: pollQuestion,
+        options: filteredOptions
+      }, { headers });
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم نشر الاستبيان في ملتقى الشعبة بنجاح!' : 'Poll posted to Class Hub successfully!');
+        setIsPollModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل إنشاء الاستبيان' : 'Failed to create poll'));
+    } finally {
+      setIsSubmittingPoll(false);
+    }
+  };
+
   // Group Stats
   const [stats, setStats] = useState({
     totalClassmates: 0,
@@ -425,6 +514,24 @@ export default function RepresentativeDashboard() {
           <p className="text-[9px] font-black uppercase text-white/40 tracking-wider mb-1">{isAr ? 'المراجع المشاركة' : 'Shared Files'}</p>
           <h4 className="text-2xl font-black text-blue-400 font-mono">{stats.totalResources}</h4>
         </div>
+      </div>
+
+      {/* ── Action Buttons Grid ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 mb-2">
+        <button 
+          onClick={handleOpenQRModal}
+          className="bg-emerald-500 text-slate-950 p-4 rounded-2xl text-xs font-black shadow-[0_0_15px_rgba(16,185,129,0.3)] flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-transform"
+        >
+          <span className="text-xl">📱</span>
+          {isAr ? 'تحضير بـ QR' : 'QR Attendance'}
+        </button>
+        <button 
+          onClick={handleOpenPollModal}
+          className="bg-slate-800 border border-slate-700/50 text-white p-4 rounded-2xl text-xs font-black flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-transform hover:bg-slate-750"
+        >
+          <span className="text-xl text-blue-400">📊</span>
+          {isAr ? 'إرسال تصويت' : 'Send Poll'}
+        </button>
       </div>
 
       {/* ── Tab Selector pills ──────────────────────────────────── */}
@@ -1023,6 +1130,180 @@ export default function RepresentativeDashboard() {
           </motion.div>
         </div>
       )}
+
+      {/* ── QR Attendance Modal ── */}
+      <AnimatePresence>
+        {isQRModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#1e293b] border border-slate-700/50 rounded-3xl p-6 w-full max-w-sm text-white shadow-2xl relative text-right"
+              dir="rtl"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5 font-sans">
+                  📱 {isAr ? 'تحضير بـ QR' : 'QR Attendance Generator'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsQRModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 font-sans text-right">
+                <div className="space-y-1">
+                  <label className="block text-xs text-[#94a3b8] text-right">
+                    {isAr ? 'اختر المحاضرة / المادة للتحضير' : 'Select Lecture / Subject'}
+                  </label>
+                  <select
+                    value={selectedQRScheduleId}
+                    onChange={(e) => {
+                      setSelectedQRScheduleId(e.target.value);
+                      setGeneratedQRToken('');
+                    }}
+                    className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-500 text-right"
+                  >
+                    {schedules.map((s) => (
+                      <option key={s.id} value={s.id} className="text-right bg-[#0b1120]">
+                        {s.subject?.name} - {s.dayOfWeek} ({s.startTime})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {!generatedQRToken ? (
+                  <button
+                    onClick={handleGenerateQR}
+                    disabled={isGeneratingQR || !selectedQRScheduleId}
+                    className="w-full bg-emerald-500 hover:bg-emerald-450 text-slate-950 py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-50 mt-2"
+                  >
+                    {isGeneratingQR 
+                      ? (isAr ? 'جاري توليد الرمز...' : 'Generating QR...') 
+                      : (isAr ? 'توليد الرمز المشفر' : 'Generate Secure QR')}
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-slate-700/50 space-y-4 my-2">
+                    <img 
+                      src={`https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=${encodeURIComponent(generatedQRToken)}`} 
+                      alt="Check-in QR Code" 
+                      className="w-48 h-48"
+                    />
+                    <p className="text-[10px] text-slate-700 font-bold text-center leading-relaxed">
+                      {isAr 
+                        ? 'اطلب من الطلاب فتح تطبيق البوابة ومسح الكود عبر الماسح. ينتهي صلاحية الكود تلقائياً بعد 15 دقيقة.' 
+                        : 'Students must scan this code using their Student Portal camera. Token expires in 15 minutes.'}
+                    </p>
+                  </div>
+                )}
+
+                {generatedQRToken && (
+                  <button
+                    onClick={handleGenerateQR}
+                    disabled={isGeneratingQR}
+                    className="w-full bg-slate-800 border border-slate-700 text-white py-2 rounded-xl text-xs font-bold transition-all"
+                  >
+                    🔄 {isAr ? 'تحديث الرمز' : 'Regenerate QR'}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Poll Creation Modal ── */}
+      <AnimatePresence>
+        {isPollModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#1e293b] border border-slate-700/50 rounded-3xl p-6 w-full max-w-sm text-white shadow-2xl relative text-right"
+              dir="rtl"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5 font-sans">
+                  📊 {isAr ? 'إرسال تصويت جديد للشعبة' : 'Send Cohort Poll'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsPollModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreatePollSubmit} className="space-y-4 font-sans text-right">
+                <div className="space-y-1">
+                  <label className="block text-xs text-[#94a3b8] text-right">
+                    {isAr ? 'سؤال الاستبيان' : 'Poll Question'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-blue-500 text-right"
+                    placeholder={isAr ? 'مثال: ما هو الموعد المناسب لتعويض محاضرة السبت؟' : 'e.g. When is the best time for the makeup class?'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs text-[#94a3b8] text-right">
+                    {isAr ? 'خيارات التصويت' : 'Poll Options'}
+                  </label>
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePollOption(idx)}
+                          className="text-red-400 hover:text-red-300 transition-colors text-sm"
+                        >
+                          ✕
+                        </button>
+                      )}
+                      <input
+                        type="text"
+                        required
+                        value={opt}
+                        onChange={(e) => handlePollOptionChange(idx, e.target.value)}
+                        className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-blue-500 text-right"
+                        placeholder={isAr ? `الخيار ${idx + 1}` : `Option ${idx + 1}`}
+                      />
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={handleAddPollOption}
+                    className="text-[10px] text-blue-400 font-bold hover:text-blue-300 flex items-center gap-1 mt-1 transition-colors"
+                  >
+                    ➕ {isAr ? 'إضافة خيار آخر' : 'Add Option'}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingPoll}
+                  className="w-full bg-blue-500 hover:bg-blue-450 text-white py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-50 mt-4"
+                >
+                  {isSubmittingPoll 
+                    ? (isAr ? 'جاري النشر في الملتقى...' : 'Posting to Class Hub...') 
+                    : (isAr ? 'نشر التصويت' : 'Create & Post Poll')}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

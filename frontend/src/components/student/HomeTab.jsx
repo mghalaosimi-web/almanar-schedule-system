@@ -109,27 +109,25 @@ export default function HomeTab({
   return (
     <div className="space-y-5">
       {/* ── 1. لوحة الترحيب بالطالب ── */}
-      <div
-        className="relative overflow-hidden rounded-[24px] p-4 shadow-xl frosted-panel"
-        style={{ borderColor: 'var(--accent-glow)' }}
-      >
-        <div className="absolute top-0 right-0 w-28 h-28 bg-[var(--accent)]/5 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex items-center gap-4">
-          <div className="relative shrink-0">
-            <div className="w-14 h-14 rounded-full border-2 border-[var(--accent)] shadow-[0_0_16px_var(--accent-glow)] bg-gradient-to-tr from-[var(--accent)]/20 to-[var(--accent)]/5 flex items-center justify-center font-black text-base text-[var(--accent)]">
-              {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-            </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-[var(--accent)] rounded-full border-2 border-[var(--bg-primary)]" />
+      <div className="bg-gradient-to-br from-[#1e293b] to-[#1e293b]/70 p-5 rounded-[24px] border border-slate-700/50 shadow-glass relative overflow-hidden mb-5">
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#f59e0b]/10 rounded-full blur-2xl"></div>
+        <div className="flex items-center justify-between relative z-10 mb-3">
+          <div>
+            <h3 className="text-lg font-bold text-white mb-0.5">{profile.name || (isAr ? 'طالب منار' : 'Manar Student')}</h3>
+            <p className="text-[#f59e0b] text-xs font-medium">{profile.department || (isAr ? 'هندسة وتكنولوجيا المعلومات' : 'Engineering & IT')}</p>
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base font-black text-[var(--text-primary)] leading-tight">
-              {profile.name || (isAr ? 'طالب منار' : 'Manar Student')}
-            </h3>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5 truncate">
-              {profile.department || (isAr ? 'هندسة البرمجيات' : 'Software Engineering')}
-              {profile.level ? (' · ' + (isAr ? 'مستوى ' : 'Lvl ') + profile.level) : ''}
-            </p>
+          {/* Daily Streak Badge */}
+          <div className="bg-orange-500/20 border border-orange-500/50 px-2 py-1 rounded-xl flex items-center gap-1 shadow-glow cursor-pointer hover:bg-orange-500/30 transition">
+            <span className="text-orange-400 font-bold text-sm">{profile.streak ?? 7}</span>
+            <span className="text-lg">🔥</span>
           </div>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-[#94a3b8] relative z-10 bg-[#0b1120]/50 p-2 rounded-xl">
+          <span>{profile.level ? ((isAr ? 'مستوى ' : 'Level ') + profile.level) : (isAr ? 'مستوى 3' : 'Level 3')}</span>
+          <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
+          <span>{profile.groupName || 'Group A'}</span>
+          <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
+          <span className="font-mono text-[#f59e0b]/80">{profile.xp ?? 350} XP 🏆</span>
         </div>
       </div>
 

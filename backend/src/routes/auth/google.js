@@ -1,4 +1,4 @@
-﻿const express   = require('express');
+const express   = require('express');
 const jwt       = require('jsonwebtoken');
 const bcrypt    = require('bcryptjs');
 const { prisma } = require('../../db');
@@ -112,7 +112,7 @@ router.post('/google', authLimiter, async (req, res) => {
 
     // Call session activity tracker
     try {
-      const { recordLogin } = require('../services/sessionTracker');
+      const { recordLogin } = require('../../services/sessionTracker');
       recordLogin(user, role);
     } catch (e) {}
 
@@ -225,7 +225,7 @@ router.post('/google-login', authLimiter, async (req, res) => {
 
     // Call session activity tracker
     try {
-      const { recordLogin } = require('../services/sessionTracker');
+      const { recordLogin } = require('../../services/sessionTracker');
       recordLogin(student, 'STUDENT');
     } catch (e) {}
 
@@ -348,7 +348,7 @@ router.post('/link-google', authLimiter, async (req, res) => {
     }
 
     try {
-      const { recordLogin } = require('../services/sessionTracker');
+      const { recordLogin } = require('../../services/sessionTracker');
       recordLogin(student, 'STUDENT');
     } catch (e) {}
 
