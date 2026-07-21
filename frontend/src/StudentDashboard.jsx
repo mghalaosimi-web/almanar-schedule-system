@@ -345,6 +345,20 @@ export default function StudentDashboard() {
     return () => clearInterval(notifTimer);
   }, [schedules, isAr]);
 
+  const fetchGoalsReminders = () => {
+    const token = localStorage.getItem('manar_token');
+    if (!token) return;
+    axios.get(`${API_URL}/api/goals/reminders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      if (res.data?.success) {
+        setGoalReminders(res.data.data);
+      }
+    }).catch(err => {
+      console.warn('[Reminders] Failed to fetch reminders:', err.message);
+    });
+  };
+
   /**
    * جلب وتحديث كافة بيانات الطالب والجدول الدراسي والإحصائيات الحية.
    * @param {boolean} forceRefresh - ما إذا كان التحديث إجبارياً ويتجاوز الذاكرة المخبأة.
@@ -889,20 +903,6 @@ export default function StudentDashboard() {
     } finally {
       window.dispatchEvent(new CustomEvent('large-operation-end'));
     }
-  };
-
-  const fetchGoalsReminders = () => {
-    const token = localStorage.getItem('manar_token');
-    if (!token) return;
-    axios.get(`${API_URL}/api/goals/reminders`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(res => {
-      if (res.data?.success) {
-        setGoalReminders(res.data.data);
-      }
-    }).catch(err => {
-      console.warn('[Reminders] Failed to fetch reminders:', err.message);
-    });
   };
 
   const handleToggleGoal = async (goalId) => {

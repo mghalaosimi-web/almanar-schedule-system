@@ -311,7 +311,6 @@ function AppLayout() {
   useEffect(() => {
     const handleUpdate = (e) => {
       const { updateHandler } = e.detail;
-      const isAr = i18n.language === 'ar';
       
       toast((t) => (
         <div className="flex flex-col gap-3 p-2 min-w-[280px]" dir={isAr ? 'rtl' : 'ltr'}>
@@ -713,7 +712,6 @@ function AppLayout() {
     const isImpersonating = !!localStorage.getItem('manar_super_admin_token');
     if (!isImpersonating) return null;
 
-    const isAr = i18n.language === 'ar';
     return (
       <div 
         className="fixed top-0 left-0 right-0 z-[9999] h-10 bg-gradient-to-r from-amber-600 to-orange-700 text-white flex items-center justify-between px-6 text-xs font-bold font-sans shadow-2xl border-b border-orange-500/20"
@@ -755,8 +753,6 @@ function AppLayout() {
     if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && user.role !== 'COLLEGE_ADMIN' && user.role !== 'UNI_ADMIN')) {
       return <Navigate to="/login" replace />;
     }
-
-    const isAr = i18n.language === 'ar';
 
     /* Nav link helper */
     const navLink = (to, icon, label, activeColor = 'var(--accent)') => {
@@ -984,8 +980,6 @@ function AppLayout() {
       return <Navigate to="/login" replace />;
     }
 
-    const isAr = i18n.language === 'ar';
-
     return (
       <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col items-center relative overflow-hidden">
         {renderImpersonationBanner()}
@@ -1096,11 +1090,6 @@ function AppLayout() {
     if (!user.googleId) {
       return <Navigate to="/link-google" replace />;
     }
-
-    // PHASE 2 FIX: isAr MUST be declared here — it is referenced in the JSX return below
-    // (e.g. dir={isAr ? 'rtl' : 'ltr'}). Without this declaration the component throws a
-    // ReferenceError in production strict mode, producing a blank white screen for all students.
-    const isAr = i18n.language === 'ar';
 
     // Full-screen layout for /student/home (StudentDashboard has its own internal nav)
     const isStudentHome = path === '/student/home';
