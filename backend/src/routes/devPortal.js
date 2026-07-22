@@ -13,6 +13,16 @@ const { verifyToken, isSuperAdmin } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification } = require('../services/notifications');
 const adminService = require('../services/adminService');
 
+function isAuthorizedAdmin(reqOrUser) {
+  const user = reqOrUser && (reqOrUser.user ? reqOrUser.user : reqOrUser);
+  return adminService.isAuthorizedAdmin(user);
+}
+
+function getModelScope(reqOrUser, modelName) {
+  const user = reqOrUser && (reqOrUser.user ? reqOrUser.user : reqOrUser);
+  return adminService.getModelScope(user, modelName);
+}
+
 const router = express.Router();
 // Global developer routes check
 router.use('/admin/dev', verifyToken, isSuperAdmin);
@@ -2454,6 +2464,42 @@ router.post('/admin/dev/audit-logs/rollback/:id', verifyToken, async (req, res) 
 });
 
 // ── MASTER DATA MANAGER EXTRA ADMIN ENDPOINTS (STUDENTS, ROOMS, MAJORS) ──
+
+// 0.5 GET /api/admin/groups - Get all groups (scoped)
+router.get('/admin/groups', verifyToken, async (req, res) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { role, collegeId, universityId } = req.user;
+    let whereClause = {};
+
+    if (role === 'COLLEGE_ADMIN') {
+      whereClause.collegeId = parseInt(collegeId);
+    } else if (role === 'UNI_ADMIN') {
+      whereClause.college = { universityId: parseInt(universityId) };
+    } else if (role === 'SUPER_ADMIN') {
+      const qCollegeId = req.query.collegeId;
+      if (qCollegeId) {
+        whereClause.collegeId = parseInt(qCollegeId);
+      }
+    }
+
+    const groups = await prisma.group.findMany({
+      where: whereClause,
+      include: {
+        college: true,
+        major: true,
+        level: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.status(200).json({ success: true, data: groups });
+  } catch (error) {
+    console.error('[API] Get admin groups error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch groups: ' + error.message });
+  }
+});
 
 // 1. GET /api/admin/students - Get all students (scoped)
 router.get('/admin/students', verifyToken, async (req, res) => {

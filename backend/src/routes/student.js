@@ -1244,8 +1244,8 @@ router.post('/student/tasks', verifyToken, async (req, res) => {
   }
 });
 
-// 3. PUT /api/student/tasks/:id - Toggle task completion / update task
-router.put('/api/student/tasks/:id', verifyToken, async (req, res) => {
+// 3. PUT /student/tasks/:id - Toggle task completion / update task
+router.put('/student/tasks/:id', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
@@ -1334,8 +1334,8 @@ router.put('/api/student/tasks/:id', verifyToken, async (req, res) => {
   }
 });
 
-// 4. DELETE /api/student/tasks/:id - Delete a personal task
-router.delete('/api/student/tasks/:id', verifyToken, async (req, res) => {
+// 4. DELETE /student/tasks/:id - Delete a personal task
+router.delete('/student/tasks/:id', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
@@ -1365,8 +1365,8 @@ router.delete('/api/student/tasks/:id', verifyToken, async (req, res) => {
   }
 });
 
-// 5. PUT /api/student/focus - Toggle focus mode status
-router.put('/api/student/focus', verifyToken, async (req, res) => {
+// 5. PUT /student/focus - Toggle focus mode status
+router.put('/student/focus', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
