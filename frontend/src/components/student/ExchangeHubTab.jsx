@@ -8,6 +8,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import { API_URL } from '../../config';
 
 /**
  * مكون ملتقى الدفعة والنقاشات الطلابية.
@@ -60,6 +62,61 @@ export default function ExchangeHubTab({
       currentStudentId = JSON.parse(studentJson).id;
     } catch {}
   }
+
+  const handleVotePoll = async (postId, optionIdx) => {
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/exchange/posts/${postId}/poll/vote`, {
+        optionIdx
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم تسجيل تصويتك بنجاح!' : 'Vote recorded successfully!');
+        const { pollId, votes, votedOptionIdx } = res.data.data;
+        if (setSelectedPost) {
+          setSelectedPost(prev => {
+            if (!prev || !prev.poll || prev.poll.id !== pollId) return prev;
+            return {
+              ...prev,
+              poll: {
+                ...prev.poll,
+                votes,
+                votedOptionIdx
+              }
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل تسجيل التصويت' : 'Failed to record vote'));
+    }
+  };
+
+  const handleToggleVerifyComment = async (commentId, currentIsVerified) => {
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.put(`${API_URL}/api/exchange/comments/${commentId}/verify`, {
+        isVerified: !currentIsVerified
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (res.data?.success) {
+        toast.success(isAr ? 'تم تحديث حالة الإجابة المعتمدة!' : 'Verified status updated!');
+        if (setSelectedPost) {
+          setSelectedPost(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              comments: (prev.comments || []).map(c => c.id === commentId ? { ...c, isVerified: !currentIsVerified } : c)
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || (isAr ? 'فشل التوثيق' : 'Failed to update verified answer'));
+    }
+  };
 
   // Scroll to bottom on load and whenever posts or exchangeTab changes
   useEffect(() => {
@@ -226,6 +283,55 @@ export default function ExchangeHubTab({
             <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed font-medium">
               {selectedPost.content}
             </p>
+
+            {/* Poll Widget */}
+            {selectedPost.poll && (
+              <div className="bg-[#1e293b] p-3.5 rounded-2xl border border-emerald-500/30 my-3 font-sans">
+                <p className="mb-2 font-bold text-xs text-white flex items-center gap-1.5">
+                  <span>📊</span> {selectedPost.poll.question}
+                </p>
+                <div className="space-y-2">
+                  {selectedPost.poll.options.map((optText, idx) => {
+                    const totalVotes = selectedPost.poll.votes?.length || 0;
+                    const optVotes = selectedPost.poll.votes?.filter(v => v.optionIdx === idx).length || 0;
+                    const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                    const isSelected = selectedPost.poll.votedOptionIdx === idx;
+                    const hasVoted = selectedPost.poll.votedOptionIdx !== undefined && selectedPost.poll.votedOptionIdx !== null;
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={hasVoted}
+                        onClick={() => handleVotePoll(selectedPost.id, idx)}
+                        className={`w-full bg-[#0b1120] border rounded-xl p-2.5 text-right relative overflow-hidden group transition-all ${
+                          isSelected 
+                            ? 'border-[#f59e0b] shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
+                            : hasVoted
+                              ? 'border-slate-700/50 opacity-90'
+                              : 'border-slate-600 hover:border-[#f59e0b]'
+                        }`}
+                      >
+                        <div 
+                          className="absolute left-0 top-0 bottom-0 bg-[#f59e0b]/20 transition-all duration-500 z-0" 
+                          style={{ width: `${pct}%` }} 
+                        />
+                        <div className="relative z-10 flex justify-between text-xs font-bold text-white">
+                          <span className="flex items-center gap-1">
+                            {optText}
+                            {isSelected && <span className="text-[#f59e0b]"> ({isAr ? 'تصويتك ✓' : 'Your Vote ✓'})</span>}
+                          </span>
+                          <span className="font-mono">{pct}%</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-2.5 text-center font-bold">
+                  {isAr ? `إجمالي أصوات الطلاب: ${selectedPost.poll.votes?.length || 0}` : `Total student votes: ${selectedPost.poll.votes?.length || 0}`}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -239,9 +345,20 @@ export default function ExchangeHubTab({
               {selectedPost.comments.map((comment) => (
                 <div
                   key={comment.id}
-                  className="frosted-panel rounded-2xl p-4 border border-white/5 bg-white/1 space-y-2.5"
-                  style={{ background: 'var(--bg-card, #121824)', border: '1px solid var(--border-card, rgba(255,255,255,0.05))' }}
+                  className={`frosted-panel rounded-2xl p-4 border space-y-2.5 ${
+                    comment.isVerified
+                      ? 'border-emerald-500/50 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                      : 'border-white/5 bg-white/1'
+                  }`}
+                  style={{ background: 'var(--bg-card, #121824)' }}
                 >
+                  {/* Verified Answer Badge Header */}
+                  {comment.isVerified && (
+                    <div className="self-end bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[9px] font-bold flex items-center gap-1 mb-2 w-fit">
+                      <i className="ph-fill ph-check-circle"></i> {isAr ? 'إجابة معتمدة من الدكتور / المندوب' : 'Verified Answer'}
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex items-center gap-2.5">
                       {comment.student?.isAnonymous ? (
@@ -276,15 +393,30 @@ export default function ExchangeHubTab({
                       </div>
                     </div>
 
-                    {comment.isMine && (
-                      <button
-                        onClick={() => handleDeleteComment(comment.id)}
-                        className="p-1.5 rounded bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 text-[10px] transition-colors"
-                        title={isAr ? 'حذف التعليق' : 'Delete Comment'}
-                      >
-                        🗑️
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {(profile?.isRepresentative || profile?.role === 'ADMIN') && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVerifyComment(comment.id, comment.isVerified)}
+                          className={`text-[9px] px-2 py-0.5 rounded border font-bold transition-all ${
+                            comment.isVerified
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                              : 'bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          {comment.isVerified ? (isAr ? '✓ إجابة معتمدة' : 'Verified') : (isAr ? '+ اعتماد الإجابة' : '+ Verify Answer')}
+                        </button>
+                      )}
+                      {comment.isMine && (
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="p-1.5 rounded bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 text-[10px] transition-colors"
+                          title={isAr ? 'حذف التعليق' : 'Delete Comment'}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-300 leading-normal font-medium pl-10 pr-2">
                     {comment.content}
