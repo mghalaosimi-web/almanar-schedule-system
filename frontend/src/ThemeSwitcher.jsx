@@ -122,8 +122,10 @@ export default function ThemeSwitcher() {
     const applyMode = (mode) => {
       if (mode === 'light') {
         htmlEl.classList.add('light');
+        htmlEl.classList.remove('dark');
       } else if (mode === 'dark') {
         htmlEl.classList.remove('light');
+        htmlEl.classList.add('dark');
       }
     };
 

@@ -20,8 +20,18 @@ router.get('/posts', verifyToken, async (req, res) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
+    const { category, excludeCategory, limit } = req.query;
+    const whereClause = { groupId: student.groupId };
+
+    if (category) {
+      whereClause.category = category;
+    } else if (excludeCategory) {
+      whereClause.category = { not: excludeCategory };
+    }
+
     const posts = await prisma.exchangePost.findMany({
-      where: { groupId: student.groupId },
+      where: whereClause,
+      take: limit ? parseInt(limit) : undefined,
       include: {
         student: {
           select: {
@@ -617,6 +627,72 @@ router.put('/comments/:commentId/verify', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Error verifying comment:', error);
     res.status(500).json({ success: false, error: 'Failed to verify comment' });
+  }
+});
+
+// 9. POST /posts/summarize - Summarize class chat using Gemini
+router.post('/posts/summarize', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Access denied. Student account required.' });
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!student || !student.groupId) {
+      return res.status(400).json({ success: false, error: 'Student does not belong to a group.' });
+    }
+
+    // Fetch the last 50 chat messages (category GENERAL)
+    const messages = await prisma.exchangePost.findMany({
+      where: { groupId: student.groupId, category: 'GENERAL' },
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        student: {
+          select: { name: true }
+        }
+      }
+    });
+
+    if (messages.length === 0) {
+      return res.status(200).json({ success: true, summary: 'لا توجد رسائل دردشة لتلخيصها بعد.' });
+    }
+
+    // Reverse to get messages in chronological order (oldest to newest)
+    const reversedMessages = messages.reverse();
+    const chatText = reversedMessages
+      .map(m => `${m.isAnonymous ? 'طالب مجهول' : m.student?.name || 'طالب'}: ${m.content}`)
+      .join('\n');
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    let summaryText = '';
+
+    if (apiKey) {
+      try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = `أنت مساعد أكاديمي ذكي. تلخص محادثات الطلاب الجامعيين في نقاط واضحة واحترافية باللغة العربية. ركز على الموضوعات الأكاديمية الهامة، التكليفات، ومواعيد الاختبارات أو الملاحظات الجادة التي تمت مناقشتها:
+\n${chatText}\n
+أرجع ملخصاً منظماً في نقاط موجزة ومفهومة باللغة العربية فقط.`;
+
+        const result = await model.generateContent(prompt);
+        summaryText = result.response.text();
+      } catch (err) {
+        console.error('[Gemini Summarize Error] Gemini API failed:', err);
+        summaryText = 'فشل الاتصال بخدمة الذكاء الاصطناعي لتوليد التلخيص حالياً. يرجى مراجعة الرسائل الأخيرة يدوياً.';
+      }
+    } else {
+      summaryText = 'خدمة التلخيص الذكي غير متوفرة لعدم تكوين مفتاح Gemini API في خادم الكلية.';
+    }
+
+    res.status(200).json({ success: true, summary: summaryText });
+  } catch (error) {
+    console.error('[API] Error in chat summarizer:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate chat summary' });
   }
 });
 

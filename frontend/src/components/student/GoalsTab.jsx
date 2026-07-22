@@ -19,11 +19,6 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
             clearInterval(interval);
             setFocusActive(false);
             localStorage.removeItem('manar_focus_mode');
-            axios.put(`${API_URL}/api/student/focus`, { isFocusing: false }, {
-              headers: { Authorization: `Bearer ${localStorage.getItem('manar_token')}` }
-            }).then(() => {
-              if (setProfile) setProfile(p => ({ ...p, isFocusing: false }));
-            }).catch(e => console.warn(e));
             toast.success(isAr ? '🏆 انتهت جلسة التركيز بنجاح! طاب مجهودك.' : '🏆 Focus session finished successfully! Great job.');
             return 0;
           }
@@ -34,40 +29,18 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [focusActive, timeLeft, isAr, setProfile]);
+  }, [focusActive, timeLeft, isAr]);
 
-  const handleToggleFocus = async () => {
+  const handleToggleFocus = () => {
     const nextState = !focusActive;
     setFocusActive(nextState);
     if (nextState) {
       setTimeLeft(1500);
       localStorage.setItem('manar_focus_mode', 'active');
-      try {
-        const token = localStorage.getItem('manar_token');
-        await axios.put(`${API_URL}/api/student/focus`, { isFocusing: true }, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        if (setProfile) {
-          setProfile(p => ({ ...p, isFocusing: true }));
-        }
-        toast.success(isAr ? '📴 تم تفعيل وضع التركيز وكتم الإشعارات' : '📴 Focus mode activated, notifications muted');
-      } catch (err) {
-        console.error(err);
-      }
+      toast.success(isAr ? '📴 تم تفعيل وضع التركيز وكتم الإشعارات محلياً' : '📴 Focus mode activated locally, notifications muted');
     } else {
       localStorage.removeItem('manar_focus_mode');
-      try {
-        const token = localStorage.getItem('manar_token');
-        await axios.put(`${API_URL}/api/student/focus`, { isFocusing: false }, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        if (setProfile) {
-          setProfile(p => ({ ...p, isFocusing: false }));
-        }
-        toast(isAr ? '🔙 تم إلغاء وضع التركيز واستئناف الإشعارات' : '🔙 Focus mode stopped, notifications resumed');
-      } catch (err) {
-        console.error(err);
-      }
+      toast(isAr ? '🔙 تم إلغاء وضع التركيز واستئناف الإشعارات' : '🔙 Focus mode stopped, notifications resumed');
     }
   };
 
@@ -84,16 +57,68 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
   const [newTaskCategory, setNewTaskCategory] = useState('PERSONAL');
   const [addingTask, setAddingTask] = useState(false);
 
+  // Smart Split states
+  const [splitLoading, setSplitLoading] = useState(false);
+  const [splitSubtasks, setSplitSubtasks] = useState([]);
+  const [selectedSubtasks, setSelectedSubtasks] = useState({});
+
+  const handleSmartSplit = async () => {
+    if (!newTaskTitle.trim()) {
+      toast.error(isAr ? 'يرجى إدخال عنوان المهمة أولاً' : 'Please enter a task title first');
+      return;
+    }
+    setSplitLoading(true);
+    setSplitSubtasks([]);
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/tasks/split`, {
+        title: newTaskTitle.trim()
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.success) {
+        setSplitSubtasks(res.data.subtasks);
+        const initialSelected = {};
+        res.data.subtasks.forEach((_, idx) => {
+          initialSelected[idx] = true;
+        });
+        setSelectedSubtasks(initialSelected);
+        toast.success(isAr ? 'تم تقسيم المهمة بنجاح!' : 'Task split successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل تقسيم المهمة' : 'Failed to split task');
+    } finally {
+      setSplitLoading(false);
+    }
+  };
+
   const handleAddTaskSubmit = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     setAddingTask(true);
-    const success = await onAddPersonalTask(newTaskTitle, newTaskDueDate || null, newTaskCategory);
+
+    // 1. Add main task
+    const mainSuccess = await onAddPersonalTask(newTaskTitle, newTaskDueDate || null, newTaskCategory);
+
+    // 2. Add subtasks in parallel
+    if (mainSuccess && splitSubtasks.length > 0) {
+      const selected = splitSubtasks.filter((_, idx) => selectedSubtasks[idx]);
+      if (selected.length > 0) {
+        const promises = selected.map(subTitle => 
+          onAddPersonalTask(subTitle, newTaskDueDate || null, 'PERSONAL')
+        );
+        await Promise.all(promises);
+      }
+    }
+
     setAddingTask(false);
-    if (success) {
+    if (mainSuccess) {
       setNewTaskTitle('');
       setNewTaskDueDate('');
       setNewTaskCategory('PERSONAL');
+      setSplitSubtasks([]);
+      setSelectedSubtasks({});
       setIsAddModalOpen(false);
     }
   };
@@ -414,6 +439,50 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
                     className="w-full bg-[#0b1120] border border-slate-700 rounded-xl p-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500 text-right"
                     placeholder={isAr ? 'مثال: تسليم بحث التفاعل البشري' : 'e.g. Turn in HCI Research'}
                   />
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-[9px] text-slate-500 font-bold">{isAr ? 'تقسيم المهمة لخطوات أصغر؟' : 'Split this task?'}</span>
+                    <button
+                      type="button"
+                      onClick={handleSmartSplit}
+                      disabled={splitLoading}
+                      className="text-amber-500 hover:text-amber-400 font-black text-[10px] flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl disabled:opacity-50 transition-all active:scale-95"
+                    >
+                      {splitLoading ? (
+                        <div className="h-3 w-3 border border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span>✨</span>
+                          {isAr ? 'التقسيم الذكي' : 'Smart Split'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {splitSubtasks.length > 0 && (
+                    <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3 mt-3.5 space-y-2 text-right">
+                      <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-2">
+                        {isAr ? 'المهام الفرعية المقترحة:' : 'Suggested Subtasks:'}
+                      </h4>
+                      <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                        {splitSubtasks.map((subTitle, idx) => (
+                          <label key={idx} className="flex items-center gap-2.5 text-[10px] cursor-pointer hover:text-white transition-colors justify-end">
+                            <span className="text-slate-300 select-none">{subTitle}</span>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedSubtasks[idx]}
+                              onChange={(e) => setSelectedSubtasks({ ...selectedSubtasks, [idx]: e.target.checked })}
+                              className="rounded bg-slate-900 border-slate-800 text-amber-550 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-[8.5px] text-slate-500 leading-normal font-bold">
+                        {isAr 
+                          ? '* سيتم إضافة المهام الفرعية المحددة كمهام شخصية مستقلة عند الحفظ.'
+                          : '* Checked subtasks will be created as separate personal tasks.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">

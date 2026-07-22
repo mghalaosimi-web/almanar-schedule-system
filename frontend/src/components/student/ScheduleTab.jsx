@@ -47,6 +47,7 @@ export default function ScheduleTab({
   // ── الحالات المحلية لتبويب الجدول ──
   const [scheduleViewMode, setScheduleViewMode] = useState('daily'); // 'daily' | 'weekly'
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'theory' | 'practical'
   
   // تهيئة اليوم المحدد تلقائياً ليكون اليوم الحالي إن كان دراسياً، وإلا السبت افتراضياً
   const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -60,12 +61,22 @@ export default function ScheduleTab({
   const isOverridden = (s) => s.overrides && s.overrides.length > 0;
 
   // إجراء التصفية الذكية للمحاضرات بناءً على الفلاتر المحددة
-  const filteredSchedules = selectedGroupFilter === 'all'
-    ? schedules
-    : schedules.filter(s => 
-        s.groupId === parseInt(selectedGroupFilter) || 
-        (s.attendingGroups && s.attendingGroups.some(ag => ag.groupId === parseInt(selectedGroupFilter)))
-      );
+  const filteredSchedules = schedules.filter(s => {
+    // Group filter
+    const matchesGroup = selectedGroupFilter === 'all' ||
+      s.groupId === parseInt(selectedGroupFilter) ||
+      (s.attendingGroups && s.attendingGroups.some(ag => ag.groupId === parseInt(selectedGroupFilter)));
+
+    // Type filter
+    let matchesType = true;
+    if (typeFilter === 'theory') {
+      matchesType = s.subject?.type === 'THEORY';
+    } else if (typeFilter === 'practical') {
+      matchesType = s.subject?.type === 'PRACTICAL' || s.subject?.type === 'LAB';
+    }
+
+    return matchesGroup && matchesType;
+  });
 
   // تصفية المحاضرات لليوم المحدد لبناء المخطط الزمني اليومي
   const dayLectures = filteredSchedules.filter(s => getActiveDay(s) === selectedDay);
@@ -142,6 +153,45 @@ export default function ScheduleTab({
               {g.name}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* ── شريط تصفية نوع المقرر نظري/عملي ── */}
+      <div className="flex items-center justify-between bg-slate-950/30 border border-slate-800/80 rounded-xl p-2.5">
+        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
+          {isAr ? 'نوع المقرر:' : 'Course Type:'}
+        </span>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+              typeFilter === 'all'
+                ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                : 'text-slate-400 hover:text-white border border-transparent'
+            }`}
+          >
+            {isAr ? 'الكل' : 'All'}
+          </button>
+          <button
+            onClick={() => setTypeFilter('theory')}
+            className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+              typeFilter === 'theory'
+                ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                : 'text-slate-400 hover:text-white border border-transparent'
+            }`}
+          >
+            {isAr ? 'نظري' : 'Theory'}
+          </button>
+          <button
+            onClick={() => setTypeFilter('practical')}
+            className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+              typeFilter === 'practical'
+                ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                : 'text-slate-400 hover:text-white border border-transparent'
+            }`}
+          >
+            {isAr ? 'عملي' : 'Practical'}
+          </button>
         </div>
       </div>
 

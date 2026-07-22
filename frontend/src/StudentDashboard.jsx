@@ -23,7 +23,7 @@ import { getFriendlyErrorMessage } from './utils/errorHelpers';
 // استيراد المكونات المقسمة والمفككة للتبويبات الفرعية للطالب
 import HomeTab from './components/student/HomeTab';
 import ScheduleTab from './components/student/ScheduleTab';
-import AlertsTab from './components/student/AlertsTab';
+import DelegateTab from './components/student/DelegateTab';
 import ProfileTab from './components/student/ProfileTab';
 import ExchangeHubTab from './components/student/ExchangeHubTab';
 import GoalsTab from './components/student/GoalsTab';
@@ -976,12 +976,21 @@ export default function StudentDashboard() {
     try {
       setPostsLoading(true);
       const token = localStorage.getItem('manar_token');
-      const res = await axios.get(`${API_URL}/api/exchange/posts`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.data?.success) {
-        setPosts(res.data.data);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const [forumRes, chatRes] = await Promise.all([
+        axios.get(`${API_URL}/api/exchange/posts?excludeCategory=GENERAL`, { headers }),
+        axios.get(`${API_URL}/api/exchange/posts?category=GENERAL&limit=50`, { headers })
+      ]);
+
+      let allCombined = [];
+      if (forumRes.data?.success) {
+        allCombined = [...forumRes.data.data];
       }
+      if (chatRes.data?.success) {
+        allCombined = [...allCombined, ...chatRes.data.data];
+      }
+      setPosts(allCombined);
     } catch (err) {
       console.error('Error fetching exchange posts:', err);
       toast.error(isAr ? 'فشل تحميل مواضيع الملتقى' : 'Failed to fetch discussion topics');
@@ -1290,10 +1299,9 @@ export default function StudentDashboard() {
 
   // ── المخطط البصري الأساسي والتصاميم ──
   return (
-    <div className="flex-1 w-full flex flex-col items-center min-h-screen p-0" style={{ backgroundColor: 'var(--bg-primary)' }} dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="flex-1 w-full flex items-center justify-center min-h-screen p-0 bg-[#070b13]" dir={isAr ? 'rtl' : 'ltr'}>
       <div
-        className="w-full max-w-md min-h-screen flex flex-col relative pb-24 shadow-2xl border-x border-[var(--border-color)] overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+        className="w-full max-w-[430px] h-[100dvh] flex flex-col relative pb-[76px] shadow-2xl border-x border-white/5 overflow-hidden bg-[#0b1120]"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -1309,33 +1317,33 @@ export default function StudentDashboard() {
         )}
         
         {/* رأس الصفحة الديناميكي الثابت */}
-        <header className="px-5 py-4 border-b border-[var(--border-color)] backdrop-blur-md sticky top-0 z-30 flex items-center justify-between" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-          <div className="min-w-0">
-            <h2 className="text-base font-black text-white truncate tracking-tight">
-              {header.title}
-            </h2>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-              {header.subtitle}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <header className="bg-[#1e293b]/85 backdrop-blur-md h-16 flex items-center justify-between px-5 absolute top-0 w-full z-40 border-b border-white/5 shadow-sm">
+          <div className="flex items-center gap-3 min-w-0">
             {header.showAvatar && (
-              <div className="w-9 h-9 rounded-xl border border-white/10 shrink-0 bg-gradient-to-tr from-white/10 to-white/5 flex items-center justify-center font-black text-xs text-white">
+              <div className="w-9 h-9 rounded-xl border border-amber-500/50 bg-[#1e293b] flex items-center justify-center font-black text-xs text-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.15)] shrink-0">
                 {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
               </div>
             )}
+            <div className="min-w-0">
+              <h2 className="text-xs font-black text-white truncate leading-tight">
+                {header.title}
+              </h2>
+              <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                {header.subtitle}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleManualSync}
-              className="btn-ghost p-2 border border-slate-800 hover:border-[var(--accent)] rounded-lg shrink-0 flex items-center justify-center"
+              className="p-2 border border-white/5 hover:border-amber-500/50 rounded-xl shrink-0 flex items-center justify-center transition-colors active:scale-95 bg-[#1e293b]/40"
               title={isAr ? 'تحديث التطبيق والبيانات' : 'Update App & Data'}
             >
-              <svg className="w-4 h-4 text-slate-400 hover:text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
+              <i className="ph ph-arrows-clockwise text-slate-400 hover:text-amber-500 text-sm"></i>
             </button>
             <button
               onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
-              className="btn-ghost px-2.5 py-1 text-[9px] font-black uppercase border border-slate-800 hover:border-[var(--accent)] rounded-lg shrink-0"
+              className="px-2.5 py-1.5 text-[9px] font-black uppercase border border-white/5 hover:border-amber-500/50 bg-[#1e293b]/40 rounded-xl shrink-0 transition-colors active:scale-95 text-white"
             >
               {isAr ? 'EN' : 'عربي'}
             </button>
@@ -1344,7 +1352,7 @@ export default function StudentDashboard() {
         </header>
 
         {/* لوحة عرض المحتوى */}
-        <main className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <main className="flex-1 overflow-y-auto pb-24 pt-20 px-4 space-y-6">
           
           {/* تنبيه وجود محاضرة نشطة الآن وإمكانية التحضير السريع */}
           {activeTab === 'home' && activeLectureNow && (
@@ -1460,14 +1468,6 @@ export default function StudentDashboard() {
                   )
                 )}
 
-                {/* 4. تبويب التنبيهات والإعلانات */}
-                {activeTab === 'alerts' && (
-                  <AlertsTab
-                    isAr={isAr}
-                    allAlerts={allAlerts}
-                  />
-                )}
-
                 {/* 5. تبويب الملف الشخصي والهوية الرقمية */}
                 {activeTab === 'profile' && (
                   <ProfileTab
@@ -1509,18 +1509,12 @@ export default function StudentDashboard() {
                   />
                 )}
 
-                {/* 7. تبويب المندوب الخاص (إذا كان الطالب مندوب شُعبة) */}
-                {activeTab === 'representative' && profile.isRepresentative && (
-                  <div className="space-y-4">
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-emerald-300 text-xs font-bold leading-relaxed text-center"
-                    >
-                      {isAr ? 'أهلاً بك في بوابة مندوب الدفعة. من هنا يمكنك توزيع زملائك وإدارة شُعب الجدول.' : 'Welcome to the Representative Portal. Manage student cohort & schedules here.'}
-                    </motion.div>
-                    <RepresentativeDashboard />
-                  </div>
+                {/* 7. تبويب المندوب الخاص */}
+                {activeTab === 'representative' && (
+                  <DelegateTab
+                    isAr={isAr}
+                    profile={profile}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -1528,98 +1522,43 @@ export default function StudentDashboard() {
         </main>
 
         {/* شريط الملاحة والتنقل السفلي */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md backdrop-blur-lg px-4 py-2.5 flex justify-around items-center z-40" style={{ backgroundColor: 'var(--bg-elevated)', borderTop: '1px solid var(--border-color)' }}>
+        <nav className="absolute bottom-0 left-0 w-full backdrop-blur-xl bg-[#1e293b]/90 border-t border-white/5 h-[72px] px-2 pb-2 pt-1 flex justify-between items-center rounded-t-3xl z-40 shadow-[0_-5px_15px_rgba(0,0,0,0.15)]">
           {[
             {
               id: 'home',
               label: isAr ? 'الرئيسية' : 'Home',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M11.47 3.82a.75.75 0 011.06 0l8.69 8.69a.75.75 0 11-1.06 1.06l-.22-.22v7.42a1.75 1.75 0 01-1.75 1.75h-8.5A1.75 1.75 0 013 20.75v-7.42l-.22.22a.75.75 0 01-1.06-1.06l8.69-8.69z" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              )
+              iconActive: 'ph-fill ph-house',
+              iconInactive: 'ph ph-house'
             },
             {
               id: 'schedule',
               label: isAr ? 'المقررات' : 'Courses',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.625 1.5H9a3.75 3.75 0 013.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 013.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 01-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875zm6.844 14.28a.75.75 0 000-1.06l-2.25-2.25a.75.75 0 00-1.06 0l-2.25 2.25a.75.75 0 001.06 1.06l.97-.97v3.28a.75.75 0 001.5 0v-3.28l.97.97a.75.75 0 001.06-1.06z" clipRule="evenodd" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-                  <path d="M6 6h10M6 10h10" />
-                </svg>
-              )
+              iconActive: 'ph-fill ph-book-open',
+              iconInactive: 'ph ph-book-open'
             },
             {
               id: 'goals',
               label: isAr ? 'المهام' : 'Tasks',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.082l3.75-5.25z" clipRule="evenodd" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="m9 12 2 2 4-4" />
-                </svg>
-              )
+              iconActive: 'ph-fill ph-checks',
+              iconInactive: 'ph ph-checks'
             },
-            ...(profile.isRepresentative ? [{
+            {
               id: 'representative',
-              label: isAr ? 'المندوب' : 'Rep Panel',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm9 11v-1a7 7 0 0 0-14 0v1h2v-1a5 5 0 0 1 10 0v1z" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              )
-            }] : []),
+              label: isAr ? 'المندوب' : 'Delegate',
+              iconActive: 'ph-fill ph-users-three',
+              iconInactive: 'ph ph-users-three'
+            },
             {
               id: 'exchange',
-              label: isAr ? 'الملتقى' : 'Class Hub',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.848 2.771A49.144 49.144 0 0112 2.25c2.43 0 4.817.178 7.152.52 1.378.201 2.448 1.28 2.597 2.677.147 1.385.22 2.79.22 4.209 0 1.355-.068 2.697-.2 4.034a3.003 3.003 0 01-2.483 2.677 48.74 48.74 0 01-3.393.363 9.771 9.771 0 01-4.007 1.258c-.114.013-.23.02-.346.02a.75.75 0 01-.75-.75v-1.352a48.567 48.567 0 01-3.33-.35 3.003 3.003 0 01-2.484-2.678 48.91 48.91 0 01-.225-4.264c0-1.371.07-2.723.21-4.053a3.003 3.003 0 012.488-2.677zM7.5 9.75a.75.75 0 000 1.5h9a.75.75 0 000-1.5h-9z" clipRule="evenodd" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-              )
+              label: isAr ? 'الملتقى' : 'Forum',
+              iconActive: 'ph-fill ph-chats',
+              iconInactive: 'ph ph-chats'
             },
             {
               id: 'profile',
               label: isAr ? 'الملف' : 'Profile',
-              iconActive: (
-                <svg className="w-5.5 h-5.5 text-[#00f59b] drop-shadow-[0_0_4px_rgba(0,245,155,0.4)]" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
-                </svg>
-              ),
-              iconInactive: (
-                <svg className="w-5.5 h-5.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              )
+              iconActive: 'ph-fill ph-user',
+              iconInactive: 'ph ph-user'
             }
           ].map(tab => {
             const active = activeTab === tab.id;
@@ -1627,27 +1566,19 @@ export default function StudentDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center py-2 transition-all duration-300 relative ${
-                  active ? 'text-[#00f59b] -translate-y-1' : 'text-slate-500 hover:text-slate-350'
+                className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-95 ${
+                  active ? 'text-[#f59e0b]' : 'text-slate-400 hover:text-slate-300'
                 }`}
               >
-                <span className="relative">
-                  {active ? tab.iconActive : tab.iconInactive}
-                  
-                  {/* نقطة إشعار تنبيهية عند وجود تعاميم غير مقروءة */}
-                  {tab.id === 'alerts' && allAlerts.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-slate-900" />
+                <div className="relative flex flex-col items-center justify-center">
+                  <i className={`${active ? tab.iconActive : tab.iconInactive} text-xl transition-all duration-200 ${
+                    active ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.65)] scale-110' : ''
+                  }`} />
+                  <span className="text-[9px] font-bold mt-1 font-sans">{tab.label}</span>
+                  {active && (
+                    <span className="absolute -bottom-2 w-1.5 h-1.5 bg-[#f59e0b] rounded-full shadow-[0_0_6px_#f59e0b]" />
                   )}
-                </span>
-                
-                <span className="text-[9px] font-black tracking-wider mt-1.5 uppercase">
-                  {tab.label}
-                </span>
-
-                {/* مؤشر تسليط الضوء السفلي التفاعلي */}
-                {active && (
-                  <span className="absolute bottom-[-1px] h-1 w-3 rounded-full bg-[#00f59b] shadow-[0_0_8px_#00f59b]" />
-                )}
+                </div>
               </button>
             );
           })}

@@ -1386,4 +1386,57 @@ router.put('/student/focus', verifyToken, async (req, res) => {
   }
 });
 
+// 6. POST /student/tasks/split - Split a personal task into subtasks
+router.post('/student/tasks/split', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
+    }
+
+    const { title } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Task title is required' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    let subtasks = [];
+
+    if (apiKey) {
+      try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = `أنت مساعد ذكي لتنظيم الدراسة. قم بتقسيم هذه المهمة الأكاديمية أو الشخصية: "${title}" إلى 3 إلى 5 مهام فرعية صغيرة، واضحة، وعملية باللغة العربية.
+أرجع الإجابة في صيغة صفيف JSON مباشر فقط، بدون تغليف markdown أو كود أو علامات اقتباس مائلة. مثال:
+["المهمة الفرعية الأولى", "المهمة الفرعية الثانية"]`;
+        
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const cleanJson = text.replace(/```json|```/g, '').trim();
+        subtasks = JSON.parse(cleanJson);
+      } catch (err) {
+        console.error('[Gemini Task Split Error] Falling back:', err);
+        subtasks = [
+          `التخطيط والتحضير لـ: ${title}`,
+          `تنفيذ العمل الأساسي لـ: ${title}`,
+          `المراجعة النهائية والتأكد من جودة العمل`,
+          `تسليم وإغلاق المهمة`
+        ];
+      }
+    } else {
+      subtasks = [
+        `التخطيط والتحضير لـ: ${title}`,
+        `تنفيذ العمل الأساسي لـ: ${title}`,
+        `المراجعة النهائية والتأكد من جودة العمل`,
+        `تسليم وإغلاق المهمة`
+      ];
+    }
+
+    res.status(200).json({ success: true, subtasks });
+  } catch (error) {
+    console.error('[API] Error splitting task:', error);
+    res.status(500).json({ success: false, error: 'Failed to split task' });
+  }
+});
+
 module.exports = router;

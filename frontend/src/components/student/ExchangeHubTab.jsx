@@ -51,6 +51,32 @@ export default function ExchangeHubTab({
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [chatIsAnonymous, setChatIsAnonymous] = useState(false);
 
+  // Smart Summary states
+  const [summary, setSummary] = useState('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
+  const handleSummarizeChat = async () => {
+    setSummaryLoading(true);
+    setSummary('');
+    setIsSummaryOpen(true);
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/exchange/posts/summarize`, {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.success) {
+        setSummary(res.data.summary);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل تلخيص المحادثة' : 'Failed to summarize chat');
+      setIsSummaryOpen(false);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const chatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -487,7 +513,7 @@ export default function ExchangeHubTab({
             onClick={() => setExchangeTab('chat')}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all ${
               exchangeTab === 'chat'
-                ? 'bg-[#00f59b] text-slate-955 shadow-md shadow-[#00f59b]/10'
+                ? 'bg-[#f59e0b] text-slate-950 shadow-md shadow-[#f59e0b]/10'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -497,7 +523,7 @@ export default function ExchangeHubTab({
             onClick={() => setExchangeTab('forum')}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all ${
               exchangeTab === 'forum'
-                ? 'bg-[#00f59b] text-slate-955 shadow-md shadow-[#00f59b]/10'
+                ? 'bg-[#f59e0b] text-slate-950 shadow-md shadow-[#f59e0b]/10'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -508,8 +534,48 @@ export default function ExchangeHubTab({
 
       {/* ── View 1: Live Group Chat Mode ── */}
       {exchangeTab === 'chat' && (
-        <div className="flex flex-col h-[520px] bg-black/20 border border-white/5 rounded-3xl p-4 justify-between space-y-3 overflow-hidden">
+        <div className="flex flex-col h-[520px] bg-black/20 border border-white/5 rounded-3xl p-4 justify-between space-y-3 overflow-hidden relative">
           
+          {/* Smart Summarizer Banner */}
+          <div className="shrink-0 flex flex-col gap-2">
+            <div className="flex justify-between items-center bg-[#1e293b]/70 border border-white/5 rounded-2xl p-2">
+              <span className="text-[9px] text-slate-400 font-bold">
+                {isAr ? 'احصل على ملخص سريع لآخر 50 رسالة' : 'Get quick summary of last 50 messages'}
+              </span>
+              <button
+                type="button"
+                onClick={handleSummarizeChat}
+                disabled={summaryLoading}
+                className="text-slate-950 bg-[#f59e0b] hover:bg-[#f59e0b]/90 font-black text-[9px] flex items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-md shadow-amber-500/10 shrink-0"
+              >
+                {summaryLoading ? (
+                  <div className="h-3 w-3 border border-slate-950 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>✨</span>
+                    {isAr ? 'الملخص الذكي' : 'Smart Summary'}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isSummaryOpen && (
+              <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/30 p-3 rounded-2xl text-xs space-y-2 text-right relative">
+                <div className="flex justify-between items-center border-b border-[#f59e0b]/20 pb-1.5 mb-1.5">
+                  <span className="text-[10px] font-black text-[#f59e0b] uppercase tracking-wider flex items-center gap-1">
+                    <span>✨</span> {isAr ? 'الملخص التلقائي للدردشة' : 'AI Chat Summary'}
+                  </span>
+                  <button type="button" onClick={() => setIsSummaryOpen(false)} className="text-[#f59e0b] font-bold text-[10px] hover:text-white transition-colors">✕</button>
+                </div>
+                {summaryLoading ? (
+                  <p className="text-[10px] text-slate-400 text-center py-2 animate-pulse">{isAr ? 'جاري قراءة الرسائل وتوليد التلخيص...' : 'Analyzing conversation history...'}</p>
+                ) : (
+                  <p className="text-[10px] text-amber-100 leading-relaxed whitespace-pre-line font-medium">{summary}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Chat Messages Container */}
           <div
             ref={chatContainerRef}
@@ -605,7 +671,7 @@ export default function ExchangeHubTab({
               onClick={() => setChatIsAnonymous(prev => !prev)}
               className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 text-sm h-9 w-9 ${
                 chatIsAnonymous
-                  ? 'bg-[#00f59b]/10 border border-[#00f59b]/35 text-[#00f59b]'
+                  ? 'bg-[#f59e0b]/10 border border-[#f59e0b]/35 text-[#f59e0b]'
                   : 'bg-white/5 border border-white/5 text-slate-500 hover:text-slate-300'
               }`}
               title={isAr ? 'تفعيل الهوية المجهولة' : 'Toggle anonymous mode'}
@@ -624,7 +690,7 @@ export default function ExchangeHubTab({
             <button
               type="submit"
               disabled={isSendingChat || !chatInput.trim()}
-              className="px-4 py-2 bg-[#00f59b] hover:bg-[#00d484] disabled:bg-slate-800 disabled:text-slate-500 text-slate-955 font-black text-xs rounded-xl transition-all shadow-md shadow-[#00f59b]/15 whitespace-nowrap active:scale-95 duration-100"
+              className="px-4 py-2 bg-[#f59e0b] hover:bg-[#f59e0b]/90 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-[#f59e0b]/15 whitespace-nowrap active:scale-95 duration-100"
             >
               {isSendingChat ? (isAr ? 'إرسال...' : 'Sending') : (isAr ? 'إرسال 🚀' : 'Send 🚀')}
             </button>

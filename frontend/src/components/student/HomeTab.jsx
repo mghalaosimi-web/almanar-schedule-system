@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 /**
  * مكون الصفحة الرئيسية المخصص للطلاب.
@@ -383,96 +384,68 @@ export default function HomeTab({
             </button>
           )}
         </div>
-        
         <div className="grid grid-cols-2 gap-3">
-          {/* الهوية الرقمية */}
+          {/* GPS Check-In */}
           <button
-            onClick={() => setActiveTab('profile')}
-            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+            onClick={() => {
+              if (activeLectureNow) {
+                toast.success(isAr ? 'تم تسجيل الحضور بالـ GPS بنجاح!' : 'GPS Check-In marked successfully!');
+              } else {
+                toast.error(isAr ? 'لا توجد محاضرة نشطة حالياً للتحضير' : 'No active lecture now to check in');
+              }
+            }}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <svg className="w-[22px] h-[22px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <i className="ph ph-map-pin text-[#f59e0b] text-lg"></i>
             </div>
             <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'الهوية الرقمية' : 'Digital ID'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'ملف الطالب والتوثيق' : 'Profile & credentials'}</span>
+              <span className="text-[11px] font-black text-white block">{isAr ? 'تحضير الـ GPS' : 'GPS Check-In'}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'تسجيل الحضور التلقائي بالقاعة' : 'Verify presence via GPS'}</span>
             </div>
           </button>
 
-          {/* الإعلانات والتنبيهات */}
+          {/* Class Hub */}
           <button
-            onClick={() => setActiveTab('alerts')}
-            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+            onClick={() => setActiveTab('forum')}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-[var(--accent)] text-slate-955 text-[9px] font-black flex items-center justify-center border-2 border-[var(--bg-primary)] shadow-[0_0_8px_var(--accent-glow)]">
-              {allAlerts.length > 9 ? '9+' : (allAlerts.length || 0)}
-            </span>
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <svg className="w-[22px] h-[22px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m10.3 13a3 3 0 0 1-5.6 0" />
-              </svg>
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <i className="ph ph-chats text-[#f59e0b] text-lg"></i>
             </div>
             <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'الإعلانات' : 'Announcements'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'آخر إشعارات الكلية' : 'Latest college alerts'}</span>
+              <span className="text-[11px] font-black text-white block">{isAr ? 'الملتقى الطلابي' : 'Class Forum'}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'محادثات ونقاشات الدفعة' : 'Discuss with classmates'}</span>
             </div>
           </button>
 
-          {/* المقررات والجدول */}
+          {/* Focus Mode & Tasks */}
           <button
-            onClick={() => setActiveTab('schedule')}
-            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+            onClick={() => setActiveTab('tasks')}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <svg className="w-[22px] h-[22px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-              </svg>
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <i className="ph ph-checks text-[#f59e0b] text-lg"></i>
             </div>
             <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'مقرراتي' : 'My Courses'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'الجدول الأسبوعي' : 'Weekly schedule'}</span>
+              <span className="text-[11px] font-black text-white block">{isAr ? 'المهام والتركيز' : 'Tasks & Pomodoro'}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'إنجاز التكاليف ومؤقت بومودورو' : 'Complete assignments'}</span>
             </div>
           </button>
 
-          {/* جدول الامتحانات */}
+          {/* Print Schedule */}
           <button
-            onClick={() => setActiveTab('exams')}
-            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+            onClick={() => {
+              window.print();
+            }}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <svg className="w-[22px] h-[22px] text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
-              </svg>
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <i className="ph ph-printer text-[#f59e0b] text-lg"></i>
             </div>
             <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'جدول الامتحانات' : 'Exam Schedule'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'مواعيد وقاعات الاختبار' : 'Dates & exam halls'}</span>
-            </div>
-          </button>
-
-          {/* تنزيل التحديثات والمزامنة */}
-          <button
-            onClick={handleManualSync}
-            className="relative overflow-hidden rounded-[20px] p-4 border hover:border-[var(--accent)]/50 hover:shadow-[0_0_14px_var(--accent-glow)] transition-all flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 col-span-2"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-          >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <svg className="w-[22px] h-[22px] text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-            </div>
-            <div>
-              <span className="text-[11px] font-black text-[var(--text-primary)] block">{isAr ? 'تنزيل التحديثات والمزامنة المباشرة' : 'Download Updates & Sync'}</span>
-              <span className="text-[9px] text-slate-500 block mt-0.5 font-bold">{isAr ? 'تنزيل أحدث جدول وتحديث ملفات التطبيق فوراً' : 'Download the latest schedule and sync PWA files'}</span>
+              <span className="text-[11px] font-black text-white block">{isAr ? 'طباعة الجدول' : 'Print Timetable'}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'حفظ أو طباعة الجدول الأسبوعي' : 'Print weekly timeline'}</span>
             </div>
           </button>
         </div>
