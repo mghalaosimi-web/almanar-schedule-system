@@ -1,4 +1,4 @@
-﻿const express   = require('express');
+const express   = require('express');
 const jwt       = require('jsonwebtoken');
 const bcrypt    = require('bcryptjs');
 const { prisma } = require('../../db');
@@ -222,6 +222,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
       { 
         id: user.id, 
         name: user.name, 
+        email: user.email,
         role, 
         sessionId,
         majorId: role === 'STUDENT' ? user.majorId : undefined,

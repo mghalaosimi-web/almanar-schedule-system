@@ -40,6 +40,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
         { 
           id: student.id, 
           name: student.name, 
+          email: student.email,
           role: 'STUDENT', 
           groupId: student.groupId,
           collegeId: student.collegeId,
@@ -85,6 +86,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
         { 
           id: lecturer.id, 
           name: lecturer.name, 
+          email: lecturer.email,
           role: 'LECTURER',
           collegeId: lecturer.collegeId,
           universityId: lecturer.universityId
@@ -125,6 +127,7 @@ router.post('/impersonate', verifyToken, async (req, res) => {
         { 
           id: admin.id, 
           name: admin.name, 
+          email: admin.email,
           role: admin.role,
           collegeId: admin.collegeId,
           universityId: admin.universityId

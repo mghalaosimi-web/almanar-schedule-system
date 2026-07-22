@@ -354,6 +354,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
       { 
         id: user.id, 
         name: user.name, 
+        email: user.email,
         role, 
         sessionId,
         majorId: role === 'STUDENT' ? user.majorId : undefined,
@@ -482,6 +483,7 @@ router.post('/google', authLimiter, async (req, res) => {
       { 
         id: user.id, 
         name: user.name, 
+        email: user.email,
         role, 
         majorId: role === 'STUDENT' ? user.majorId : undefined,
         levelId: role === 'STUDENT' ? user.levelId : undefined,
@@ -597,6 +599,7 @@ router.post('/google-login', authLimiter, async (req, res) => {
       { 
         id: student.id, 
         name: student.name, 
+        email: student.email,
         role: 'STUDENT', 
         majorId: student.majorId, 
         levelId: student.levelId, 
@@ -698,6 +701,7 @@ router.post('/link-google', authLimiter, async (req, res) => {
       { 
         id: student.id, 
         name: student.name, 
+        email: student.email,
         role: 'STUDENT', 
         majorId: student.majorId,
         levelId: student.levelId,
