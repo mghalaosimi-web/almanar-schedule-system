@@ -1033,7 +1033,7 @@ function AppLayout() {
               {navLink('/admin/groups',    '👥', isAr ? 'إدارة الشعب' : 'Group Management')}
               {navLink('/admin/students',  '🎓', isAr ? 'سجل الطلاب' : 'Students Database')}
               {navLink('/admin/logs',      '📜', isAr ? 'سجلات النظام' : 'System Logs')}
-              {user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com') && (
+              {(user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()))) && (
                 <>
                   {navLink('/admin/dev-portal', '⌨️', isAr ? 'بوابة المطورين' : 'Dev Portal', '#60c4ff')}
                   <button
@@ -1043,24 +1043,24 @@ function AppLayout() {
                         const sRes = await axios.get(`${API_URL}/api/students`, { headers: { Authorization: `Bearer ${tk}` } });
                         if (sRes.data?.success && sRes.data.data.length > 0) {
                           const s = sRes.data.data[0];
-                          const r = await axios.post(`${API_URL}/api/auth/impersonate`, { studentId: s.id }, { headers: { Authorization: `Bearer ${tk}` } });
-                          if (r.data?.success) {
-                            localStorage.setItem('manar_token', r.data.token);
-                            localStorage.setItem('manar_user', JSON.stringify(r.data.user));
-                            localStorage.setItem('student_profile', JSON.stringify({ name: s.name, email: s.email, department: s.major?.department?.name || '', level: s.level?.name || '', groupId: s.groupId }));
-                            toast.success(isAr ? `معاينة: ${s.name}` : `Preview as ${s.name}`);
-                            setIsSidebarOpen(false);
-                            navigate('/student/home');
+                          const impRes = await axios.post(`${API_URL}/api/auth/impersonate`, { studentId: s.id }, { headers: { Authorization: `Bearer ${tk}` } });
+                          if (impRes.data?.success) {
+                            localStorage.setItem('manar_super_admin_token', tk);
+                            localStorage.setItem('manar_super_admin_user', localStorage.getItem('manar_user'));
+                            localStorage.setItem('manar_token', impRes.data.token);
+                            localStorage.setItem('manar_user', JSON.stringify({ ...s, role: 'STUDENT' }));
+                            localStorage.setItem('student_profile', JSON.stringify({ name: s.name, email: s.email, department: s.major?.name || '', groupId: s.groupId }));
+                            window.location.href = '/student/home';
                           }
-                        } else {
-                          toast.error(isAr ? 'لا يوجد طلاب' : 'No students found');
                         }
-                      } catch { toast.error(isAr ? 'فشل المعاينة' : 'Preview failed'); }
+                      } catch (err) {
+                        toast.error(isAr ? 'فشل بدء وضع المعاينة السريعة' : 'Quick preview failed');
+                      }
                     }}
-                    className="w-full mt-1 flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-black tracking-wide transition-all duration-200 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5"
+                    className="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-xs font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer border border-amber-500/20 my-1"
                   >
-                    <span>🔑 {isAr ? 'دخول كطالب' : 'Student Preview'}</span>
-                    <span style={{ color: 'var(--accent)' }}>{isAr ? '←' : '→'}</span>
+                    <span className="text-base">👁️</span>
+                    <span>{isAr ? 'معاينة سريعة كطالب' : 'Quick Student Preview'}</span>
                   </button>
                 </>
               )}
@@ -1094,7 +1094,7 @@ function AppLayout() {
             <Route path="/admin/logs"       element={<SystemLog />} />
             <Route path="/admin/god-mode"   element={<Navigate to="/admin/dev-portal" replace />} />
             <Route path="/super-admin/dashboard" element={<Navigate to="/admin/dev-portal" replace />} />
-            <Route path="/admin/dev-portal" element={user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com') ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
+            <Route path="/admin/dev-portal" element={(user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()))) ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
             <Route path="/admin/instructions" element={<Instructions />} />
             <Route path="*" element={<Navigate to="/admin/overview" replace />} />
           </Routes>

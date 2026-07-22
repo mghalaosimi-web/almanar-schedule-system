@@ -44,7 +44,12 @@ async function tenantDbMiddleware(req, res, next) {
           req.originalUrl.startsWith('/api/admin/dev')
         );
 
-        if (!config.isLicenseActive && (!req.user || req.user.role !== 'SUPER_ADMIN') && !isDevRoute) {
+        const isDeveloper = req.user && (
+          req.user.role === 'SUPER_ADMIN' ||
+          (req.user.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(req.user.email.toLowerCase()))
+        );
+
+        if (!config.isLicenseActive && !isDeveloper && !isDevRoute) {
           return res.status(403).json({ success: false, error: 'LICENSE_REVOKED' });
         }
         

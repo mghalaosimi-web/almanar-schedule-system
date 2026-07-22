@@ -65,7 +65,7 @@ export default function CommandPalette() {
   if (userJson) {
     try { user = JSON.parse(userJson); } catch {}
   }
-  const isDeveloper = user?.role === 'SUPER_ADMIN' && (user.email === 'developer@mghal.com' || user.email === 'm.gh.alosimi@gmail.com');
+  const isDeveloper = user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()));
 
   // Navigational shortcuts
   const navigationItems = [

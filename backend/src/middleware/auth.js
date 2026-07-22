@@ -44,12 +44,16 @@ async function verifyToken(req, res, next) {
       }
     }
 
-    // Check if college is deactivated (exclude SUPER_ADMIN and Dev Portal routes)
+    // Check if college is deactivated (exclude SUPER_ADMIN, developer emails, and Dev Portal routes)
     const isDevRoute = req.originalUrl && (
       req.originalUrl.includes('/dev') || 
       req.originalUrl.startsWith('/api/admin/dev')
     );
-    if (decoded.role !== 'SUPER_ADMIN' && decoded.collegeId && !isDevRoute) {
+    const isDeveloper = decoded.role === 'SUPER_ADMIN' || (
+      decoded.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(decoded.email.toLowerCase())
+    );
+
+    if (!isDeveloper && decoded.collegeId && !isDevRoute) {
       const systemSettings = require('../services/systemSettings');
       const deactivated = systemSettings.get('deactivatedColleges') || [];
       if (deactivated.includes(parseInt(decoded.collegeId))) {
