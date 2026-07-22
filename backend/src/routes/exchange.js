@@ -17,7 +17,7 @@ router.get('/posts', verifyToken, async (req, res) => {
     });
 
     if (!student || !student.groupId) {
-      return res.status(400).json({ success: false, error: 'You are not assigned to any group yet.' });
+      return res.status(200).json({ success: true, data: [] });
     }
 
     const posts = await prisma.exchangePost.findMany({

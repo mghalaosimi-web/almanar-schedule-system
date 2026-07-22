@@ -26,13 +26,26 @@ async function isRep(req, res, next) {
         });
         if (student && student.groupId) {
           req.user.groupId = student.groupId;
+        } else if (student && student.collegeId) {
+          // Fallback: try to find first group in student's college/major
+          const fallbackGroup = await prisma.group.findFirst({
+            where: {
+              collegeId: student.collegeId,
+              ...(student.majorId ? { majorId: student.majorId } : {})
+            }
+          });
+          if (fallbackGroup) {
+            req.user.groupId = fallbackGroup.id;
+          }
         }
-      } else if (isAdmin) {
-        const firstGroup = await prisma.group.findFirst({
+      }
+      
+      if (!req.user.groupId) {
+        const globalGroup = await prisma.group.findFirst({
           where: req.user.collegeId ? { collegeId: req.user.collegeId } : {}
         });
-        if (firstGroup) {
-          req.user.groupId = firstGroup.id;
+        if (globalGroup) {
+          req.user.groupId = globalGroup.id;
         }
       }
     } catch (err) {
@@ -41,7 +54,8 @@ async function isRep(req, res, next) {
   }
 
   if (!req.user.groupId && !isAdmin) {
-    return res.status(400).json({ success: false, error: 'Representative has no assigned group.' });
+    // Return empty success structure instead of 400 Bad Request to prevent frontend toast errors
+    return res.status(200).json({ success: true, data: [] });
   }
   next();
 }

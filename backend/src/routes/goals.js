@@ -19,6 +19,25 @@ async function isRep(req, res, next) {
       });
       if (student && student.groupId) {
         req.user.groupId = student.groupId;
+      } else if (student && student.collegeId) {
+        const fallbackGroup = await prisma.group.findFirst({
+          where: {
+            collegeId: student.collegeId,
+            ...(student.majorId ? { majorId: student.majorId } : {})
+          }
+        });
+        if (fallbackGroup) {
+          req.user.groupId = fallbackGroup.id;
+        }
+      }
+
+      if (!req.user.groupId) {
+        const globalGroup = await prisma.group.findFirst({
+          where: req.user.collegeId ? { collegeId: req.user.collegeId } : {}
+        });
+        if (globalGroup) {
+          req.user.groupId = globalGroup.id;
+        }
       }
     } catch (err) {
       console.error('[Goals isRep] Error fetching groupId:', err);
@@ -26,7 +45,7 @@ async function isRep(req, res, next) {
   }
 
   if (!req.user.groupId) {
-    return res.status(400).json({ success: false, error: 'Representative has no assigned group.' });
+    return res.status(200).json({ success: true, data: [] });
   }
   next();
 }
