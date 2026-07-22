@@ -71,7 +71,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
         fetchPatches(true);
       }
     } catch (err) {
-      toast.error(isAr ? 'فشل دمج وتحديث الكود' : 'Failed to merge and apply code update');
+      toast.error(err.response?.data?.error || (isAr ? 'فشل دمج وتحديث الكود' : 'Failed to merge and apply code update'));
     } finally {
       setActioningPatch(null);
     }
@@ -92,7 +92,7 @@ export default function SelfHealingPatcher({ API_URL, token, isAr }) {
         fetchPatches(true);
       }
     } catch (err) {
-      toast.error(isAr ? 'فشل استبعاد الرقعة' : 'Failed to dismiss patch');
+      toast.error(err.response?.data?.error || (isAr ? 'فشل استبعاد الرقعة' : 'Failed to dismiss patch'));
     } finally {
       setActioningPatch(null);
     }

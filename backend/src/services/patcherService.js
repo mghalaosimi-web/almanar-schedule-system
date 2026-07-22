@@ -157,16 +157,17 @@ Format your response STRICTLY as a JSON object (no markdown formatting, no code 
       let explanationEn = 'Run-time fallback patcher executed programmatically (without Gemini API).';
 
       if (err.message && err.message.includes('TEST_ERROR')) {
-        const targetLine = "throw new Error('TEST_ERROR: Simulating a critical 500 error to verify AI self-healing patch generation.');";
-        const replacementLine = "return res.status(200).json({ success: true, message: 'Test error resolved: Self-Healing Patcher is fully active and operational.' });";
-        
-        if (fileContent.includes(targetLine)) {
-          proposedCode = fileContent.replace(targetLine, replacementLine);
+        const lines = fileContent.split(/\r?\n/);
+        const testErrorIndex = lines.findIndex(l => l.includes('TEST_ERROR'));
+        if (testErrorIndex !== -1) {
+          const indent = lines[testErrorIndex].match(/^\s*/)[0];
+          lines[testErrorIndex] = `${indent}return res.status(200).json({ success: true, message: 'Test error resolved: Self-Healing Patcher is fully active and operational.' });`;
+          proposedCode = lines.join('\n');
           explanationAr = 'تم التعرف على خطأ الاختبار التجريبي. يقترح هذا التعديل استبدال جملة الرمي (throw) بجملة إرجاع (return) آمنة بحالة 200 لمنع الانهيار.';
           explanationEn = 'Simulated test error detected. This proposed patch replaces the throwing expression with a safe HTTP 200 response to prevent system crash.';
         }
       } else {
-        const lines = fileContent.split('\n');
+        const lines = fileContent.split(/\r?\n/);
         if (lines.length >= lineNo) {
           const originalLine = lines[lineNo - 1];
           if (originalLine.includes('throw') || originalLine.includes('Error')) {
@@ -242,24 +243,37 @@ function approvePatch(id) {
     throw new Error(`Patch is already ${patch.status}`);
   }
 
-  // Double check if target file exists
-  if (!fs.existsSync(patch.filePath)) {
+  // Resolve target file path robustly across environments
+  let resolvedPath = patch.filePath;
+  if (!fs.existsSync(resolvedPath)) {
+    const rootPath = path.resolve(__dirname, '../..');
+    const match = patch.filePath.match(/[\\/]backend[\\/](src[\\/].*)$/i) || patch.filePath.match(/src[\\/].*$/i);
+    if (match) {
+      const candidate = path.join(rootPath, match[1] || match[0]);
+      if (fs.existsSync(candidate)) {
+        resolvedPath = candidate;
+      }
+    }
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
     throw new Error(`Target file does not exist at ${patch.filePath}`);
   }
 
   // Backup file before overwrite
-  const backupPath = patch.filePath + '.bak';
-  fs.copyFileSync(patch.filePath, backupPath);
+  const backupPath = resolvedPath + '.bak';
+  fs.copyFileSync(resolvedPath, backupPath);
 
   // Write new file content
-  fs.writeFileSync(patch.filePath, patch.proposedCode, 'utf8');
+  fs.writeFileSync(resolvedPath, patch.proposedCode, 'utf8');
 
   // Update status
   patch.status = 'APPROVED';
+  patch.filePath = resolvedPath;
   patch.resolvedAt = new Date().toISOString();
   savePatches(patches);
 
-  console.log(`[PatcherService] Applied patch ${id} to ${patch.filePath}. Backup saved to ${backupPath}`);
+  console.log(`[PatcherService] Applied patch ${id} to ${resolvedPath}. Backup saved to ${backupPath}`);
   
   // Return patch details
   return patch;

@@ -188,8 +188,8 @@ export default function RepresentativeDashboard() {
     try {
       setLoading(true);
       const [schedsRes, classmatesRes, roomsRes, resourcesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/rep/schedules`, { headers }),
-        axios.get(`${API_URL}/api/rep/classmates`, { headers }),
+        axios.get(`${API_URL}/api/rep/schedules`, { headers }).catch(err => ({ error: err, data: { success: false, data: [] } })),
+        axios.get(`${API_URL}/api/rep/classmates`, { headers }).catch(err => ({ error: err, data: { success: false, data: [] } })),
         axios.get(`${API_URL}/api/rooms`, { headers }).catch(() => ({ data: { success: true, data: [] } })),
         axios.get(`${API_URL}/api/rep/resources`, { headers }).catch(() => ({ data: { success: true, data: [] } }))
       ]);
@@ -200,10 +200,16 @@ export default function RepresentativeDashboard() {
           setSelectedScheduleId(schedsRes.data.data[0].id.toString());
           setRescheduleScheduleId(schedsRes.data.data[0].id.toString());
         }
+      } else if (schedsRes.error) {
+        const errMsg = schedsRes.error.response?.data?.error;
+        if (errMsg) toast.error(errMsg);
       }
 
       if (classmatesRes.data?.success) {
         setClassmates(classmatesRes.data.data);
+      } else if (classmatesRes.error) {
+        const errMsg = classmatesRes.error.response?.data?.error;
+        if (errMsg) toast.error(errMsg);
       }
 
       if (roomsRes.data?.success) {
@@ -219,7 +225,7 @@ export default function RepresentativeDashboard() {
       await fetchBroadcastsHistory();
     } catch (err) {
       console.error(err);
-      toast.error(isAr ? 'فشل تحميل البيانات التمهيدية' : 'Failed to load initial dashboard data');
+      toast.error(err.response?.data?.error || (isAr ? 'فشل تحميل البيانات التمهيدية' : 'Failed to load initial dashboard data'));
     } finally {
       setLoading(false);
     }

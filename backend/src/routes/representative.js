@@ -8,25 +8,39 @@ const router = express.Router();
 
 // Middleware to authorize student representatives
 async function isRep(req, res, next) {
-  if (req.user?.role !== 'STUDENT' || !req.user.isRepresentative) {
+  const isAdmin = ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'UNI_ADMIN'].includes(req.user?.role);
+  
+  if (req.user?.role !== 'STUDENT' && !isAdmin) {
+    return res.status(403).json({ success: false, error: 'Access denied. Representative privileges required.' });
+  }
+  if (!isAdmin && !req.user?.isRepresentative) {
     return res.status(403).json({ success: false, error: 'Access denied. Representative privileges required.' });
   }
   
   // Dynamically fetch groupId from database to prevent stale token issues
   if (!req.user.groupId) {
     try {
-      const student = await prisma.student.findUnique({
-        where: { id: req.user.id }
-      });
-      if (student && student.groupId) {
-        req.user.groupId = student.groupId;
+      if (req.user.role === 'STUDENT') {
+        const student = await prisma.student.findUnique({
+          where: { id: req.user.id }
+        });
+        if (student && student.groupId) {
+          req.user.groupId = student.groupId;
+        }
+      } else if (isAdmin) {
+        const firstGroup = await prisma.group.findFirst({
+          where: req.user.collegeId ? { collegeId: req.user.collegeId } : {}
+        });
+        if (firstGroup) {
+          req.user.groupId = firstGroup.id;
+        }
       }
     } catch (err) {
       console.error('[isRep] Error fetching student groupId:', err);
     }
   }
 
-  if (!req.user.groupId) {
+  if (!req.user.groupId && !isAdmin) {
     return res.status(400).json({ success: false, error: 'Representative has no assigned group.' });
   }
   next();
