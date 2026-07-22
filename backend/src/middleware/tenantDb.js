@@ -37,8 +37,14 @@ async function tenantDbMiddleware(req, res, next) {
       });
 
       if (config) {
-        // License status enforcement
-        if (!config.isLicenseActive && (!req.user || req.user.role !== 'SUPER_ADMIN')) {
+        // License status enforcement (bypass for SUPER_ADMIN or Dev Portal management endpoints)
+        const isDevRoute = req.originalUrl && (
+          req.originalUrl.includes('/dev') || 
+          req.originalUrl.includes('/tenant') ||
+          req.originalUrl.startsWith('/api/admin/dev')
+        );
+
+        if (!config.isLicenseActive && (!req.user || req.user.role !== 'SUPER_ADMIN') && !isDevRoute) {
           return res.status(403).json({ success: false, error: 'LICENSE_REVOKED' });
         }
         

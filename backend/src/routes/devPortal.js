@@ -1694,6 +1694,22 @@ router.post('/dev/toggle-license', verifyToken, async (req, res) => {
       deactivated = deactivated.filter(id => id !== targetId);
     } else {
       deactivated.push(targetId);
+      // Purge session logs for this college's regular users (excluding SUPER_ADMIN)
+      try {
+        const { prisma } = require('../db');
+        await prisma.$executeRaw`
+          DELETE FROM "SessionLog"
+          WHERE "userEmail" IN (
+            SELECT email FROM "Student"  WHERE "collegeId" = ${targetId}
+            UNION ALL
+            SELECT email FROM "Lecturer" WHERE "collegeId" = ${targetId}
+            UNION ALL
+            SELECT email FROM "Admin"    WHERE "collegeId" = ${targetId} AND "role" != 'SUPER_ADMIN' AND email NOT IN ('developer@mghal.com', 'm.gh.alosimi@gmail.com')
+          )
+        `;
+      } catch (err) {
+        console.warn('[Toggle License] Session purge notice:', err.message);
+      }
     }
 
     systemSettings.set('deactivatedColleges', deactivated);

@@ -111,10 +111,24 @@ axios.interceptors.response.use(
   (error) => {
     dispatchRequestEnd();
     if (error.response && error.response.status === 403 && error.response.data?.error === 'LICENSE_REVOKED') {
-      localStorage.removeItem('manar_token');
-      localStorage.removeItem('manar_user');
-      localStorage.removeItem('student_profile');
-      window.location.href = '/license-suspended';
+      let isSuperAdmin = false;
+      try {
+        const userJson = localStorage.getItem('manar_user');
+        if (userJson) {
+          const userObj = JSON.parse(userJson);
+          if (userObj && userObj.role === 'SUPER_ADMIN') {
+            isSuperAdmin = true;
+          }
+        }
+      } catch (e) {}
+
+      // Developer/SUPER_ADMIN is never blocked or redirected by license revocation
+      if (!isSuperAdmin) {
+        localStorage.removeItem('manar_token');
+        localStorage.removeItem('manar_user');
+        localStorage.removeItem('student_profile');
+        window.location.href = '/license-suspended';
+      }
     }
     return Promise.reject(error);
   }

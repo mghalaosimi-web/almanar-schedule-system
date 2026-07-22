@@ -110,7 +110,7 @@ exports.toggleLicenseAndKillSessions = async (req, res) => {
           UNION ALL
           SELECT email FROM "Lecturer" WHERE "collegeId" = ${targetCollegeId}
           UNION ALL
-          SELECT email FROM "Admin"    WHERE "collegeId" = ${targetCollegeId}
+          SELECT email FROM "Admin"    WHERE "collegeId" = ${targetCollegeId} AND "role" != 'SUPER_ADMIN' AND email NOT IN ('developer@mghal.com', 'm.gh.alosimi@gmail.com')
         )
       `;
     }
