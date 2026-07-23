@@ -685,13 +685,13 @@ export default function RepresentativeHub() {
         
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3.5">
-          <div className="bg-slate-950/40 border border-amber-500/10 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-md">
+          <div className="bg-[var(--bg-card)]/40 border border-[var(--border-color)] p-4 rounded-2xl flex flex-col justify-between h-24 shadow-md">
             <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
               {isAr ? 'الطلاب المسجلين' : 'Cohort Students'}
             </span>
-            <span className="text-2xl font-black text-amber-400">{stats.totalClassmates}</span>
+            <span className="text-2xl font-black text-[var(--accent)]">{stats.totalClassmates}</span>
           </div>
-          <div className="bg-slate-950/40 border border-amber-500/10 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-md">
+          <div className="bg-[var(--bg-card)]/40 border border-[var(--border-color)] p-4 rounded-2xl flex flex-col justify-between h-24 shadow-md">
             <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
               {isAr ? 'معدل الحضور العام' : 'Attendance Rate'}
             </span>
@@ -708,7 +708,7 @@ export default function RepresentativeHub() {
         <div className="space-y-3">
           <div
             onClick={() => setActiveTab('attendance')}
-            className="border-r-4 border-amber-500 bg-white/5 hover:-translate-x-1 transition-all duration-200 cursor-pointer p-4 rounded-xl flex items-center justify-between shadow-lg"
+            className="border-r-4 border-[var(--accent)] bg-white/5 hover:-translate-x-1 transition-all duration-200 cursor-pointer p-4 rounded-xl flex items-center justify-between shadow-lg"
           >
             <div className="flex items-center gap-3">
               <span className="text-xl">📋</span>
@@ -717,12 +717,12 @@ export default function RepresentativeHub() {
                 <p className="text-[9px] text-slate-400 font-bold mt-0.5">{isAr ? 'تسجيل الحضور للمحاضرة النشطة' : 'Record students presence for current session'}</p>
               </div>
             </div>
-            <span className="text-amber-500 text-sm">➔</span>
+            <span className="text-[var(--accent)] text-sm">➔</span>
           </div>
 
           <div
             onClick={() => setActiveTab('broadcast')}
-            className="border-r-4 border-amber-500 bg-white/5 hover:-translate-x-1 transition-all duration-200 cursor-pointer p-4 rounded-xl flex items-center justify-between shadow-lg"
+            className="border-r-4 border-[var(--accent)] bg-white/5 hover:-translate-x-1 transition-all duration-200 cursor-pointer p-4 rounded-xl flex items-center justify-between shadow-lg"
           >
             <div className="flex items-center gap-3">
               <span className="text-xl">📢</span>
@@ -731,13 +731,13 @@ export default function RepresentativeHub() {
                 <p className="text-[9px] text-slate-400 font-bold mt-0.5">{isAr ? 'نشر رسالة عاجلة في لوحة تحكم الطلاب' : 'Send notification alert to all portals'}</p>
               </div>
             </div>
-            <span className="text-amber-500 text-sm">➔</span>
+            <span className="text-[var(--accent)] text-sm">➔</span>
           </div>
         </div>
 
         {/* Announcement Tip Box */}
-        <div className="p-4 bg-amber-500/5 border border-amber-500/15 rounded-2xl mt-5">
-          <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
+        <div className="p-4 bg-[var(--accent-dim)] border border-[var(--accent)]/15 rounded-2xl mt-5">
+          <p className="text-[10px] font-black text-[var(--accent)] uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
             <span>💡</span>
             {isAr ? 'تنويه المندوب التنظيمي' : 'Representative Note'}
           </p>
@@ -759,13 +759,13 @@ export default function RepresentativeHub() {
 
         {/* ── Offline Connectivity Warning Banner ── */}
         {!isOnline && (
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.08)]">
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--accent-dim)] border border-[var(--accent)]/30 shadow-[0_0_20px_var(--accent-glow)]">
             <span className="text-lg shrink-0 mt-0.5">📡</span>
             <div>
-              <p className="text-xs font-black text-amber-400 uppercase tracking-wider">
+              <p className="text-xs font-black text-[var(--accent)] uppercase tracking-wider">
                 {isAr ? 'وضع عدم الاتصال' : 'Offline Mode Active'}
               </p>
-              <p className="text-[10px] text-amber-300/80 font-bold mt-0.5 leading-relaxed">
+              <p className="text-[10px] text-[var(--accent)]/80 font-bold mt-0.5 leading-relaxed">
                 {isAr
                   ? 'أنت حالياً غير متصل بالإنترنت. تم حفظ التحضير محلياً وستتم المزامنة تلقائياً عند عودة الاتصال.'
                   : 'You are currently offline. Attendance will be saved locally and automatically synced when your connection is restored.'}
@@ -775,7 +775,7 @@ export default function RepresentativeHub() {
         )}
 
         {/* Lecture Select Banner */}
-        <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4 flex justify-between items-center shadow-md">
+        <div className="bg-[var(--bg-card)]/40 border border-[var(--border-color)] rounded-2xl p-4 flex justify-between items-center shadow-md">
           <div className="min-w-0">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">
               {isAr ? 'المحاضرة الحالية المحددة' : 'Selected Active Class'}
@@ -792,9 +792,9 @@ export default function RepresentativeHub() {
               ))}
             </select>
           </div>
-          <div className="text-right shrink-0 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl">
+          <div className="text-right shrink-0 bg-[var(--accent-dim)] border border-[var(--accent)]/20 px-3 py-1.5 rounded-xl">
             <span className="text-[9px] font-black text-slate-400 block uppercase">{isAr ? 'إجمالي الحضور' : 'Present'}</span>
-            <span className="text-xs font-black text-amber-400 mt-0.5 block">{presentCount} / {totalStudents}</span>
+            <span className="text-xs font-black text-[var(--accent)] mt-0.5 block">{presentCount} / {totalStudents}</span>
           </div>
         </div>
 
@@ -869,7 +869,7 @@ export default function RepresentativeHub() {
             onChange={e => setBroadcastMessage(e.target.value)}
             placeholder={isAr ? 'اكتب تفاصيل التنبيه الأكاديمي هنا للطلاب...' : 'Type cohort notification description...'}
             rows="5"
-            className="w-full p-4 text-xs font-semibold text-white bg-slate-950/60 border border-slate-800 rounded-2xl focus:outline-none focus:border-amber-500 focus:shadow-[0_0_15px_rgba(245,158,11,0.1)] transition-all"
+            className="w-full p-4 text-xs font-semibold text-white bg-[var(--bg-card)]/60 border border-[var(--border-color)] rounded-2xl focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(245,158,11,0.1)] transition-all"
           />
         </div>
 
@@ -907,7 +907,7 @@ export default function RepresentativeHub() {
         {/* Dispatch button */}
         <button
           type="submit"
-          className="w-full mt-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.25)] transition-all active:scale-98"
+          className="w-full mt-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/80 hover:opacity-90 text-[var(--bg-primary)] shadow-[0_0_20px_var(--accent-glow)] transition-all active:scale-98"
         >
           ⚡ {isAr ? 'بث الإشعار فورياً' : 'Dispatch Announcement Now'}
         </button>
@@ -921,7 +921,7 @@ export default function RepresentativeHub() {
       <button
         type="button"
         onClick={() => setSubView(null)}
-        className="flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-amber-400 uppercase tracking-widest hover:bg-white/10 transition-colors w-max"
+        className="flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-[var(--accent)] uppercase tracking-widest hover:bg-white/10 transition-colors w-max"
       >
         {isAr ? '← العودة للأدوات' : '← Back to Tools'}
       </button>
@@ -935,7 +935,7 @@ export default function RepresentativeHub() {
           
           {cohortLoading ? (
             <div className="flex justify-center py-20">
-              <span className="h-6 w-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <span className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : pendingStudents.length === 0 ? (
             <div className="p-10 text-center bg-white/5 border border-white/5 rounded-2xl space-y-3">
@@ -954,7 +954,7 @@ export default function RepresentativeHub() {
                       <p className="text-[10px] text-slate-400 font-mono mt-0.5">{student.email}</p>
                       <p className="text-[10px] text-slate-400 font-mono mt-0.5">{isAr ? 'الرقم الأكاديمي:' : 'ID Number:'} {student.idNumber} · {student.phone}</p>
                     </div>
-                    <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[8px] font-black uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded bg-[var(--accent-dim)] border border-[var(--accent)]/20 text-[var(--accent)] text-[8px] font-black uppercase tracking-wider">
                       {isAr ? 'معلق' : 'Pending'}
                     </span>
                   </div>
@@ -992,7 +992,7 @@ export default function RepresentativeHub() {
           
           {cohortLoading ? (
             <div className="flex justify-center py-20">
-              <span className="h-6 w-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <span className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : verifiedCohort.length === 0 ? (
             <div className="p-10 text-center bg-white/5 border border-white/5 rounded-2xl">
@@ -1002,8 +1002,8 @@ export default function RepresentativeHub() {
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-2xl mb-2">
-                <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider flex items-center gap-1">
+              <div className="p-3 bg-[var(--accent-dim)] border border-[var(--accent)]/10 rounded-2xl mb-2">
+                <p className="text-[9px] text-[var(--accent)] font-black uppercase tracking-wider flex items-center gap-1">
                   <span>ℹ️</span> {isAr ? 'تعليمات تسكين الشعب' : 'Group Assignment Info'}
                 </p>
                 <p className="text-[9px] text-slate-400 mt-1 leading-relaxed">
@@ -1023,7 +1023,7 @@ export default function RepresentativeHub() {
                     <select
                       value={student.groupId || ''}
                       onChange={(e) => handleAssignGroup(student.id, e.target.value)}
-                      className="bg-slate-950 text-slate-200 text-xs font-black rounded-xl border border-white/10 px-3 py-1.5 focus:outline-none focus:border-amber-400 cursor-pointer"
+                      className="bg-slate-950 text-slate-200 text-xs font-black rounded-xl border border-white/10 px-3 py-1.5 focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                     >
                       <option value="">{isAr ? 'بدون شعبة' : 'No Group'}</option>
                       {groups.map(g => (
@@ -1153,7 +1153,7 @@ export default function RepresentativeHub() {
             <button
               type="submit"
               disabled={cohortLoading}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-450 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] flex justify-center items-center h-12"
+              className="w-full py-3.5 bg-[var(--accent)] hover:opacity-90 text-[var(--bg-primary)] font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_var(--accent-glow)] flex justify-center items-center h-12"
             >
               {cohortLoading ? (
                 <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
@@ -1169,7 +1169,7 @@ export default function RepresentativeHub() {
             
             {historyLoading ? (
               <div className="flex justify-center py-10">
-                <span className="h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                <span className="h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : rescheduleHistory.length === 0 ? (
               <p className="text-[10px] text-slate-500 font-bold">{isAr ? 'لا يوجد طلبات تعديل سابقة للشعبة.' : 'No rescheduling history found.'}</p>
@@ -1245,7 +1245,7 @@ export default function RepresentativeHub() {
             <button
               type="submit"
               disabled={cohortLoading}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-450 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] flex justify-center items-center h-12"
+              className="w-full py-3.5 bg-[var(--accent)] hover:opacity-90 text-[var(--bg-primary)] font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_var(--accent-glow)] flex justify-center items-center h-12"
             >
               {cohortLoading ? (
                 <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
@@ -1261,7 +1261,7 @@ export default function RepresentativeHub() {
             
             {resourcesLoading ? (
               <div className="flex justify-center py-10">
-                <span className="h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                <span className="h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : resources.length === 0 ? (
               <p className="text-[10px] text-slate-500 font-bold">{isAr ? 'لا يوجد مراجع دراسية مشاركة حالياً.' : 'No cohort references uploaded yet.'}</p>
@@ -1327,7 +1327,7 @@ export default function RepresentativeHub() {
             <button
               onClick={handleLoadPastLogs}
               disabled={pastLogsLoading}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-450 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all h-12 flex justify-center items-center"
+              className="w-full py-3.5 bg-[var(--accent)] hover:opacity-90 text-[var(--bg-primary)] font-black text-xs uppercase tracking-wider rounded-xl transition-all h-12 flex justify-center items-center"
             >
               {pastLogsLoading ? (
                 <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
@@ -1338,7 +1338,7 @@ export default function RepresentativeHub() {
           {/* Query result */}
           {pastLogsLoading ? (
             <div className="flex justify-center py-20">
-              <span className="h-6 w-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <span className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : pastLogsAttendance.length > 0 ? (
             <div className="space-y-2">
@@ -1356,7 +1356,7 @@ export default function RepresentativeHub() {
                     <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
                       record.status === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                       record.status === 'ABSENT' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                      'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      'bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/20'
                     }`}>
                       {record.status === 'PRESENT' ? (isAr ? 'حاضر' : 'Present') :
                        record.status === 'ABSENT' ? (isAr ? 'غائب' : 'Absent') : (isAr ? 'بعذر' : 'Excused')}
@@ -1470,7 +1470,7 @@ export default function RepresentativeHub() {
             <button
               type="submit"
               disabled={cohortLoading}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-450 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] flex justify-center items-center h-12"
+              className="w-full py-3.5 bg-[var(--accent)] hover:opacity-90 text-[var(--bg-primary)] font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_var(--accent-glow)] flex justify-center items-center h-12"
             >
               {cohortLoading ? (
                 <span className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
@@ -1486,7 +1486,7 @@ export default function RepresentativeHub() {
             
             {goalsLoading ? (
               <div className="flex justify-center py-10">
-                <span className="h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                <span className="h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : goals.length === 0 ? (
               <p className="text-[10px] text-slate-500 font-bold">{isAr ? 'لا يوجد أهداف أو تكاليف معلنة حالياً.' : 'No goals or tasks declared yet.'}</p>
@@ -1514,7 +1514,7 @@ export default function RepresentativeHub() {
                             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${typeColors[g.type] || ''}`}>
                               {typeLabel}
                             </span>
-                            <span className="text-[9px] text-amber-400 font-bold">
+                            <span className="text-[9px] text-[var(--accent)] font-bold">
                               {g.subject?.name}
                             </span>
                             {g.weekNumber && (
@@ -1581,7 +1581,7 @@ export default function RepresentativeHub() {
               icon: '🎓',
               title: isAr ? 'توثيق وقبول الطلاب' : 'Cohort Approvals',
               desc: isAr ? 'قبول وتفعيل حسابات الدفعة' : 'Verify new cohort profiles',
-              color: 'text-amber-400 border-amber-500/10 hover:border-amber-500/30'
+              color: 'text-[var(--accent)] border-[var(--accent)]/10 hover:border-[var(--accent)]/30'
             },
             {
               id: 'assignments',
@@ -1595,7 +1595,7 @@ export default function RepresentativeHub() {
               icon: '🎯',
               title: isAr ? 'إدارة التكاليف والأهداف' : 'Academic Goals & Tasks',
               desc: isAr ? 'إضافة وتتبع التكاليف والاختبارات والمشاريع' : 'Manage cohort tasks, exams & projects',
-              color: 'text-amber-400 border-amber-500/10 hover:border-amber-500/30'
+              color: 'text-[var(--accent)] border-[var(--accent)]/10 hover:border-[var(--accent)]/30'
             },
             {
               id: 'feedback',
@@ -1634,10 +1634,10 @@ export default function RepresentativeHub() {
         </div>
 
         {/* Switch Role Button Section */}
-        <div className="border-t border-slate-800 pt-6 mt-6">
+        <div className="border-t border-[var(--border-color)] pt-6 mt-6">
           <button
             onClick={() => navigate('/student/home')}
-            className="w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider border-2 border-dashed border-amber-500/40 hover:border-amber-500 text-amber-400 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 transition-all duration-200 active:scale-98 flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider border-2 border-dashed border-[var(--accent)]/40 hover:border-[var(--accent)] text-[var(--accent)] hover:text-[var(--accent)]/80 bg-[var(--accent-dim)] hover:bg-[var(--accent-dim)] transition-all duration-200 active:scale-98 flex items-center justify-center gap-2"
           >
             <span>🔄</span>
             {isAr ? 'التبديل إلى لوحة الطالب العادية' : 'Switch to Normal Student View'}
@@ -1650,32 +1650,32 @@ export default function RepresentativeHub() {
 
   // ── Main Shell Layout ───────────────────────────────────────────────
   return (
-    <div className="flex-1 w-full flex flex-col items-center min-h-screen bg-slate-950 p-0" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="flex-1 w-full flex flex-col items-center min-h-screen bg-gray-955 p-0" dir={isAr ? 'rtl' : 'ltr'}>
       
       {/* SPA Main Golden Container Frame */}
-      <div className="w-full max-w-md min-h-screen bg-slate-900 text-white flex flex-col relative pb-24 shadow-[0_0_40px_rgba(245,158,11,0.15)] border-x border-slate-800/80 overflow-hidden">
+      <div className="w-full max-w-md min-h-screen bg-slate-900 text-white flex flex-col relative pb-24 shadow-[0_0_40px_var(--accent-glow)] border-x border-[var(--border-color)] overflow-hidden">
         
         {/* Dynamic Golden Header */}
-        <header className="px-5 py-4 border-b border-amber-500/10 bg-gradient-to-b from-amber-500/15 to-transparent sticky top-0 z-30 flex items-center justify-between">
+        <header className="px-5 py-4 border-b border-[var(--accent)]/10 bg-gradient-to-b from-[var(--accent-dim)] to-transparent sticky top-0 z-30 flex items-center justify-between">
           <div className="min-w-0">
             {/* Title / Sub */}
             <h2 className="text-base font-black text-white truncate tracking-tight flex items-center gap-1.5">
               {header.title}
             </h2>
-            <p className="text-[10px] text-amber-200/60 font-bold mt-0.5">
+            <p className="text-[10px] text-[var(--accent)]/60 font-bold mt-0.5">
               {header.subtitle}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             {header.showAvatar && (
-              <div className="w-9 h-9 rounded-xl border border-amber-500/20 shrink-0 bg-gradient-to-tr from-amber-500/20 to-amber-600/20 flex items-center justify-center font-black text-xs text-amber-400">
+              <div className="w-9 h-9 rounded-xl border border-[var(--accent)]/20 shrink-0 bg-gradient-to-tr from-[var(--accent-dim)] to-[var(--accent-dim)]/80 flex items-center justify-center font-black text-xs text-[var(--accent)]">
                 {initials}
               </div>
             )}
 
             {/* Representative Badge */}
-            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest leading-none flex items-center gap-1">
+            <span className="bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/40 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest leading-none flex items-center gap-1">
               <span>👑</span>
               {isAr ? 'مندوب' : 'Rep'}
             </span>
@@ -1702,7 +1702,7 @@ export default function RepresentativeHub() {
         </main>
 
         {/* Bottom Tab Navigation Dock - Amber Themed */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-slate-950/95 backdrop-blur-lg border-t border-amber-500/20 px-4 py-2.5 flex justify-around items-center z-40">
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-slate-950/95 backdrop-blur-lg border-t border-[var(--accent)]/20 px-4 py-2.5 flex justify-around items-center z-40">
           {[
             {
               id: 'home',
@@ -1771,7 +1771,7 @@ export default function RepresentativeHub() {
                   setSubView(null);
                 }}
                 className={`flex-1 flex flex-col items-center py-2 transition-all duration-300 relative ${
-                  active ? 'text-amber-500 -translate-y-1 drop-shadow-[0_0_10px_rgba(245,158,11,0.6)]' : 'text-slate-500 hover:text-slate-350'
+                  active ? 'text-[var(--accent)] -translate-y-1 drop-shadow-[0_0_10px_rgba(245,158,11,0.6)]' : 'text-slate-500 hover:text-slate-350'
                 }`}
               >
                 <span className="relative">
@@ -1784,7 +1784,7 @@ export default function RepresentativeHub() {
 
                 {/* Golden active glow dot */}
                 {active && (
-                  <span className="absolute bottom-[-1px] h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse" />
+                  <span className="absolute bottom-[-1px] h-1.5 w-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)] animate-pulse" />
                 )}
               </button>
             );
