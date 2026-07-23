@@ -411,7 +411,7 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#1e293b] border border-slate-700/50 rounded-3xl p-6 w-full max-w-sm text-white shadow-2xl relative"
+              className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 w-full max-w-sm text-white shadow-2xl relative"
             >
               <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
                 <h3 className="text-base font-bold text-white flex items-center gap-1.5 font-sans">

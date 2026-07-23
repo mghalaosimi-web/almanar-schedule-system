@@ -110,12 +110,12 @@ export default function HomeTab({
   return (
     <div className="space-y-5">
       {/* ── 1. لوحة الترحيب بالطالب ── */}
-      <div className="bg-gradient-to-br from-[#1e293b] to-[#1e293b]/70 p-5 rounded-[24px] border border-slate-700/50 shadow-glass relative overflow-hidden mb-5">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#f59e0b]/10 rounded-full blur-2xl"></div>
+      <div className="bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-card)]/70 p-5 rounded-[24px] border border-[var(--border-color)] shadow-glass relative overflow-hidden mb-5">
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[var(--accent-dim)] rounded-full blur-2xl"></div>
         <div className="flex items-center justify-between relative z-10 mb-3">
           <div>
             <h3 className="text-lg font-bold text-white mb-0.5">{profile.name || (isAr ? 'طالب منار' : 'Manar Student')}</h3>
-            <p className="text-[#f59e0b] text-xs font-medium">{profile.department || (isAr ? 'هندسة وتكنولوجيا المعلومات' : 'Engineering & IT')}</p>
+            <p className="text-[var(--accent)] text-xs font-medium">{profile.department || (isAr ? 'هندسة وتكنولوجيا المعلومات' : 'Engineering & IT')}</p>
           </div>
           {/* Daily Streak Badge */}
           <div className="bg-orange-500/20 border border-orange-500/50 px-2 py-1 rounded-xl flex items-center gap-1 shadow-glow cursor-pointer hover:bg-orange-500/30 transition">
@@ -123,12 +123,12 @@ export default function HomeTab({
             <span className="text-lg">🔥</span>
           </div>
         </div>
-        <div className="flex items-center justify-between text-[11px] text-[#94a3b8] relative z-10 bg-[#0b1120]/50 p-2 rounded-xl">
+        <div className="flex items-center justify-between text-[11px] text-[#94a3b8] relative z-10 bg-[var(--bg-primary)]/50 p-2 rounded-xl">
           <span>{profile.level ? ((isAr ? 'مستوى ' : 'Level ') + profile.level) : (isAr ? 'مستوى 3' : 'Level 3')}</span>
           <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
           <span>{profile.groupName || 'Group A'}</span>
           <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
-          <span className="font-mono text-[#f59e0b]/80">{profile.xp ?? 350} XP 🏆</span>
+          <span className="font-mono text-[var(--accent)]/80">{profile.xp ?? 350} XP 🏆</span>
         </div>
       </div>
 
@@ -394,10 +394,10 @@ export default function HomeTab({
                 toast.error(isAr ? 'لا توجد محاضرة نشطة حالياً للتحضير' : 'No active lecture now to check in');
               }
             }}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
+            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-              <i className="ph ph-map-pin text-[#f59e0b] text-lg"></i>
+            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
+              <i className="ph ph-map-pin text-[var(--accent)] text-lg"></i>
             </div>
             <div>
               <span className="text-[11px] font-black text-white block">{isAr ? 'تحضير الـ GPS' : 'GPS Check-In'}</span>
@@ -407,11 +407,11 @@ export default function HomeTab({
 
           {/* Class Hub */}
           <button
-            onClick={() => setActiveTab('forum')}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
+            onClick={() => setActiveTab('exchange')}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-              <i className="ph ph-chats text-[#f59e0b] text-lg"></i>
+            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
+              <i className="ph ph-chats text-[var(--accent)] text-lg"></i>
             </div>
             <div>
               <span className="text-[11px] font-black text-white block">{isAr ? 'الملتقى الطلابي' : 'Class Forum'}</span>
@@ -421,11 +421,11 @@ export default function HomeTab({
 
           {/* Focus Mode & Tasks */}
           <button
-            onClick={() => setActiveTab('tasks')}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
+            onClick={() => setActiveTab('goals')}
+            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-              <i className="ph ph-checks text-[#f59e0b] text-lg"></i>
+            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
+              <i className="ph ph-checks text-[var(--accent)] text-lg"></i>
             </div>
             <div>
               <span className="text-[11px] font-black text-white block">{isAr ? 'المهام والتركيز' : 'Tasks & Pomodoro'}</span>
@@ -438,10 +438,10 @@ export default function HomeTab({
             onClick={() => {
               window.print();
             }}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-white/5 hover:border-amber-500/50 hover:shadow-[0_0_14px_rgba(245,158,11,0.15)] bg-[#1e293b] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
+            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
           >
-            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-              <i className="ph ph-printer text-[#f59e0b] text-lg"></i>
+            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
+              <i className="ph ph-printer text-[var(--accent)] text-lg"></i>
             </div>
             <div>
               <span className="text-[11px] font-black text-white block">{isAr ? 'طباعة الجدول' : 'Print Timetable'}</span>

@@ -312,7 +312,7 @@ export default function ExchangeHubTab({
 
             {/* Poll Widget */}
             {selectedPost.poll && (
-              <div className="bg-[#1e293b] p-3.5 rounded-2xl border border-emerald-500/30 my-3 font-sans">
+              <div className="bg-[var(--bg-elevated)] p-3.5 rounded-2xl border border-[var(--border-color)] my-3 font-sans">
                 <p className="mb-2 font-bold text-xs text-white flex items-center gap-1.5">
                   <span>📊</span> {selectedPost.poll.question}
                 </p>
@@ -538,7 +538,7 @@ export default function ExchangeHubTab({
           
           {/* Smart Summarizer Banner */}
           <div className="shrink-0 flex flex-col gap-2">
-            <div className="flex justify-between items-center bg-[#1e293b]/70 border border-white/5 rounded-2xl p-2">
+            <div className="flex justify-between items-center bg-[var(--bg-elevated)]/70 border border-[var(--border-color)] rounded-2xl p-2">
               <span className="text-[9px] text-slate-400 font-bold">
                 {isAr ? 'احصل على ملخص سريع لآخر 50 رسالة' : 'Get quick summary of last 50 messages'}
               </span>

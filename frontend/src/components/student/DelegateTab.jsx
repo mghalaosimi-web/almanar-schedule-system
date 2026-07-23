@@ -161,8 +161,8 @@ export default function DelegateTab({ isAr, profile }) {
 
   if (!profile.isRepresentative) {
     return (
-      <div className="bg-[#1e293b]/60 backdrop-blur-md border border-white/5 p-6 rounded-2xl text-center space-y-4">
-        <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 mx-auto text-xl">
+      <div className="bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] p-6 rounded-2xl text-center space-y-4">
+        <div className="w-12 h-12 bg-[var(--accent-dim)] rounded-full flex items-center justify-center text-[var(--accent)] mx-auto text-xl">
           <i className="ph ph-crown"></i>
         </div>
         <h3 className="text-sm font-bold text-white">{isAr ? 'قسم المندوب الأكاديمي' : 'Representative Panel'}</h3>
@@ -192,12 +192,12 @@ export default function DelegateTab({ isAr, profile }) {
 
       {/* Cohort Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-[#1e293b]/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex flex-col justify-center items-center text-center">
-          <span className="text-2xl text-amber-500 mb-1"><i className="ph ph-users-three"></i></span>
+        <div className="bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] p-4 rounded-2xl flex flex-col justify-center items-center text-center">
+          <span className="text-2xl text-[var(--accent)] mb-1"><i className="ph ph-users-three"></i></span>
           <span className="text-slate-400 text-[10px] font-bold">{isAr ? 'إجمالي طلاب الشعبة' : 'Cohort Students'}</span>
           <span className="text-xl font-bold text-white mt-1">{stats.totalClassmates}</span>
         </div>
-        <div className="bg-[#1e293b]/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex flex-col justify-center items-center text-center">
+        <div className="bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] p-4 rounded-2xl flex flex-col justify-center items-center text-center">
           <span className="text-2xl text-emerald-500 mb-1"><i className="ph ph-chart-line-up"></i></span>
           <span className="text-slate-400 text-[10px] font-bold">{isAr ? 'نسبة حضور المحاضرات' : 'Attendance Rate'}</span>
           <span className="text-xl font-bold text-white mt-1">{stats.attendanceRate}%</span>
@@ -214,9 +214,9 @@ export default function DelegateTab({ isAr, profile }) {
               setIsQRModalOpen(true);
               setQrToken('');
             }}
-            className="flex flex-col items-center gap-2 bg-[#1e293b]/60 border border-white/5 hover:border-amber-500/30 p-4 rounded-2xl text-center transition-all duration-200 active:scale-95"
+            className="flex flex-col items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] p-4 rounded-2xl text-center transition-all duration-200 active:scale-95"
           >
-            <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 text-lg">
+            <div className="w-10 h-10 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-full flex items-center justify-center text-[var(--accent)] text-lg animate-pulse-ring">
               <i className="ph ph-qr-code"></i>
             </div>
             <span className="text-xs font-bold text-white">{isAr ? 'توليد كود الحضور' : 'Generate Attendance QR'}</span>
@@ -225,9 +225,9 @@ export default function DelegateTab({ isAr, profile }) {
           {/* New Poll */}
           <button
             onClick={() => setIsPollModalOpen(true)}
-            className="flex flex-col items-center gap-2 bg-[#1e293b]/60 border border-white/5 hover:border-amber-500/30 p-4 rounded-2xl text-center transition-all duration-200 active:scale-95"
+            className="flex flex-col items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] p-4 rounded-2xl text-center transition-all duration-200 active:scale-95"
           >
-            <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 text-lg">
+            <div className="w-10 h-10 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-full flex items-center justify-center text-[var(--accent)] text-lg">
               <i className="ph ph-chart-bar"></i>
             </div>
             <span className="text-xs font-bold text-white">{isAr ? 'إنشاء استبيان تصويت' : 'Create Poll'}</span>
@@ -236,7 +236,7 @@ export default function DelegateTab({ isAr, profile }) {
       </div>
 
       {/* Classmate attendance tracking list */}
-      <div className="bg-[#1e293b]/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 space-y-3">
+      <div className="bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] rounded-2xl p-4 space-y-3">
         <h4 className="text-xs font-black text-white">{isAr ? 'سجل تفاعل الحضور الفردي' : 'Student Engagement'}</h4>
         
         {stats.classmateStats && stats.classmateStats.length > 0 ? (
