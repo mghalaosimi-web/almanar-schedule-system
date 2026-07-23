@@ -95,7 +95,7 @@ export default function DevPortal() {
   const token = localStorage.getItem('manar_token');
 
   // Passcode Lock State
-  const [isUnlocked, setIsUnlocked] = useState(true);
+  const [isUnlocked, setIsUnlocked] = useState(() => sessionStorage.getItem('manar_dev_unlocked') === 'true');
   const [passcode, setPasscode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [passcodeError, setPasscodeError] = useState('');
@@ -363,7 +363,7 @@ export default function DevPortal() {
       <motion.div
         animate={{ width: sidebarExpanded ? 260 : 70 }}
         className={`
-          bg-black/40 border-r border-white/5 backdrop-blur-xl min-h-screen flex flex-col shrink-0 transition-all duration-300 relative z-50
+          bg-[var(--bg-card)]/40 border-r border-[var(--border-color)] backdrop-blur-xl min-h-screen flex flex-col shrink-0 transition-all duration-300 relative z-50
           fixed md:relative
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           ${isAr ? 'right-0 border-l border-r-0' : 'left-0'}
@@ -372,7 +372,7 @@ export default function DevPortal() {
       >
         <button
           onClick={() => { setSidebarExpanded(!sidebarExpanded); setSidebarOpen(false); }}
-          className="absolute top-4 -left-3 w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-750 flex items-center justify-center text-xs text-white shadow-xl cursor-pointer z-40 hidden md:flex"
+          className="absolute top-4 -left-3 w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-xs text-white shadow-xl cursor-pointer z-40 hidden md:flex"
         >
           {sidebarExpanded ? '‹' : '›'}
         </button>
@@ -385,7 +385,7 @@ export default function DevPortal() {
         </button>
 
         {/* Brand */}
-        <div className="p-6 border-b border-white/5 flex items-center gap-3 overflow-hidden">
+        <div className="p-6 border-b border-[var(--border-color)] flex items-center gap-3 overflow-hidden">
           <span className="text-xl shrink-0">🛡️</span>
           {sidebarExpanded && (
             <motion.span
@@ -432,7 +432,7 @@ export default function DevPortal() {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white/5 flex items-center justify-between overflow-hidden">
+        <div className="p-4 border-t border-[var(--border-color)] flex items-center justify-between overflow-hidden">
           {sidebarExpanded ? (
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-ping shrink-0" />
@@ -450,7 +450,7 @@ export default function DevPortal() {
         {/* ═══════════════════════════════════════════════════════════════════
             HEADER: Title + Multi-Tenant Context Selector + Live Stats
         ════════════════════════════════════════════════════════════════════ */}
-        <div className="bg-black/20 border-b border-white/5 backdrop-blur-md px-6 py-4 sticky top-0 z-20">
+        <div className="bg-[var(--bg-elevated)]/25 border-b border-[var(--border-color)] backdrop-blur-md px-6 py-4 sticky top-0 z-20">
 
           {/* Row 1: Title + Context Selector */}
           <div className="flex flex-wrap justify-between items-start gap-4 mb-3">
