@@ -1320,19 +1320,26 @@ export default function StudentDashboard() {
           </div>
         )}
         
-        {/* رأس الصفحة الديناميكي الثابت */}
-        <header className="bg-[var(--bg-card)]/85 backdrop-blur-md h-16 flex items-center justify-between px-5 absolute top-0 w-full z-40 border-b border-[var(--border-color)] shadow-sm">
-          <div className="flex items-center gap-3 min-w-0">
+        {/* رأس الصفحة الديناميكي الثابت — تصميم تطبيق هاتف زجاجي */}
+        <header className="bg-[var(--bg-card)]/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 absolute top-0 w-full z-40 border-b border-[var(--border-color)] shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
             {header.showAvatar && (
-              <div className="w-9 h-9 rounded-xl border border-[var(--accent)]/50 bg-[var(--bg-card)] flex items-center justify-center font-black text-xs text-[var(--accent)] shadow-[0_0_12px_var(--accent-glow)] shrink-0">
+              <div className="w-9 h-9 rounded-2xl border border-[var(--accent)]/50 bg-[var(--bg-card)] flex items-center justify-center font-black text-xs text-[var(--accent)] shadow-[0_0_12px_var(--accent-glow)] shrink-0 active-press cursor-pointer">
                 {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
               </div>
             )}
             <div className="min-w-0">
-              <h2 className="text-xs font-black text-white truncate leading-tight">
-                {header.title}
-              </h2>
-              <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-xs font-black text-white truncate leading-tight">
+                  {header.title}
+                </h2>
+                {profile.isRepresentative && (
+                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase px-1.5 py-0.2 rounded-full shrink-0">
+                    👑 {isAr ? 'مندوب' : 'Rep'}
+                  </span>
+                )}
+              </div>
+              <p className="text-[9px] text-slate-400 font-bold mt-0.5 truncate">
                 {header.subtitle}
               </p>
             </div>
@@ -1340,14 +1347,14 @@ export default function StudentDashboard() {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleManualSync}
-              className="p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-colors active:scale-95 bg-[var(--bg-card)]/40"
+              className="p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 bg-[var(--bg-card)]/60 text-slate-300"
               title={isAr ? 'تحديث التطبيق والبيانات' : 'Update App & Data'}
             >
-              <i className="ph ph-arrows-clockwise text-slate-400 hover:text-[var(--accent)] text-sm"></i>
+              <i className="ph ph-arrows-clockwise text-slate-300 hover:text-[var(--accent)] text-sm"></i>
             </button>
             <button
               onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
-              className="px-2.5 py-1.5 text-[9px] font-black uppercase border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)]/40 rounded-xl shrink-0 transition-colors active:scale-95 text-[var(--text-primary)]"
+              className="px-2.5 py-1.5 text-[9px] font-black uppercase border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)]/60 rounded-xl shrink-0 transition-all active-press active:scale-95 text-[var(--text-primary)]"
             >
               {isAr ? 'EN' : 'عربي'}
             </button>
@@ -1525,8 +1532,8 @@ export default function StudentDashboard() {
           )}
         </main>
 
-        {/* شريط الملاحة والتنقل السفلي */}
-        <nav className="absolute bottom-0 left-0 w-full backdrop-blur-xl bg-[var(--bg-card)]/90 border-t border-[var(--border-color)] h-[72px] px-2 pb-2 pt-1 flex justify-between items-center rounded-t-3xl z-40 shadow-[0_-5px_15px_rgba(0,0,0,0.15)]">
+        {/* شريط الملاحة والتنقل السفلي للتطبيق (Native Bottom Navigation Bar) */}
+        <nav className="bottom-nav-dock absolute bottom-0 left-0 w-full backdrop-blur-2xl bg-[#0f172a]/95 border-t border-white/10 h-[74px] px-1 pb-3 pt-1 flex justify-between items-center rounded-t-3xl z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.4)] select-none">
           {[
             {
               id: 'home',
@@ -1570,17 +1577,20 @@ export default function StudentDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-95 ${
-                  active ? 'text-[#f59e0b]' : 'text-slate-400 hover:text-slate-300'
+                className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active-press ${
+                  active ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <div className="relative flex flex-col items-center justify-center">
                   <i className={`${active ? tab.iconActive : tab.iconInactive} text-xl transition-all duration-200 ${
-                    active ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.65)] scale-110' : ''
+                    active ? 'drop-shadow-[0_0_10px_rgba(245,158,11,0.7)] scale-110' : ''
                   }`} />
-                  <span className="text-[9px] font-bold mt-1 font-sans">{tab.label}</span>
+                  <span className="text-[9px] font-extrabold mt-1 font-sans">{tab.label}</span>
                   {active && (
-                    <span className="absolute -bottom-2 w-1.5 h-1.5 bg-[#f59e0b] rounded-full shadow-[0_0_6px_#f59e0b]" />
+                    <motion.span
+                      layoutId="activeTabIndicator"
+                      className="absolute -bottom-2 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]"
+                    />
                   )}
                 </div>
               </button>
