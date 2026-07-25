@@ -365,7 +365,7 @@ export default function ProfileTab({
           WebkitBackdropFilter: 'blur(20px)'
         }}
       >
-        <div className="absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ backgroundColor: 'var(--accent, #10b981)' }} />
+        <div className="absolute top-0 right-0 w-36 h-36 rounded-full blur-xl opacity-20 pointer-events-none" style={{ backgroundColor: 'var(--accent, #10b981)' }} />
         <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl opacity-15 pointer-events-none" style={{ backgroundColor: 'var(--accent, #10b981)' }} />
         
         <div className="flex justify-between items-start mb-6">

@@ -127,6 +127,130 @@ export default function DevPortal() {
   const [sidebarOpen, setSidebarOpen]         = useState(false); // Mobile overlay
   const [activeTab, setActiveTab]             = useState('telemetry');
 
+  // Global context (multi-tenant selector)
+  const [tenantContext, setTenantContext] = useState({ id: 'ALL', type: 'ALL', label: 'All Tenants' });
+  const [allTenants, setAllTenants]       = useState({ universities: [], colleges: [] });
+
+  // Live Telemetry
+  const [telemetry, setTelemetry] = useState(null);
+  const [loading, setLoading]     = useState(true);
+
+  // ── Fetch tenant list for dropdown ──
+  const fetchTenants = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/dev/tenant-configs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        setAllTenants({
+          universities: res.data.data.universities || [],
+          colleges:     res.data.data.colleges     || [],
+        });
+      }
+    } catch (_) {}
+  };
+
+  // ── Fetch telemetry ──
+  const fetchTelemetry = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/dev/dashboard-telemetry`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) setTelemetry(res.data.data);
+    } catch (err) {
+      console.error('Telemetry fetch failed:', err.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isUnlocked) return;
+    fetchTelemetry();
+    fetchTenants();
+    const interval = setInterval(() => fetchTelemetry(true), 8000);
+    return () => clearInterval(interval);
+  }, [isUnlocked]);
+
+  // ── Impersonation handler ──
+  const handleImpersonateStart = (impersonateToken, targetUser) => {
+    localStorage.setItem('manar_super_admin_token', token);
+    localStorage.setItem('manar_super_admin_user', localStorage.getItem('manar_user'));
+    localStorage.setItem('manar_token', impersonateToken);
+    
+    // Construct full user object matching standard login user object
+    const role = targetUser.role || targetUser.type || 'STUDENT';
+    const userToSave = {
+      id: targetUser.id,
+      name: targetUser.name,
+      email: targetUser.email,
+      role: role,
+      googleId: targetUser.googleId || 'impersonated',
+      groupId: targetUser.groupId,
+      collegeId: targetUser.collegeId,
+      isRepresentative: targetUser.isRepresentative,
+      universityId: targetUser.universityId,
+      collegeName: targetUser.collegeName,
+      universityName: targetUser.universityName,
+      universityLogo: targetUser.universityLogo,
+      themeColor: targetUser.themeColor
+    };
+    
+    localStorage.setItem('manar_user', JSON.stringify(userToSave));
+    
+    if (role === 'STUDENT') {
+      localStorage.setItem('student_profile', JSON.stringify({
+        name: targetUser.name,
+        email: targetUser.email,
+        department: targetUser.groupName || targetUser.major?.name || '',
+        groupId: targetUser.groupId
+      }));
+      if (userToSave.isRepresentative) {
+        window.location.href = '/student/representative';
+      } else {
+        window.location.href = '/student/home';
+      }
+    } else if (role === 'LECTURER') {
+      window.location.href = '/lecturer/home';
+    } else {
+      window.location.href = '/admin/overview';
+    }
+  };
+
+  // ── Build tenantFilter prop from context ──
+  const tenantFilter = (() => {
+    if (tenantContext.type === 'ALL')        return {};
+    if (tenantContext.type === 'UNIVERSITY') return { universityId: tenantContext.universityId };
+    if (tenantContext.type === 'COLLEGE')    return { collegeId: tenantContext.collegeId, universityId: tenantContext.universityId };
+    return {};
+  })();
+
+  const menuItems = [
+    { id: 'telemetry',     labelAr: 'لوحة التحكم والقياس',    labelEn: 'Overview & Telemetry', icon: '📊' },
+    { id: 'chart',         labelAr: 'رسم النشاط الحي 24h',    labelEn: 'Live Activity Chart',  icon: '📈' },
+    { id: 'traffic',       labelAr: 'مراقبة الجلسات الحية',   labelEn: 'Live Traffic & Kicks',  icon: '👥' },
+    { id: 'inspector',     labelAr: 'رادار الطلبات الحية',    labelEn: 'API Request Inspector', icon: '🔌' },
+    { id: 'devstats',      labelAr: 'إحصائيات الأجهزة',       labelEn: 'Device Stats & OS',     icon: '📱' },
+    { id: 'audit',         labelAr: 'سجل التدقيق البصري',     labelEn: 'Audit Log Viewer',      icon: '📋' },
+    { id: 'branches',      labelAr: 'تحكم الشعب العميق',      labelEn: 'Deep Branch Control',   icon: '🌳' },
+    { id: 'alerts',        labelAr: 'بث التنبيهات الفورية',   labelEn: 'Universal Alerts',      icon: '📢' },
+    { id: 'crud',          labelAr: 'التحكم الشامل بالكيانات', labelEn: 'Master Entity CRUD',    icon: '⚙️' },
+    { id: 'branding',      labelAr: 'المستأجرين والعلامة',    labelEn: 'Tenants & Branding',    icon: '🏛️' },
+    { id: 'db-map',        labelAr: 'خريطة الربط وقواعد البيانات', labelEn: 'Database Integration Map', icon: '🗺️' },
+    { id: 'impersonation', labelAr: 'محاكاة الحسابات',        labelEn: 'God Impersonator',      icon: '🚀' },
+    { id: 'insights',      labelAr: 'مستشار التنبؤ الذكي',    labelEn: 'AI Operations Insights', icon: '🤖' },
+    { id: 'patcher',       labelAr: 'الشفاء الذاتي بـ AI',     labelEn: 'AI Self-Healing Patcher', icon: '🩺' },
+    { id: 'terminal',      labelAr: 'غرفة استعلام SQL',       labelEn: 'SQL Query Terminal',     icon: '💻' },
+    { id: 'backup',        labelAr: 'النسخ الاحتياطي',        labelEn: 'Backup Manager',         icon: '💾' },
+    { id: 'engine',        labelAr: 'غرفة المحرك والتعدين',   labelEn: 'System Engine Room',    icon: '🔒' },
+  ];
+
+  const dbLatency = telemetry?.server?.dbLatency ?? 0;
+  const onlineCount = telemetry?.onlineUsers?.length ?? 0;
+  const uptimeHrs = telemetry?.server?.uptime ? Math.round(telemetry.server.uptime / 3600) : 0;
+  const ramMb = telemetry?.server?.memory?.rss ? Math.round(telemetry.server.memory.rss / (1024 * 1024)) : 0;
+
   if (!isUnlocked) {
     return (
       <div 
@@ -215,129 +339,6 @@ export default function DevPortal() {
       </div>
     );
   }
-
-  // Global context (multi-tenant selector)
-  const [tenantContext, setTenantContext] = useState({ id: 'ALL', type: 'ALL', label: 'All Tenants' });
-  const [allTenants, setAllTenants]       = useState({ universities: [], colleges: [] });
-
-  // Live Telemetry
-  const [telemetry, setTelemetry] = useState(null);
-  const [loading, setLoading]     = useState(true);
-
-  // ── Fetch tenant list for dropdown ──
-  const fetchTenants = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/admin/dev/tenant-configs`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data?.success) {
-        setAllTenants({
-          universities: res.data.data.universities || [],
-          colleges:     res.data.data.colleges     || [],
-        });
-      }
-    } catch (_) {}
-  };
-
-  // ── Fetch telemetry ──
-  const fetchTelemetry = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const res = await axios.get(`${API_URL}/api/admin/dev/dashboard-telemetry`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data?.success) setTelemetry(res.data.data);
-    } catch (err) {
-      console.error('Telemetry fetch failed:', err.message);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTelemetry();
-    fetchTenants();
-    const interval = setInterval(() => fetchTelemetry(true), 8000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ── Impersonation handler ──
-  const handleImpersonateStart = (impersonateToken, targetUser) => {
-    localStorage.setItem('manar_super_admin_token', token);
-    localStorage.setItem('manar_super_admin_user', localStorage.getItem('manar_user'));
-    localStorage.setItem('manar_token', impersonateToken);
-    
-    // Construct full user object matching standard login user object
-    const role = targetUser.role || targetUser.type || 'STUDENT';
-    const userToSave = {
-      id: targetUser.id,
-      name: targetUser.name,
-      email: targetUser.email,
-      role: role,
-      googleId: targetUser.googleId || 'impersonated',
-      groupId: targetUser.groupId,
-      collegeId: targetUser.collegeId,
-      isRepresentative: targetUser.isRepresentative,
-      universityId: targetUser.universityId,
-      collegeName: targetUser.collegeName,
-      universityName: targetUser.universityName,
-      universityLogo: targetUser.universityLogo,
-      themeColor: targetUser.themeColor
-    };
-    
-    localStorage.setItem('manar_user', JSON.stringify(userToSave));
-    
-    if (role === 'STUDENT') {
-      localStorage.setItem('student_profile', JSON.stringify({
-        name: targetUser.name,
-        email: targetUser.email,
-        department: targetUser.groupName || targetUser.major?.name || '',
-        groupId: targetUser.groupId
-      }));
-      if (userToSave.isRepresentative) {
-        window.location.href = '/student/representative';
-      } else {
-        window.location.href = '/student/home';
-      }
-    } else if (role === 'LECTURER') {
-      window.location.href = '/lecturer/home';
-    } else {
-      window.location.href = '/admin/overview';
-    }
-  };
-
-  // ── Build tenantFilter prop from context ──
-  const tenantFilter = (() => {
-    if (tenantContext.type === 'ALL')        return {};
-    if (tenantContext.type === 'UNIVERSITY') return { universityId: tenantContext.universityId };
-    if (tenantContext.type === 'COLLEGE')    return { collegeId: tenantContext.collegeId, universityId: tenantContext.universityId };
-    return {};
-  })();
-
-  const menuItems = [
-    { id: 'telemetry',     labelAr: 'لوحة التحكم والقياس',    labelEn: 'Overview & Telemetry', icon: '📊' },
-    { id: 'chart',         labelAr: 'رسم النشاط الحي 24h',    labelEn: 'Live Activity Chart',  icon: '📈' },
-    { id: 'traffic',       labelAr: 'مراقبة الجلسات الحية',   labelEn: 'Live Traffic & Kicks',  icon: '👥' },
-    { id: 'inspector',     labelAr: 'رادار الطلبات الحية',    labelEn: 'API Request Inspector', icon: '🔌' },
-    { id: 'devstats',      labelAr: 'إحصائيات الأجهزة',       labelEn: 'Device Stats & OS',     icon: '📱' },
-    { id: 'audit',         labelAr: 'سجل التدقيق البصري',     labelEn: 'Audit Log Viewer',      icon: '📋' },
-    { id: 'branches',      labelAr: 'تحكم الشعب العميق',      labelEn: 'Deep Branch Control',   icon: '🌳' },
-    { id: 'alerts',        labelAr: 'بث التنبيهات الفورية',   labelEn: 'Universal Alerts',      icon: '📢' },
-    { id: 'crud',          labelAr: 'التحكم الشامل بالكيانات', labelEn: 'Master Entity CRUD',    icon: '⚙️' },
-    { id: 'branding',      labelAr: 'المستأجرين والعلامة',    labelEn: 'Tenants & Branding',    icon: '🏛️' },
-    { id: 'db-map',        labelAr: 'خريطة الربط وقواعد البيانات', labelEn: 'Database Integration Map', icon: '🗺️' },
-    { id: 'impersonation', labelAr: 'محاكاة الحسابات',        labelEn: 'God Impersonator',      icon: '🚀' },
-    { id: 'insights',      labelAr: 'مستشار التنبؤ الذكي',    labelEn: 'AI Operations Insights', icon: '🤖' },
-    { id: 'patcher',       labelAr: 'الشفاء الذاتي بـ AI',     labelEn: 'AI Self-Healing Patcher', icon: '🩺' },
-    { id: 'terminal',      labelAr: 'غرفة استعلام SQL',       labelEn: 'SQL Query Terminal',     icon: '💻' },
-    { id: 'backup',        labelAr: 'النسخ الاحتياطي',        labelEn: 'Backup Manager',         icon: '💾' },
-    { id: 'engine',        labelAr: 'غرفة المحرك والتعدين',   labelEn: 'System Engine Room',    icon: '🔒' },
-  ];
-
-  const dbLatency = telemetry?.server?.dbLatency ?? 0;
-  const onlineCount = telemetry?.onlineUsers?.length ?? 0;
-  const uptimeHrs = telemetry?.server?.uptime ? Math.round(telemetry.server.uptime / 3600) : 0;
-  const ramMb = telemetry?.server?.memory?.rss ? Math.round(telemetry.server.memory.rss / (1024 * 1024)) : 0;
 
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[var(--bg-primary)] text-slate-100 flex overflow-hidden font-sans">

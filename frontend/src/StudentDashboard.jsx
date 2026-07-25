@@ -132,7 +132,7 @@ const UnderDevelopmentView = ({ isAr, featureNameAr, featureNameEn }) => {
       className="frosted-panel rounded-3xl p-8 border border-white/5 bg-white/2 text-center space-y-6 max-w-md mx-auto my-8 relative overflow-hidden"
       style={{ background: 'var(--bg-card, #121824)', border: '1px solid var(--border-card, rgba(255,255,255,0.05))' }}
     >
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-[var(--accent)]/5 rounded-full blur-xl pointer-events-none" />
       <div className="w-16 h-16 rounded-2xl bg-amber-550/10 border border-amber-500/20 flex items-center justify-center text-3xl mx-auto shadow-inner">
         🚧
       </div>
@@ -408,6 +408,7 @@ export default function StudentDashboard() {
       if (!hasLoadedFromCache) {
         setLoading(true);
       }
+      setStudentGoalsLoading(true);
       const token = localStorage.getItem('manar_token');
       
       const profileRes = await axios.get(`${API_URL}/api/student/settings`, {
@@ -565,6 +566,7 @@ export default function StudentDashboard() {
         }));
         setStudentGoals([...mappedPersonal, ...mappedAcademic]);
       }
+      setStudentGoalsLoading(false);
       fetchGoalsReminders();
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -577,6 +579,7 @@ export default function StudentDashboard() {
       }
     } finally {
       setLoading(false);
+      setStudentGoalsLoading(false);
     }
   };
 
@@ -696,6 +699,7 @@ export default function StudentDashboard() {
 
   // ── معالجة حركة التحديث بالسحب (Pull to Refresh) ──
   const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
   const touchStartY = React.useRef(0);
   const PULL_THRESHOLD = 80;
 

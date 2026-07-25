@@ -32,10 +32,10 @@ export default function DelegateTab({ isAr, profile }) {
     try {
       const token = localStorage.getItem('manar_token');
       const [statsRes, schedulesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/representative/dashboard/stats`, {
+        axios.get(`${API_URL}/api/rep/dashboard/stats`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         }),
-        axios.get(`${API_URL}/api/representative/schedules`, {
+        axios.get(`${API_URL}/api/rep/schedules`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
       ]);
@@ -74,7 +74,7 @@ export default function DelegateTab({ isAr, profile }) {
     setQrToken('');
     try {
       const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/representative/attendance/qr-token`, {
+      const res = await axios.post(`${API_URL}/api/rep/attendance/qr-token`, {
         scheduleId: parseInt(selectedScheduleId)
       }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}

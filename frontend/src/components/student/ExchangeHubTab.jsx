@@ -190,6 +190,10 @@ export default function ExchangeHubTab({
       );
       if (success) {
         setChatInput('');
+        // Auto-scroll to bottom after sending
+        setTimeout(() => {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       }
     } catch (err) {
       console.error('Failed to send group chat message:', err);
@@ -534,7 +538,7 @@ export default function ExchangeHubTab({
 
       {/* ── View 1: Live Group Chat Mode ── */}
       {exchangeTab === 'chat' && (
-        <div className="flex flex-col h-[520px] bg-black/20 border border-white/5 rounded-3xl p-4 justify-between space-y-3 overflow-hidden relative">
+        <div className="flex flex-col h-[calc(100dvh-280px)] min-h-[400px] max-h-[580px] bg-black/20 border border-white/5 rounded-3xl p-4 justify-between space-y-3 overflow-hidden relative">
           
           {/* Smart Summarizer Banner */}
           <div className="shrink-0 flex flex-col gap-2">
@@ -579,7 +583,7 @@ export default function ExchangeHubTab({
           {/* Chat Messages Container */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 pr-1 pl-1 no-scrollbar scroll-smooth"
+            className="flex-1 overflow-y-auto space-y-3 pr-1 pl-1 pb-2 no-scrollbar scroll-smooth"
           >
             {postsLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-xs text-slate-500 gap-2">
@@ -682,6 +686,12 @@ export default function ExchangeHubTab({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && chatInput.trim() && !isSendingChat) {
+                  e.preventDefault();
+                  handleSendChatMessage(e);
+                }
+              }}
               placeholder={isAr ? 'اكتب رسالتك للدفعة هنا...' : 'Type message to your class...'}
               className="flex-1 bg-transparent border-0 px-3 py-2 text-xs text-white focus:outline-none placeholder-slate-650 text-right font-sans"
               dir="rtl"
@@ -769,7 +779,7 @@ export default function ExchangeHubTab({
                   className="frosted-panel rounded-3xl p-5 border border-white/5 bg-white/2 hover:bg-white/4 cursor-pointer active:scale-[0.99] transition-all duration-200 space-y-3 relative overflow-hidden group"
                   style={{ background: 'var(--bg-card, #121824)', border: '1px solid var(--border-card, rgba(255,255,255,0.05))' }}
                 >
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-[var(--accent)]/5 rounded-full blur-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
                   
                   <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center gap-2.5">
