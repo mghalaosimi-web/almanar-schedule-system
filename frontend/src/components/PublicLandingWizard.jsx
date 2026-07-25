@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { API_URL } from '../config';
 import Logo from '../Logo';
 import ThemeSwitcher from '../ThemeSwitcher';
+import PWAInstallModal from './PWAInstallModal';
 
 const containerVariants = {
   hidden: { opacity: 0, scale: 0.95 },
@@ -345,6 +346,7 @@ export default function PublicLandingWizard() {
   // PWA Installer State & Listeners
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -372,18 +374,7 @@ export default function PublicLandingWizard() {
   }, []);
 
   const handlePwaButtonClick = async () => {
-    if (isStandalone) {
-      navigate('/login');
-      return;
-    }
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`PWA Install choice: ${outcome}`);
-      setDeferredPrompt(null);
-    } else {
-      navigate('/login');
-    }
+    setShowPwaInstallModal(true);
   };
 
   // Data
@@ -814,7 +805,15 @@ export default function PublicLandingWizard() {
             <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full blur-[150px] mix-blend-screen pointer-events-none transition-colors duration-700 opacity-10" style={{ backgroundColor: 'var(--accent)' }} />
 
             {/* Top Utilities bar */}
-            <div className="absolute top-6 right-6 z-50 flex items-center gap-4">
+            <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+              <button
+                onClick={() => setShowPwaInstallModal(true)}
+                className="px-3.5 py-2 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[11px] hover:bg-[var(--accent)] hover:text-slate-950 transition-all font-black flex items-center gap-1.5 text-[var(--accent)] shadow-sm cursor-pointer"
+                title={isAr ? "تحميل / تثبيت التطبيق" : "Download / Install App"}
+              >
+                <span>📲</span>
+                <span>{isAr ? 'تحميل التطبيق (APK/PWA)' : 'App (APK/PWA)'}</span>
+              </button>
               <button
                 onClick={() => {
                   // Clear offline caches and refresh
@@ -862,32 +861,21 @@ export default function PublicLandingWizard() {
                 </div>
               </div>
 
-              {/* PWA Installer Button */}
-              {(deferredPrompt || isStandalone) && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="w-full max-w-sm mb-6 px-4"
+              {/* PWA / APK Installer Button */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="w-full max-w-sm mb-6 px-4"
+              >
+                <button
+                  onClick={handlePwaButtonClick}
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[var(--accent-dim)] to-white/5 border border-[var(--accent-glow)] hover:border-[var(--accent)] text-white hover:text-[var(--accent)] font-black text-xs uppercase tracking-wider transition-all duration-300 hover:shadow-[0_0_20px_var(--accent-glow)] flex items-center justify-center gap-3 backdrop-blur-md cursor-pointer"
                 >
-                  <button
-                    onClick={handlePwaButtonClick}
-                    className="w-full py-3.5 px-6 rounded-2xl bg-white/5 border border-white/10 hover:border-[var(--accent)] text-white hover:text-[var(--accent)] hover:bg-[var(--accent-dim)] font-black text-xs uppercase tracking-wider transition-all duration-300 hover:shadow-[0_0_20px_var(--accent-glow)] flex items-center justify-center gap-3 backdrop-blur-md cursor-pointer"
-                  >
-                    {isStandalone ? (
-                      <>
-                        <span>📲</span>
-                        <span>{isAr ? 'فتح التطبيق' : 'Open App'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>📥</span>
-                        <span>{isAr ? 'تثبيت التطبيق على الشاشة الرئيسية' : 'Install App'}</span>
-                      </>
-                    )}
-                  </button>
-                </motion.div>
-              )}
+                  <span>📲</span>
+                  <span>{isAr ? 'تثبيت / تحميل التطبيق (PWA / APK)' : 'Install / Download App (PWA / APK)'}</span>
+                </button>
+              </motion.div>
 
               {/* Dynamic Title */}
               <div className="text-center mb-8">
@@ -1298,6 +1286,13 @@ export default function PublicLandingWizard() {
             <AnimatePresence>
               {modalType && <InfoModal type={modalType} onClose={() => setModalType(null)} />}
             </AnimatePresence>
+
+            {/* PWA / APK Install Modal */}
+            <PWAInstallModal
+              isOpen={showPwaInstallModal}
+              onClose={() => setShowPwaInstallModal(false)}
+              deferredPrompt={deferredPrompt}
+            />
           </motion.div>
         )}
       </AnimatePresence>

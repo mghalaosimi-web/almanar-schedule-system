@@ -17,6 +17,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import ConfirmationModal from './ConfirmationModal';
 import UserSettings from './UserSettings';
 import RepresentativeDashboard from './RepresentativeDashboard';
+import PWAInstallModal from './components/PWAInstallModal';
 import { scheduleOfflineNotifications } from './utils/localNotifications';
 import { getFriendlyErrorMessage } from './utils/errorHelpers';
 
@@ -212,6 +213,7 @@ export default function StudentDashboard() {
   const [subjectStats, setSubjectStats] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [alertFilter, setAlertFilter] = useState('All');
+  const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
   
   // Goals and Reminders states
   const [studentGoals, setStudentGoals] = useState([]);
@@ -1346,6 +1348,13 @@ export default function StudentDashboard() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button
+              onClick={() => setShowPwaInstallModal(true)}
+              className="p-2 border border-[var(--accent-glow)] hover:border-[var(--accent)] bg-[var(--accent-dim)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 text-[var(--accent)]"
+              title={isAr ? 'تحميل / تثبيت التطبيق (APK/PWA)' : 'Download / Install App'}
+            >
+              <span className="text-xs font-bold">📲</span>
+            </button>
+            <button
               onClick={handleManualSync}
               className="p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 bg-[var(--bg-card)]/60 text-slate-300"
               title={isAr ? 'تحديث التطبيق والبيانات' : 'Update App & Data'}
@@ -1423,6 +1432,7 @@ export default function StudentDashboard() {
                     setActiveTab={setActiveTab}
                     handleManualSync={handleManualSync}
                     goalReminders={goalReminders}
+                    onOpenPwaModal={() => setShowPwaInstallModal(true)}
                   />
                 )}
 
@@ -1696,6 +1706,14 @@ export default function StudentDashboard() {
         onCancel={() => setIsLogoutModalOpen(false)}
         confirmText={isAr ? 'خروج' : 'Sign Out'}
         cancelText={isAr ? 'إلغاء' : 'Cancel'}
+      />
+
+      {/* PWA / APK Install Modal */}
+      <PWAInstallModal
+        isOpen={showPwaInstallModal}
+        onClose={() => setShowPwaInstallModal(false)}
+        deferredPrompt={null}
+        onInstallPwa={installApp}
       />
 
       {/* حقن حركات الرسوم البصرية الفاخرة للـ Marquee والنبض */}

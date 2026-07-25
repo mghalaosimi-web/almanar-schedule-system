@@ -69,6 +69,7 @@ export default function CommandPalette() {
 
   // Navigational shortcuts
   const navigationItems = [
+    { name: '📲 تثبيت أو تحميل التطبيق (PWA / APK)', subtitle: 'تحميل ملف أندرويد APK المباشر أو تثبيت التطبيق', action: () => window.location.href = '/Manar_Schedule.apk' },
     { name: '📖 دليل المستخدم / Instructions', subtitle: 'كيفية استخدام بوابة الطالب خطوة بخطوة', action: '/instructions' },
     { name: '⚙️ الذهاب إلى الإعدادات', subtitle: 'تعديل الملف الشخصي والخيارات', action: '/settings' },
     { name: '📅 عرض جدول المحاضرات الأسبوعي', subtitle: 'الانتقال إلى لوحة العرض الرئيسية', action: '/' },

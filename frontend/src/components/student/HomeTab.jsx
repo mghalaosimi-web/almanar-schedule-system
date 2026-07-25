@@ -60,7 +60,8 @@ export default function HomeTab({
   setProfileViewMode,
   setActiveTab,
   handleManualSync,
-  goalReminders = []
+  goalReminders = [],
+  onOpenPwaModal
 }) {
   const now = new Date();
   const currentTimeStr = now.toTimeString().substring(0, 5);
@@ -375,14 +376,15 @@ export default function HomeTab({
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h4 className="text-sm font-black text-[var(--text-primary)] tracking-wide">{isAr ? 'إجراءات سريعة' : 'Quick Actions'}</h4>
-          {isInstallable && (
-            <button
-              onClick={installApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-dim)] border border-[var(--accent-glow)] hover:bg-[var(--accent-dim)]/80 rounded-full text-[9px] font-black text-[var(--accent)] transition-all"
-            >
-              <span>📲</span> {isAr ? 'تثبيت التطبيق' : 'Install App'}
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (onOpenPwaModal) onOpenPwaModal();
+              else if (installApp) installApp();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-dim)] border border-[var(--accent-glow)] hover:bg-[var(--accent)] hover:text-slate-950 rounded-full text-[10px] font-black text-[var(--accent)] transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            <span>📲</span> {isAr ? 'تثبيت / تحميل التطبيق (APK/PWA)' : 'App (APK/PWA)'}
+          </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {/* GPS Check-In */}
