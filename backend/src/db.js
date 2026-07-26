@@ -140,6 +140,34 @@ if (!global.prisma) {
               return fallbackEngine.execute(prop, action, args[0]);
             }
             try {
+              const AUDITED_ACTIONS = ['create', 'update', 'delete', 'upsert'];
+              const EXCLUDED_MODELS = ['auditLog', 'sessionLog', 'notificationLog', 'pushSubscription', 'verificationCode'];
+
+              if (AUDITED_ACTIONS.includes(action) && !EXCLUDED_MODELS.includes(prop)) {
+                const { recordAuditLog } = require('./services/auditService');
+                let beforeJson = null;
+                if ((action === 'update' || action === 'delete' || action === 'upsert') && args[0]?.where && typeof modelTarget.findUnique === 'function') {
+                  try {
+                    beforeJson = await modelTarget.findUnique({ where: args[0].where });
+                  } catch (e) {}
+                }
+
+                const result = await modelTarget[action](...args);
+
+                let afterJson = (action === 'delete') ? null : result;
+                let entityId = result?.id || beforeJson?.id || args[0]?.where?.id || null;
+
+                recordAuditLog({
+                  action,
+                  entity: prop.charAt(0).toUpperCase() + prop.slice(1),
+                  entityId,
+                  beforeJson,
+                  afterJson
+                });
+
+                return result;
+              }
+
               return await modelTarget[action](...args);
             } catch (err) {
               if (isDatabaseConnectionError(err) && !activeTenantClient) {

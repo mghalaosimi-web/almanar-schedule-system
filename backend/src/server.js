@@ -29,11 +29,16 @@ const representativeRouter = require('./routes/representative');
 const exchangeRouter = require('./routes/exchange');
 const databaseRouter = require('./routes/database');
 const goalsRouter = require('./routes/goals');
+const auditRouter = require('./routes/audit');
+const searchRouter = require('./routes/search');
+const analyticsRouter = require('./routes/analytics');
+const aiRouter = require('./routes/aiRoutes');
 
 const { activityLogger } = require('./middleware/activityLogger');
 const { requestLoggerMiddleware } = require('./middleware/requestLogger');
 const { firewallMiddleware } = require('./middleware/firewall');
 const { tenantDbMiddleware } = require('./middleware/tenantDb');
+const { auditContextMiddleware } = require('./services/auditService');
 
 const app = express();
 
@@ -130,6 +135,7 @@ app.use(tenantDbMiddleware);
 app.use(firewallMiddleware);
 app.use(activityLogger);
 app.use(requestLoggerMiddleware);
+app.use(auditContextMiddleware);
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
@@ -147,6 +153,9 @@ app.use('/api/rep', representativeRouter);
 app.use('/api/exchange', exchangeRouter);
 app.use('/api', databaseRouter);
 app.use('/api/goals', goalsRouter);
+app.use('/api', auditRouter);
+app.use('/api', searchRouter);
+app.use('/api', analyticsRouter);
 
 // Self-healing database check & migrations
 async function runStartupMigrations() {
@@ -267,8 +276,10 @@ async function boot() {
       console.warn('[DATABASE] Connection check warning:', dbErr.message);
     }
 
-    // Initialize cron summary engine
+    // Initialize cron summary engine and ERP Event Bus
     initializeCronJobs();
+    const { initializeDefaultListeners } = require('./services/eventBus');
+    initializeDefaultListeners();
 
     const PORT = process.env.PORT || 5000;
     const server = app.listen(PORT, () => {
