@@ -67,12 +67,13 @@ export default function ScheduleTab({
       s.groupId === parseInt(selectedGroupFilter) ||
       (s.attendingGroups && s.attendingGroups.some(ag => ag.groupId === parseInt(selectedGroupFilter)));
 
-    // Type filter
+    // Type filter with robust case-insensitive check
     let matchesType = true;
+    const subjectType = (s.subject?.type || s.type || '').toUpperCase();
     if (typeFilter === 'theory') {
-      matchesType = s.subject?.type === 'THEORY';
+      matchesType = subjectType === 'THEORY';
     } else if (typeFilter === 'practical') {
-      matchesType = s.subject?.type === 'PRACTICAL' || s.subject?.type === 'LAB';
+      matchesType = ['PRACTICAL', 'LAB', 'PRACTICE', 'LABORATORY'].includes(subjectType);
     }
 
     return matchesGroup && matchesType;

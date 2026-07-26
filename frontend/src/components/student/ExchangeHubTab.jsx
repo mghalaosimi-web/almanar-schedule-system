@@ -177,7 +177,7 @@ export default function ExchangeHubTab({
 
   // ── Send instant group chat message ──
   const handleSendChatMessage = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!chatInput.trim() || isSendingChat) return;
     try {
       setIsSendingChat(true);
@@ -190,10 +190,12 @@ export default function ExchangeHubTab({
       );
       if (success) {
         setChatInput('');
-        // Auto-scroll to bottom after sending
-        setTimeout(() => {
-          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        // Auto-scroll to bottom reliably after DOM render
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 60);
+        });
       }
     } catch (err) {
       console.error('Failed to send group chat message:', err);
@@ -584,7 +586,7 @@ export default function ExchangeHubTab({
           {/* Chat Messages Container */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 pr-1 pl-1 pb-2 no-scrollbar scroll-smooth"
+            className="flex-1 overflow-y-auto space-y-3 pr-1 pl-1 pb-16 no-scrollbar scroll-smooth"
           >
             {postsLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-xs text-slate-500 gap-2">

@@ -986,13 +986,17 @@ export default function StudentDashboard() {
   };
 
   const handleToggleGoal = async (goalId) => {
+    const goal = studentGoals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    const previousState = goal.completed;
+    // Optimistic state update for immediate UI progress bar reaction
+    setStudentGoals(prev => prev.map(g => g.id === goalId ? { ...g, completed: !previousState } : g));
+
     try {
       const token = localStorage.getItem('manar_token');
-      const goal = studentGoals.find(g => g.id === goalId);
-      if (!goal) return;
-
       const res = await axios.put(`${API_URL}/api/student/tasks/${goalId}`, {
-        completed: !goal.completed
+        completed: !previousState
       }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -1001,10 +1005,11 @@ export default function StudentDashboard() {
         if (res.data.xpAwarded) {
           toast.success(isAr ? `🏆 حصلت على +${res.data.xpAwarded} نقطة XP!` : `🏆 Earned +${res.data.xpAwarded} XP!`, { icon: '✨' });
         }
-        fetchData(true);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Task toggle error:', err);
+      // Rollback on network failure
+      setStudentGoals(prev => prev.map(g => g.id === goalId ? { ...g, completed: previousState } : g));
       toast.error(isAr ? 'فشل تحديث حالة المهمة.' : 'Failed to update task state.');
     }
   };
@@ -1803,7 +1808,7 @@ export default function StudentDashboard() {
         </main>
 
         {/* شريط الملاحة والتنقل السفلي للتطبيق (Native Bottom Navigation Bar) */}
-        <nav className="bottom-nav-dock absolute bottom-0 left-0 w-full backdrop-blur-2xl bg-[#0f172a]/95 border-t border-white/10 h-[74px] px-1 pb-3 pt-1 flex justify-between items-center rounded-t-3xl z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.4)] select-none">
+        <nav className="bottom-nav-dock fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto backdrop-blur-md bg-[#0f172a]/95 border-t border-white/10 h-[70px] px-1 pb-2 pt-1 flex justify-around items-center rounded-t-3xl z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.4)] select-none">
           {[
             {
               id: 'home',
@@ -1851,19 +1856,21 @@ export default function StudentDashboard() {
                   soundEngine.playClick();
                   setActiveTab(tab.id);
                 }}
-                className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active-press ${
-                  active ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 transition-all duration-200 active-press ${
+                  active ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <div className="relative flex flex-col items-center justify-center">
-                  <i className={`${active ? tab.iconActive : tab.iconInactive} text-xl transition-all duration-200 ${
+                  <i className={`${active ? tab.iconActive : tab.iconInactive} text-lg transition-all duration-200 ${
                     active ? 'drop-shadow-[0_0_10px_rgba(245,158,11,0.7)] scale-110' : ''
                   }`} />
-                  <span className="text-[9px] font-extrabold mt-1 font-sans">{tab.label}</span>
+                  <span className={`text-[9px] sm:text-[10px] mt-0.5 truncate max-w-[55px] font-sans ${active ? 'font-black text-amber-400' : 'font-semibold'}`}>
+                    {tab.label}
+                  </span>
                   {active && (
                     <motion.span
                       layoutId="activeTabIndicator"
-                      className="absolute -bottom-2 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]"
+                      className="absolute -bottom-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]"
                     />
                   )}
                 </div>

@@ -135,9 +135,12 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
   const examCount = goals.filter(g => g.type === 'EXAM').length;
   const achievementCount = goals.filter(g => g.type === 'ACHIEVEMENT').length;
 
-  const filteredGoals = filterType === 'ALL'
-    ? goals
-    : goals.filter(g => g.type === filterType);
+  const filteredGoals = goals.filter(g => {
+    if (filterType === 'ALL') return true;
+    if (filterType === 'ACADEMIC') return !g.isPersonal && g.type !== 'PERSONAL';
+    if (filterType === 'PERSONAL') return g.isPersonal || g.type === 'PERSONAL';
+    return g.type === filterType;
+  });
 
   const getBadgeStyles = (type) => {
     switch (type) {
@@ -258,6 +261,8 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
       <div className="flex gap-2 border-b border-slate-850 pb-3 overflow-x-auto no-scrollbar">
         {[
           { id: 'ALL', label: isAr ? 'الكل' : 'All', icon: '🎯' },
+          { id: 'ACADEMIC', label: isAr ? 'أكاديمية' : 'Academic', icon: '🎓' },
+          { id: 'PERSONAL', label: isAr ? 'شخصية' : 'Personal', icon: '👤' },
           { id: 'ASSIGNMENT', label: isAr ? 'التكاليف' : 'Tasks', icon: '📝' },
           { id: 'PROJECT', label: isAr ? 'المشاريع' : 'Projects', icon: '📁' },
           { id: 'EXAM', label: isAr ? 'الاختبارات' : 'Exams', icon: '📅' },
@@ -268,10 +273,10 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
             <button
               key={tab.id}
               onClick={() => setFilterType(tab.id)}
-              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 border shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 border shrink-0 ${
                 active
                   ? 'bg-slate-800 text-white border-slate-700 shadow-md scale-105'
-                  : 'bg-white/5 border-transparent text-slate-400 hover:text-white hover:bg-white/10'
+                  : 'bg-white/5 border-transparent text-slate-350 hover:text-white hover:bg-white/10'
               }`}
             >
               {tab.icon} {tab.label}
