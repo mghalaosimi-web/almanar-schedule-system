@@ -488,86 +488,104 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
     setExcuseNote('');
   };
 
+  // Filtered Students List
+  const filteredStudents = classmates.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
+                          s.idNumber.toLowerCase().includes(searchStudent.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    if (statusFilter === 'ALL') return true;
+    if (statusFilter === 'WARNING') return s.warning || s.attendanceRate < 75;
+    return s.status === statusFilter;
+  });
+
+  // Calculate live counters
+  const presentCount = classmates.filter(c => c.status === 'PRESENT').length;
+  const absentCount = classmates.filter(c => c.status === 'ABSENT').length;
+  const lateCount = classmates.filter(c => c.status === 'LATE').length;
+  const excusedCount = classmates.filter(c => c.status === 'EXCUSED').length;
+  const liveAttendancePercent = classmates.length > 0 ? Math.round((presentCount / classmates.length) * 100) : 100;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Crown Banner */}
-      <div className="bg-gradient-to-r from-emerald-950/90 via-slate-900 to-amber-950/50 border border-emerald-500/30 p-4 rounded-2xl relative overflow-hidden shadow-xl">
-        <div className="absolute -left-3 -top-3 text-emerald-500/10 text-7xl pointer-events-none">
+      <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-amber-950/40 border border-emerald-500/30 p-5 rounded-3xl relative overflow-hidden shadow-2xl">
+        <div className="absolute -left-4 -top-4 text-emerald-500/10 text-8xl pointer-events-none">
           <i className="ph-fill ph-crown"></i>
         </div>
-        <div className="relative z-10 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9.5px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1">
                 <span>👑</span> {isAr ? 'صلاحيات المندوب القيادية' : 'Cohort Representative'}
               </span>
             </div>
-            <h2 className="text-base font-black text-white mt-1 leading-tight truncate">
+            <h2 className="text-lg font-black text-white mt-1.5 leading-tight">
               {isAr ? 'لوحة قيادة مندوب الدفعة' : 'Delegate Control Hub'}
             </h2>
-            <p className="text-[10px] text-slate-300 font-semibold mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-300 font-semibold mt-0.5">
               {isAr ? `إدارة حضور واقتراحات وترتيبات شعبة (${profile?.groupName || profile?.major || 'الشعبة الأولى'})` : `Managing cohort (${profile?.groupName || 'Section A'})`}
             </p>
           </div>
           <button
             onClick={() => fetchDelegateData()}
             disabled={loading}
-            className="w-9 h-9 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl flex items-center justify-center transition-all active:scale-95 shrink-0 shadow-md"
+            className="w-10 h-10 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-2xl flex items-center justify-center transition-all active:scale-95 shrink-0 shadow-lg"
             title={isAr ? 'تحديث البيانات' : 'Refresh'}
           >
-            <i className={`ph ph-arrows-clockwise text-base ${loading ? 'animate-spin' : ''}`}></i>
+            <i className={`ph ph-arrows-clockwise text-lg ${loading ? 'animate-spin' : ''}`}></i>
           </button>
         </div>
       </div>
 
       {/* Cohort Live Metrics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-slate-900/80 border border-emerald-500/20 p-2.5 rounded-xl flex items-center gap-2.5 relative overflow-hidden shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-sm shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="bg-slate-900/80 border border-emerald-500/20 p-3.5 rounded-2xl flex items-center gap-3 relative overflow-hidden shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg shrink-0">
             👥
           </div>
-          <div className="min-w-0">
-            <span className="text-[8.5px] text-slate-400 font-bold block truncate">{isAr ? 'طلاب الشعبة' : 'Total Students'}</span>
-            <span className="text-sm font-black text-white font-mono">{classmates.length}</span>
+          <div>
+            <span className="text-[9px] text-slate-400 font-bold block">{isAr ? 'طلاب الشعبة' : 'Total Students'}</span>
+            <span className="text-base font-black text-white font-mono">{classmates.length}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-emerald-500/20 p-2.5 rounded-xl flex items-center gap-2.5 relative overflow-hidden shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-sm shrink-0">
+        <div className="bg-slate-900/80 border border-emerald-500/20 p-3.5 rounded-2xl flex items-center gap-3 relative overflow-hidden shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg shrink-0">
             ✅
           </div>
-          <div className="min-w-0">
-            <span className="text-[8.5px] text-slate-400 font-bold block truncate">{isAr ? 'حاضرون الآن' : 'Present'}</span>
-            <span className="text-sm font-black text-emerald-400 font-mono">{presentCount}</span>
+          <div>
+            <span className="text-[9px] text-slate-400 font-bold block">{isAr ? 'حاضرون الآن' : 'Present'}</span>
+            <span className="text-base font-black text-emerald-400 font-mono">{presentCount}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-red-500/20 p-2.5 rounded-xl flex items-center gap-2.5 relative overflow-hidden shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 flex items-center justify-center text-sm shrink-0">
+        <div className="bg-slate-900/80 border border-red-500/20 p-3.5 rounded-2xl flex items-center gap-3 relative overflow-hidden shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-red-500/15 text-red-400 border border-red-500/30 flex items-center justify-center text-lg shrink-0">
             ❌
           </div>
-          <div className="min-w-0">
-            <span className="text-[8.5px] text-slate-400 font-bold block truncate">{isAr ? 'غائبون' : 'Absent'}</span>
-            <span className="text-sm font-black text-red-400 font-mono">{absentCount}</span>
+          <div>
+            <span className="text-[9px] text-slate-400 font-bold block">{isAr ? 'غائبون' : 'Absent'}</span>
+            <span className="text-base font-black text-red-400 font-mono">{absentCount}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-amber-500/20 p-2.5 rounded-xl flex items-center gap-2.5 relative overflow-hidden shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center text-sm shrink-0">
+        <div className="bg-slate-900/80 border border-amber-500/20 p-3.5 rounded-2xl flex items-center gap-3 relative overflow-hidden shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center text-lg shrink-0">
             📊
           </div>
-          <div className="min-w-0">
-            <span className="text-[8.5px] text-slate-400 font-bold block truncate">{isAr ? 'نسبة الحضور' : 'Rate'}</span>
-            <span className="text-sm font-black text-amber-400 font-mono">{liveAttendancePercent}%</span>
+          <div>
+            <span className="text-[9px] text-slate-400 font-bold block">{isAr ? 'نسبة الحضور' : 'Rate'}</span>
+            <span className="text-base font-black text-amber-400 font-mono">{liveAttendancePercent}%</span>
           </div>
         </div>
       </div>
 
       {/* Main Sub-tab Navigation */}
-      <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5 gap-1 select-none overflow-x-auto no-scrollbar">
+      <div className="flex bg-slate-950 p-1 rounded-2xl border border-white/5 gap-1 select-none overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveSubTab('attendance')}
-          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 text-[10.5px] font-black rounded-xl transition-all whitespace-nowrap ${
             activeSubTab === 'attendance'
               ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
               : 'text-slate-400 hover:text-white'
@@ -577,7 +595,7 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
         </button>
         <button
           onClick={() => setActiveSubTab('overview')}
-          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 text-[10.5px] font-black rounded-xl transition-all whitespace-nowrap ${
             activeSubTab === 'overview'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
               : 'text-slate-400 hover:text-white'
@@ -587,7 +605,7 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
         </button>
         <button
           onClick={() => setActiveSubTab('resources')}
-          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 text-[10.5px] font-black rounded-xl transition-all whitespace-nowrap ${
             activeSubTab === 'resources'
               ? 'bg-blue-500 text-slate-950 shadow-md shadow-blue-500/20'
               : 'text-slate-400 hover:text-white'
@@ -597,7 +615,7 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
         </button>
         <button
           onClick={() => setActiveSubTab('reschedule')}
-          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 text-[10.5px] font-black rounded-xl transition-all whitespace-nowrap ${
             activeSubTab === 'reschedule'
               ? 'bg-purple-500 text-slate-950 shadow-md shadow-purple-500/20'
               : 'text-slate-400 hover:text-white'
@@ -607,7 +625,7 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
         </button>
         <button
           onClick={() => setActiveSubTab('broadcast')}
-          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 text-[10.5px] font-black rounded-xl transition-all whitespace-nowrap ${
             activeSubTab === 'broadcast'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
               : 'text-slate-400 hover:text-white'

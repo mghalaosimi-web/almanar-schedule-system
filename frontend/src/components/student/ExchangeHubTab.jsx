@@ -501,19 +501,18 @@ export default function ExchangeHubTab({
 
   // ── Main UI view ──
   return (
-    <div className="w-full space-y-4 flex flex-col">
+    <div className="space-y-4 flex flex-col h-full">
       
       {/* Header and Class Section Badge */}
-      <div className="bg-slate-900/80 border border-white/10 p-3 rounded-2xl flex justify-between items-center gap-3 shadow-md">
+      <div className="flex justify-between items-center gap-3">
         <div>
-          <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-            <span>🏫</span>
-            <span>{isAr ? `شعبة: ${profile.groupName || 'شعبتك الدراسية'}` : `Class: ${profile.groupName || 'Your Section'}`}</span>
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">
+            {isAr ? `شعبة: ${profile.groupName || 'شعبتك الدارسية'}` : `Class: ${profile.groupName || 'Your Section'}`}
           </h3>
         </div>
 
         {/* Tab switcher: Live Group Chat vs Academic Threads */}
-        <div className="flex bg-slate-955 border border-white/5 rounded-xl p-0.5 select-none shrink-0">
+        <div className="flex bg-slate-955 border border-white/5 rounded-xl p-0.5 select-none">
           <button
             onClick={() => setExchangeTab('chat')}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all ${
@@ -539,7 +538,7 @@ export default function ExchangeHubTab({
 
       {/* ── View 1: Live Group Chat Mode ── */}
       {exchangeTab === 'chat' && (
-        <div className="flex flex-col h-[520px] bg-black/20 border border-white/5 rounded-3xl p-3 sm:p-4 justify-between space-y-3 overflow-hidden relative shadow-xl">
+        <div className="flex flex-col h-[calc(100dvh-280px)] min-h-[400px] max-h-[580px] bg-black/20 border border-white/5 rounded-3xl p-4 justify-between space-y-3 overflow-hidden relative">
           
           {/* Smart Summarizer Banner */}
           <div className="shrink-0 flex flex-col gap-2">
