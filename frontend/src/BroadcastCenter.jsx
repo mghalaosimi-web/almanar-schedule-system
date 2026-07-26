@@ -4,6 +4,9 @@ import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { API_URL } from './config';
+import { SessionService } from './utils/sessionService';
+import { PERMISSIONS, hasPermission } from './utils/permissionRegistry';
+import { AUDIENCE_TYPES, resolveAudience } from './utils/audienceRegistry';
 
 export default function BroadcastCenter() {
   const { t, i18n } = useTranslation();
@@ -16,14 +19,13 @@ export default function BroadcastCenter() {
   const [sentStatus, setSentStatus] = useState(null);
   const [groups, setGroups] = useState([]);
   const [majors, setMajors] = useState([]);
+  const [students, setStudents] = useState([]);
   const [selectedMajorId, setSelectedMajorId] = useState('');
 
   const fetchGroups = async () => {
     try {
-      const token = localStorage.getItem('manar_token');
-      const userJson = localStorage.getItem('manar_user');
-      let userObj = null;
-      try { userObj = JSON.parse(userJson); } catch {}
+      const token = SessionService.getToken();
+      const userObj = SessionService.getUser();
 
       let url = `${API_URL}/api/groups`;
       if (userObj?.role === 'SUPER_ADMIN') {
@@ -49,10 +51,8 @@ export default function BroadcastCenter() {
 
   const fetchMajors = async () => {
     try {
-      const token = localStorage.getItem('manar_token');
-      const userJson = localStorage.getItem('manar_user');
-      let userObj = null;
-      try { userObj = JSON.parse(userJson); } catch {}
+      const token = SessionService.getToken();
+      const userObj = SessionService.getUser();
 
       let url = `${API_URL}/api/majors`;
       if (userObj?.role === 'SUPER_ADMIN') {
@@ -78,14 +78,31 @@ export default function BroadcastCenter() {
     }
   };
 
+  const fetchStudents = async () => {
+    try {
+      const token = SessionService.getToken();
+      const user = SessionService.getUser();
+      if (!hasPermission(user, PERMISSIONS.SEND_BROADCASTS)) return;
+      const collegeId = user?.role === 'SUPER_ADMIN' ? localStorage.getItem('superadmin_selectedCollegeId') : null;
+      const suffix = collegeId ? `?collegeId=${collegeId}` : '';
+      const res = await axios.get(`${API_URL}/api/students${suffix}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (res.data?.success) setStudents(res.data.data ?? []);
+    } catch (err) {
+      // Preview data is non-blocking: sending continues through the server policy.
+      console.warn('[Audience Registry] Could not load recipient index:', err.message);
+    }
+  };
+
   useEffect(() => {
     fetchGroups();
     fetchMajors();
+    fetchStudents();
 
     const handleCollegeSwitch = () => {
       console.log('[BroadcastCenter] College switch event detected, reloading groups & majors.');
       fetchGroups();
       fetchMajors();
+      fetchStudents();
     };
 
     window.addEventListener('MANAR_COLLEGE_SWITCH', handleCollegeSwitch);
@@ -101,10 +118,13 @@ export default function BroadcastCenter() {
     setLoading(true);
     setSentStatus(null);
 
-    const token = localStorage.getItem('manar_token');
-    const userJson = localStorage.getItem('manar_user');
-    let userObj = null;
-    try { userObj = JSON.parse(userJson); } catch {}
+    const token = SessionService.getToken();
+    const userObj = SessionService.getUser();
+
+    if (!hasPermission(userObj, PERMISSIONS.SEND_BROADCASTS)) {
+      toast.error(isAr ? 'لا تملك صلاحية إرسال التعميمات.' : 'You do not have permission to send broadcasts.');
+      return;
+    }
 
     try {
       let res;
@@ -165,6 +185,18 @@ export default function BroadcastCenter() {
       setLoading(false);
     }
   };
+
+  const audience = broadcastType === 'GROUP'
+    ? resolveAudience({
+        type: target === 'ALL' ? AUDIENCE_TYPES.ALL_COLLEGE : AUDIENCE_TYPES.GROUP,
+        id: target === 'ALL' ? SessionService.getUser()?.collegeId : target,
+        students, groups, majors,
+      })
+    : resolveAudience({ type: AUDIENCE_TYPES.MAJOR, id: selectedMajorId, students, groups, majors });
+
+  const audienceName = target === 'ALL'
+    ? (isAr ? 'جميع طلاب الكلية' : 'All college students')
+    : (audience.entity?.name || (broadcastType === 'MAJOR' ? (isAr ? 'التخصص المحدد' : 'Selected major') : (isAr ? 'المجموعة المحددة' : 'Selected group')));
 
   return (
     <motion.div
@@ -261,6 +293,47 @@ export default function BroadcastCenter() {
               </select>
             </div>
           )}
+
+          <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-2">
+            <div className="flex items-center justify-between gap-3 border-b border-cyan-500/20 pb-2">
+              <span className="font-black text-cyan-300 text-xs flex items-center gap-1.5">
+                🎯 {isAr ? 'معاينة الجمهور المستهدف' : 'Target Audience Preview'}
+              </span>
+              <span className="shrink-0 rounded-full bg-cyan-500/20 px-3 py-1 text-[11px] font-black text-cyan-200 border border-cyan-400/30">
+                👥 {isAr ? `عدد المستلمين: ${audience.count}` : `Recipients: ${audience.count}`}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span className="text-gray-400">{isAr ? 'الهدف:' : 'Target:'}</span>{' '}
+                <span className="font-bold text-white">{audience.humanReadable?.title || audienceName}</span>
+              </div>
+              {audience.humanReadable?.departmentName && (
+                <div>
+                  <span className="text-gray-400">{isAr ? 'القسم:' : 'Dept:'}</span>{' '}
+                  <span className="font-bold text-cyan-100">{audience.humanReadable.departmentName}</span>
+                </div>
+              )}
+              {audience.humanReadable?.majorName && (
+                <div>
+                  <span className="text-gray-400">{isAr ? 'التخصص:' : 'Major:'}</span>{' '}
+                  <span className="font-bold text-cyan-100">{audience.humanReadable.majorName}</span>
+                </div>
+              )}
+              {audience.humanReadable?.levelName && (
+                <div>
+                  <span className="text-gray-400">{isAr ? 'المستوى:' : 'Level:'}</span>{' '}
+                  <span className="font-bold text-cyan-100">{audience.humanReadable.levelName}</span>
+                </div>
+              )}
+              {audience.humanReadable?.groupName && (
+                <div>
+                  <span className="text-gray-400">{isAr ? 'المجموعة:' : 'Group:'}</span>{' '}
+                  <span className="font-bold text-cyan-100">{audience.humanReadable.groupName}</span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Alert Message Box */}
           <div className="space-y-1">

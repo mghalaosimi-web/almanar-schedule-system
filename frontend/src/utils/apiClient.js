@@ -15,14 +15,14 @@
 
 import axios from 'axios';
 import { API_URL } from '../config';
-import { SESSION_KEYS } from './constants';
+import { SessionService } from './sessionService';
 
 /**
  * Returns a thin API client bound to the current session token.
  * Re-reads the token on every call so it always reflects the current session.
  */
 export function getApiClient() {
-  const token = localStorage.getItem(SESSION_KEYS.TOKEN);
+  const token = SessionService.getToken();
   const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
 
   return {

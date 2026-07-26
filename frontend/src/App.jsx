@@ -7,6 +7,8 @@ import { API_URL } from './config';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProgressLoader from './components/ProgressLoader';
+import { PERMISSIONS, hasPermission } from './utils/permissionRegistry';
+import { SessionService } from './utils/sessionService';
 
 // Shared layout controls & modal
 import Logo from './Logo';
@@ -111,27 +113,11 @@ axios.interceptors.response.use(
   (error) => {
     dispatchRequestEnd();
     if (error.response && error.response.status === 403 && error.response.data?.error === 'LICENSE_REVOKED') {
-      let isAdmin = false;
-      try {
-        const userJson = localStorage.getItem('manar_user');
-        if (userJson) {
-          const userObj = JSON.parse(userJson);
-          if (
-            userObj && (
-              ['SUPER_ADMIN', 'UNI_ADMIN', 'COLLEGE_ADMIN', 'ADMIN'].includes(userObj.role) ||
-              (userObj.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(userObj.email.toLowerCase()))
-            )
-          ) {
-            isAdmin = true;
-          }
-        }
-      } catch (e) {}
+      const isAdmin = hasPermission(SessionService.getUser(), PERMISSIONS.ACCESS_ADMIN_PORTAL);
 
       // Admin users & Developers are NEVER blocked or redirected to /license-suspended by license revocation
       if (!isAdmin) {
-        localStorage.removeItem('manar_token');
-        localStorage.removeItem('manar_user');
-        localStorage.removeItem('student_profile');
+        SessionService.logout();
         window.location.href = '/license-suspended';
       }
     }
@@ -274,7 +260,7 @@ function AppLayout() {
   const [tenants, setTenants] = useState([]);
 
   const isAr = i18n.language === 'ar';
-  const token = localStorage.getItem('manar_token');
+  const token = SessionService.getToken();
 
   // Admin secure gateway passcode lock
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(sessionStorage.getItem('manar_admin_unlocked') === 'true');
@@ -305,24 +291,18 @@ function AppLayout() {
   };
 
   const handleAdminCancel = () => {
-    localStorage.removeItem('manar_token');
-    localStorage.removeItem('manar_user');
-    localStorage.removeItem('student_profile');
+    SessionService.logout();
     navigate('/login');
   };
 
   const handleLogoClick = () => {
     const token = localStorage.getItem('manar_token');
-    const userJson = localStorage.getItem('manar_user');
-    let user = null;
-    if (userJson) {
-      try { user = JSON.parse(userJson); } catch {}
-    }
+    const user = SessionService.getUser();
     if (!token || !user) {
       navigate('/');
       return;
     }
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'COLLEGE_ADMIN' || user.role === 'UNI_ADMIN') {
+    if (hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
       navigate('/admin/overview');
     } else if (user.role === 'LECTURER') {
       navigate('/lecturer/home');
@@ -464,7 +444,7 @@ function AppLayout() {
     const isPublicPath = ['/', '/login', '/register', '/verify'].includes(path);
     if (!isPublicPath) return; // Already on a protected route, let route guards handle it
 
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'COLLEGE_ADMIN' || user.role === 'UNI_ADMIN') {
+    if (hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
       navigate('/admin/overview', { replace: true });
     } else if (user.role === 'LECTURER') {
       navigate('/lecturer/home', { replace: true });
@@ -488,7 +468,7 @@ function AppLayout() {
     if (!isOnPublicPath) return;
 
     // User is logged in but on a public path — push them forward
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'COLLEGE_ADMIN' || user.role === 'UNI_ADMIN') {
+    if (hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
       navigate('/admin/overview', { replace: true });
     } else if (user.role === 'LECTURER') {
       navigate('/lecturer/home', { replace: true });
@@ -755,9 +735,7 @@ function AppLayout() {
         headers: { Authorization: `Bearer ${token}` }
       }).catch(err => console.warn('[Logout API] Error logging out:', err.message));
     }
-    localStorage.removeItem('manar_token');
-    localStorage.removeItem('manar_user');
-    localStorage.removeItem('student_profile');
+    SessionService.logout();
     setIsLogoutModalOpen(false);
     navigate('/login');
   };
@@ -804,7 +782,7 @@ function AppLayout() {
   };
 
   if (isAdminPath) {
-    if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && user.role !== 'COLLEGE_ADMIN' && user.role !== 'UNI_ADMIN')) {
+    if (!token || !user || !hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
       return <Navigate to="/login" replace />;
     }
 
@@ -1038,7 +1016,7 @@ function AppLayout() {
               {navLink('/admin/groups',    '👥', isAr ? 'إدارة الشعب' : 'Group Management')}
               {navLink('/admin/students',  '🎓', isAr ? 'سجل الطلاب' : 'Students Database')}
               {navLink('/admin/logs',      '📜', isAr ? 'سجلات النظام' : 'System Logs')}
-              {(user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()))) && (
+              {hasPermission(user, PERMISSIONS.ACCESS_DEV_PORTAL) && (
                 <>
                   {navLink('/admin/dev-portal', '⌨️', isAr ? 'بوابة المطورين' : 'Dev Portal', '#60c4ff')}
                   <button
@@ -1099,7 +1077,7 @@ function AppLayout() {
             <Route path="/admin/logs"       element={<SystemLog />} />
             <Route path="/admin/god-mode"   element={<Navigate to="/admin/dev-portal" replace />} />
             <Route path="/super-admin/dashboard" element={<Navigate to="/admin/dev-portal" replace />} />
-            <Route path="/admin/dev-portal" element={(user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()))) ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
+            <Route path="/admin/dev-portal" element={hasPermission(user, PERMISSIONS.ACCESS_DEV_PORTAL) ? <DevPortal /> : <Navigate to="/admin/overview" replace />} />
             <Route path="/admin/instructions" element={<Instructions />} />
             <Route path="*" element={<Navigate to="/admin/overview" replace />} />
           </Routes>

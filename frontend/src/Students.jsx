@@ -6,11 +6,14 @@ import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { API_URL } from './config';
 import UserDetailsModal from './components/UserDetailsModal';
+import { useEntities } from './context/EntityProvider';
+import { SessionService } from './utils/sessionService';
 
 export default function Students() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const navigate = useNavigate();
+  const { search: globalSearch } = useEntities();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState(null);
@@ -62,10 +65,8 @@ export default function Students() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('manar_token');
-      const userJson = localStorage.getItem('manar_user');
-      let userObj = null;
-      try { userObj = JSON.parse(userJson); } catch {}
+      const token = SessionService.getToken();
+      const userObj = SessionService.getUser();
 
       let url = `${API_URL}/api/students`;
       if (userObj?.role === 'SUPER_ADMIN') {
@@ -106,7 +107,7 @@ export default function Students() {
   const handleImpersonate = async (student) => {
     setImpersonatingId(student.id);
     try {
-      const token = localStorage.getItem('manar_token');
+      const token = SessionService.getToken();
       const res = await axios.post(
         `${API_URL}/api/auth/impersonate`,
         { studentId: student.id },
@@ -118,17 +119,13 @@ export default function Students() {
 
         // Store active admin session credentials in a separate cache if we want to restore later,
         // or just perform direct overwriting per phase requirements.
-        localStorage.setItem('manar_token', studentToken);
-        localStorage.setItem('manar_user', JSON.stringify(studentUser));
-
-        // Create student_profile cache
-        localStorage.setItem('student_profile', JSON.stringify({
+        SessionService.setSession({ token: studentToken, user: studentUser, studentProfile: {
           name: student.name,
           email: student.email,
           department: student.major?.department?.name || 'Default Department',
           level: student.level?.name || 'Default Level',
           groupId: student.groupId
-        }));
+        }});
 
         toast.success(`God Mode Activated: Logged in as ${student.name}`);
         navigate('/student/home');
@@ -145,7 +142,7 @@ export default function Students() {
   const handleToggleRep = async (student) => {
     setTogglingRepId(student.id);
     try {
-      const token = localStorage.getItem('manar_token');
+      const token = SessionService.getToken();
       const res = await axios.put(
         `${API_URL}/api/admin/students/${student.id}/representative-status`,
         { isRepresentative: !student.isRepresentative },
@@ -229,13 +226,9 @@ export default function Students() {
   );
 
   // Filter students based on query, verification status, and cascading hierarchy
+  const searchMatches = new Set(globalSearch.search(searchQuery, students.length).map((student) => String(student.entity?.id ?? student.id)));
   const filteredStudents = students.filter(student => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = (
-      student.name.toLowerCase().includes(query) ||
-      student.email.toLowerCase().includes(query) ||
-      student.idNumber.toLowerCase().includes(query)
-    );
+    const matchesSearch = !searchQuery.trim() || searchMatches.has(String(student.id));
     const matchesUnverified = !showUnverifiedOnly || (student.isEmailVerified === false || student.isPhoneVerified === false);
     const matchesDepartment = filterDepartment === 'ALL' || String(student.major?.department?.id) === filterDepartment;
     const matchesMajor = filterMajor === 'ALL' || String(student.major?.id) === filterMajor;

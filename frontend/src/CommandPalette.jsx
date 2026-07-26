@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from './config';
+import { PERMISSIONS, hasPermission } from './utils/permissionRegistry';
+import { SessionService } from './utils/sessionService';
+import { useEntities } from './context/EntityProvider';
 
 export default function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +13,7 @@ export default function CommandPalette() {
   const [schedules, setSchedules] = useState([]);
   const navigate = useNavigate();
   const inputRef = useRef(null);
+  const { search: entitySearch } = useEntities();
 
   // Fix 6: In-memory schedule cache with 3-minute TTL.
   // Previously re-fetched /api/schedules on EVERY Ctrl+K open.
@@ -84,12 +88,8 @@ export default function CommandPalette() {
     }
   };
 
-  const userJson = localStorage.getItem('manar_user');
-  let user = null;
-  if (userJson) {
-    try { user = JSON.parse(userJson); } catch {}
-  }
-  const isDeveloper = user?.role === 'SUPER_ADMIN' || (user?.email && ['developer@mghal.com', 'm.gh.alosimi@gmail.com'].includes(user.email.toLowerCase()));
+  const user = SessionService.getUser();
+  const isDeveloper = hasPermission(user, PERMISSIONS.ACCESS_DEV_PORTAL);
 
   // Navigational shortcuts
   const navigationItems = [
@@ -105,8 +105,7 @@ export default function CommandPalette() {
       name: '🚪 تسجيل الخروج من الحساب', 
       subtitle: 'إنهاء الجلسة الحالية', 
       action: () => { 
-        localStorage.removeItem('manar_token');
-        localStorage.removeItem('manar_user');
+        SessionService.logout();
         navigate('/login');
       } 
     }
@@ -124,6 +123,7 @@ export default function CommandPalette() {
     s.lecturerName.toLowerCase().includes(query.toLowerCase()) ||
     s.room.name.toLowerCase().includes(query.toLowerCase())
   );
+  const entityResults = entitySearch.search(query, 8);
 
   return (
     <AnimatePresence>
@@ -204,7 +204,58 @@ export default function CommandPalette() {
                 </div>
               )}
 
-              {filteredNav.length === 0 && filteredSchedules.length === 0 && (
+              {entityResults.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] text-gray-500 font-bold px-2 uppercase tracking-wider">دليل الكيانات (ERP Index)</span>
+                  {entityResults.map((result) => {
+                    const entity = result.entity || result;
+                    const typeLabel =
+                      result.type === 'Student' ? 'طالب' :
+                      result.type === 'Lecturer' ? 'محاضر' :
+                      result.type === 'Group' ? 'شعبة' :
+                      result.type === 'Major' ? 'تخصص' :
+                      result.type === 'Department' ? 'قسم' :
+                      result.type === 'Level' ? 'مستوى' :
+                      result.type === 'Course' ? 'مادة' : 'كيان';
+
+                    const icon =
+                      result.type === 'Student' ? '👤' :
+                      result.type === 'Lecturer' ? '👨‍🏫' :
+                      result.type === 'Group' ? '👥' :
+                      result.type === 'Major' ? '🎓' :
+                      result.type === 'Department' ? '🏛️' :
+                      result.type === 'Course' ? '📚' : '🔖';
+
+                    const subText = [
+                      result.idNumber ? `ID: ${result.idNumber}` : null,
+                      result.code ? `الكود: ${result.code}` : null,
+                      result.department ? `القسم: ${result.department}` : null,
+                      result.level ? `المستوى: ${result.level}` : null,
+                      result.group ? `المجموعة: ${result.group}` : null,
+                    ].filter(Boolean).join(' · ');
+
+                    return (
+                      <button
+                        key={`${entity.id || result.id}-${entity.email || result.code || result.name}`}
+                        onClick={() => handleAction(result.type === 'Student' ? '/admin/students' : '/admin/overview')}
+                        className="w-full text-right p-2.5 rounded-xl hover:bg-white/5 transition flex justify-between items-center group"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-white group-hover:text-[var(--accent)] transition">
+                            {icon} {result.name || entity.name || entity.code || result.idNumber}
+                          </span>
+                          <span className="text-[10px] text-gray-400 mt-0.5">{subText || entity.email || '—'}</span>
+                        </div>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-white/10 text-cyan-300 font-mono shrink-0">
+                          {typeLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {filteredNav.length === 0 && filteredSchedules.length === 0 && entityResults.length === 0 && (
                 <div className="text-center py-6 text-xs text-gray-500 font-medium">
                   لا توجد نتائج تطابق بحثك...
                 </div>
