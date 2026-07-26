@@ -5,9 +5,9 @@
  * @author أنتيجرافيتي (Antigravity)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -173,10 +173,27 @@ export default function StudentDashboard() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const navigate = useNavigate();
+  const location = useLocation();
   const { isInstallable, installApp } = usePWAInstall();
 
-  // ── حالات الحالة العامة (Core States) ──
-  const [activeTab, setActiveTab] = useState('home');
+  // ── Fix 3: URL Deep-Link Tab Sync ────────────────────────────────────────
+  // Read ?tab= on mount so /student/home?tab=goals opens Goals tab directly.
+  const getTabFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const urlTab = params.get('tab');
+    const validTabs = ['home', 'schedule', 'goals', 'exchange', 'alerts', 'profile', 'delegate'];
+    return validTabs.includes(urlTab) ? urlTab : 'home';
+  };
+
+  const [activeTab, setActiveTabState] = useState(getTabFromUrl);
+
+  // Wrapper that syncs state + URL together
+  const setActiveTab = useCallback((tab) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url.toString());
+  }, []);
   const [systemSettings, setSystemSettings] = useState(() => {
     try {
       const saved = localStorage.getItem('cached_system_settings');
@@ -610,19 +627,28 @@ export default function StudentDashboard() {
   useEffect(() => {
     fetchData();
 
-    // التحديث الفوري الموجه عبر قنوات SSE للأحداث الحية مع التنبيه الصوتي
-    const onUpdate = () => {
-      soundEngine.playNotification();
-      haptics.warning();
-      fetchData(true);
+    // ── Fix 2: SSE Debounce — Prevent Double-Fetch Race Condition ─────────
+    // When SSE fires SCHEDULE_UPDATE + BROADCAST_RECEIVE simultaneously,
+    // the old code triggered two separate fetchData(true) calls = 14 parallel
+    // API requests. The debounce window collapses bursts into a single call.
+    let _sseDebounceTimer = null;
+    const debouncedFetch = () => {
+      clearTimeout(_sseDebounceTimer);
+      _sseDebounceTimer = setTimeout(() => {
+        soundEngine.playNotification();
+        haptics.warning();
+        fetchData(true);
+      }, 600);
     };
-    window.addEventListener('MANAR_SCHEDULE_UPDATE', onUpdate);
-    window.addEventListener('MANAR_BROADCAST_RECEIVE', onUpdate);
-    window.addEventListener('MANAR_ATTENDANCE_MARKED', onUpdate);
+
+    window.addEventListener('MANAR_SCHEDULE_UPDATE', debouncedFetch);
+    window.addEventListener('MANAR_BROADCAST_RECEIVE', debouncedFetch);
+    window.addEventListener('MANAR_ATTENDANCE_MARKED', debouncedFetch);
     return () => {
-      window.removeEventListener('MANAR_SCHEDULE_UPDATE', onUpdate);
-      window.removeEventListener('MANAR_BROADCAST_RECEIVE', onUpdate);
-      window.removeEventListener('MANAR_ATTENDANCE_MARKED', onUpdate);
+      clearTimeout(_sseDebounceTimer);
+      window.removeEventListener('MANAR_SCHEDULE_UPDATE', debouncedFetch);
+      window.removeEventListener('MANAR_BROADCAST_RECEIVE', debouncedFetch);
+      window.removeEventListener('MANAR_ATTENDANCE_MARKED', debouncedFetch);
     };
   }, []);
 

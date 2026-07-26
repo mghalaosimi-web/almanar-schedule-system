@@ -11,6 +11,12 @@ export default function CommandPalette() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
 
+  // Fix 6: In-memory schedule cache with 3-minute TTL.
+  // Previously re-fetched /api/schedules on EVERY Ctrl+K open.
+  // Now the fetch only fires if cache is empty or older than 3 minutes.
+  const scheduleCacheRef = useRef({ data: [], ts: 0 });
+  const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+
   // Global key listener for Ctrl+K or Cmd+K
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -25,17 +31,35 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Fetch all schedules for quick indexing on open
+  // Invalidate cache when a schedule update SSE event fires
+  useEffect(() => {
+    const invalidateCache = () => {
+      scheduleCacheRef.current = { data: [], ts: 0 };
+    };
+    window.addEventListener('MANAR_SCHEDULE_UPDATE', invalidateCache);
+    return () => window.removeEventListener('MANAR_SCHEDULE_UPDATE', invalidateCache);
+  }, []);
+
+  // Fetch schedules for quick indexing on open — uses cache if fresh
   useEffect(() => {
     if (isOpen) {
       const fetchIndex = async () => {
-        try {
-          const res = await axios.get(`${API_URL}/api/schedules`);
-          if (res.data && res.data.success) {
-            setSchedules(res.data.data);
+        const { data, ts } = scheduleCacheRef.current;
+        const isFresh = Date.now() - ts < CACHE_TTL_MS && data.length > 0;
+
+        if (isFresh) {
+          // Serve from cache — no network call needed
+          setSchedules(data);
+        } else {
+          try {
+            const res = await axios.get(`${API_URL}/api/schedules`);
+            if (res.data && res.data.success) {
+              scheduleCacheRef.current = { data: res.data.data, ts: Date.now() };
+              setSchedules(res.data.data);
+            }
+          } catch (e) {
+            console.error('Command Palette fetch error:', e);
           }
-        } catch (e) {
-          console.error('Command Palette fetch error:', e);
         }
       };
       fetchIndex();

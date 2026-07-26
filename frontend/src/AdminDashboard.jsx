@@ -173,6 +173,9 @@ export default function AdminDashboard({ tab }) {
   }, []);
 
   // Reload tab contents on switch
+  // Fix 4: fetchGroups() is guarded — only fetches if not already loaded.
+  // This eliminates the redundant 3× fetch that occurred on schedule/exams/broadcast tab switches.
+  // Groups are re-fetched only after a CRUD operation resets the list (setGroups([])).
   useEffect(() => {
     if (activeTab === 'overview') {
       fetchMetrics();
@@ -182,12 +185,12 @@ export default function AdminDashboard({ tab }) {
       fetchUnverifiedStudents();
     } else if (activeTab === 'schedule') {
       fetchSchedules();
-      fetchGroups();
+      if (groups.length === 0) fetchGroups();
     } else if (activeTab === 'exams') {
       fetchExams();
-      fetchGroups();
+      if (groups.length === 0) fetchGroups();
     } else if (activeTab === 'broadcast') {
-      fetchGroups();
+      if (groups.length === 0) fetchGroups();
     } else if (activeTab === 'bulkImport') {
       setBulkResult(null);
       setBulkFile(null);
@@ -844,6 +847,7 @@ export default function AdminDashboard({ tab }) {
           <BroadcastTab
             isAr={isAr}
             groups={groups}
+            totalStudents={metrics?.students ?? null}
             broadcastTarget={broadcastTarget}
             setBroadcastTarget={setBroadcastTarget}
             broadcastMessage={broadcastMessage}
