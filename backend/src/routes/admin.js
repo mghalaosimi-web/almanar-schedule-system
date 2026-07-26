@@ -1,8 +1,8 @@
-﻿const express = require('express');
+const express = require('express');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
 const { prisma } = require('../db');
-const { verifyToken, isSuperAdmin } = require('../middleware/auth');
+const { verifyToken, isSuperAdmin, requirePermission } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification } = require('../services/notifications');
 
 // استيراد الخدمات المفككة لإدارة منطق العمليات الإدارية الثقيلة
@@ -273,7 +273,7 @@ router.put('/admin/god-mode/students/:id/representative', verifyToken, async (re
 });
 
 // 5b. Toggle Representative Status (Public Admin API with Isolation Scoping)
-router.put('/admin/students/:id/representative-status', verifyToken, async (req, res) => {
+router.put('/admin/students/:id/representative-status', verifyToken, requirePermission('STUDENT.TOGGLE_REP'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -380,7 +380,7 @@ router.delete('/admin/god-mode/lecturers/:id', verifyToken, async (req, res) => 
 });
 
 // 6d. Manage Lecturers - Create (Protected: Admin)
-router.post('/admin/lecturers', verifyToken, async (req, res) => {
+router.post('/admin/lecturers', verifyToken, requirePermission('LECTURER.MANAGE'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -465,7 +465,7 @@ router.get('/admin/lecturers', verifyToken, async (req, res) => {
 });
 
 // 6f. Manage Lecturers - Update (Protected: Admin)
-router.put('/admin/lecturers/:id', verifyToken, async (req, res) => {
+router.put('/admin/lecturers/:id', verifyToken, requirePermission('LECTURER.MANAGE'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -694,7 +694,7 @@ router.get('/students', verifyToken, async (req, res) => {
  * - message: رسالة تأكيد الحفظ بنجاح.
  * - data: كائن الاستثناء المولد بقاعدة البيانات.
  */
-router.post('/schedules/override', verifyToken, async (req, res) => {
+router.post('/schedules/override', verifyToken, requirePermission('SCHEDULE.EDIT'), async (req, res) => {
   try {
     // التحقق من الصلاحيات الإدارية للمستخدم
     if (!isAuthorizedAdmin(req)) {
@@ -727,7 +727,7 @@ router.post('/schedules/override', verifyToken, async (req, res) => {
 });
 
 // 12. POST NEW BASE SCHEDULE (Protected: Manual Schedule Entry)
-router.post('/schedules', verifyToken, async (req, res) => {
+router.post('/schedules', verifyToken, requirePermission('SCHEDULE.CREATE'), async (req, res) => {
   try {
     // Role Authorization Check
     if (!isAuthorizedAdmin(req)) {
@@ -885,7 +885,7 @@ router.post('/schedules', verifyToken, async (req, res) => {
 });
 
 // 12.5 PUT UPDATE SCHEDULE (Protected: Admin Edit)
-router.put('/schedules/:id', verifyToken, async (req, res) => {
+router.put('/schedules/:id', verifyToken, requirePermission('SCHEDULE.EDIT'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden: Only administrators can edit schedules' });
@@ -1041,7 +1041,7 @@ router.put('/schedules/:id', verifyToken, async (req, res) => {
 });
 
 // 12.6 DELETE SCHEDULE (Protected: Admin Delete)
-router.delete('/schedules/:id', verifyToken, async (req, res) => {
+router.delete('/schedules/:id', verifyToken, requirePermission('SCHEDULE.DELETE'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden: Only administrators can delete schedules' });
@@ -1360,7 +1360,7 @@ router.get('/admin/analytics', verifyToken, async (req, res) => {
 });
 
 
-router.post('/broadcasts', verifyToken, async (req, res) => {
+router.post('/broadcasts', verifyToken, requirePermission('BROADCAST.SEND'), async (req, res) => {
   try {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ success: false, error: 'Forbidden' });

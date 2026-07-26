@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getUserPermissions, hasPermission, requirePermission } = require('./rbac');
 
 // ── Super Admin Verification Cache (TTL: 5 minutes) ──────────────────────────
 // Eliminates the DB query on every /admin/dev/* request.
@@ -28,6 +29,7 @@ async function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+    req.user.permissions = getUserPermissions(req.user);
     
     // Check Force Logout / Revoked Session
     if (decoded.sessionId) {
@@ -151,4 +153,4 @@ function invalidateSuperAdminCache(userId) {
   console.log(`[isSuperAdmin] Cache invalidated for userId: ${userId}`);
 }
 
-module.exports = { verifyToken, verifyAdmin, isSuperAdmin, invalidateSuperAdminCache };
+module.exports = { verifyToken, verifyAdmin, isSuperAdmin, invalidateSuperAdminCache, requirePermission, hasPermission };
