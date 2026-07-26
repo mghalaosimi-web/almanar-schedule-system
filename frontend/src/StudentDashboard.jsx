@@ -237,6 +237,7 @@ export default function StudentDashboard() {
   const [pwaModalInitialTab, setPwaModalInitialTab] = useState('pwa');
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [isQuickHeaderMenuOpen, setIsQuickHeaderMenuOpen] = useState(false);
 
   const triggerApkDownload = (e, initialTab = 'apk') => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1456,9 +1457,12 @@ export default function StudentDashboard() {
           </div>
         )}
         
-        {/* رأس الصفحة الديناميكي الثابت — تصميم تطبيق هاتف زجاجي */}
-        <header className="bg-[var(--bg-card)]/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 absolute top-0 w-full z-40 border-b border-[var(--border-color)] shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
+        {/* رأس الصفحة الديناميكي الثابت — تصميم تطبيق هاتف زجاجي أنيق وبسيط */}
+        <header
+          className="bg-[var(--bg-card)]/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 fixed w-full max-w-[430px] z-40 border-b border-[var(--border-color)] shadow-sm transition-all"
+          style={{ top: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {/* Drawer menu button */}
             <button
               type="button"
@@ -1468,7 +1472,7 @@ export default function StudentDashboard() {
                 setIsSideDrawerOpen(true);
               }}
               className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 hover:bg-[var(--accent-dim)] hover:border-[var(--accent-glow)] hover:text-[var(--accent)] flex items-center justify-center text-white font-black text-sm shrink-0 transition-all active:scale-95 shadow-sm"
-              title={isAr ? 'القائمة الجانبية (السحب لليمين)' : 'Side Menu'}
+              title={isAr ? 'القائمة الجانبية' : 'Side Menu'}
             >
               ☰
             </button>
@@ -1478,7 +1482,7 @@ export default function StudentDashboard() {
                 {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
               </div>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <h2 className="text-xs font-black text-white truncate leading-tight">
                   {header.title}
@@ -1494,7 +1498,9 @@ export default function StudentDashboard() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+
+          {/* أزرار الإجراءات السريعة المنظمة والمتناسقة */}
+          <div className="flex items-center gap-2 shrink-0 relative">
             {/* Notification Center Bell Button */}
             <button
               type="button"
@@ -1513,27 +1519,115 @@ export default function StudentDashboard() {
                 </span>
               )}
             </button>
+
+            {/* Quick Settings & Appearance Dropdown Toggle */}
             <button
-              onClick={(e) => triggerApkDownload(e, 'apk')}
-              className="p-2 border border-[var(--accent-glow)] hover:border-[var(--accent)] bg-[var(--accent-dim)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 text-[var(--accent)] cursor-pointer"
-              title={isAr ? 'تحميل ملف APK مباشر وتثبيت التطبيق' : 'Download APK File'}
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                haptics.impactLight();
+                setIsQuickHeaderMenuOpen(!isQuickHeaderMenuOpen);
+              }}
+              className={`p-2 border rounded-xl shrink-0 flex items-center justify-center transition-all active:scale-95 ${
+                isQuickHeaderMenuOpen
+                  ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
+                  : 'border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)]/60 text-slate-300'
+              }`}
+              title={isAr ? 'إعدادات سريعة والمظهر' : 'Quick Settings'}
             >
-              <span className="text-xs font-bold">📲</span>
+              <span className="text-xs">⚙️</span>
             </button>
-            <button
-              onClick={handleManualSync}
-              className="p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 bg-[var(--bg-card)]/60 text-slate-300"
-              title={isAr ? 'تحديث التطبيق والبيانات' : 'Update App & Data'}
-            >
-              <i className="ph ph-arrows-clockwise text-slate-300 hover:text-[var(--accent)] text-sm"></i>
-            </button>
-            <button
-              onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
-              className="px-2.5 py-1.5 text-[9px] font-black uppercase border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)]/60 rounded-xl shrink-0 transition-all active-press active:scale-95 text-[var(--text-primary)]"
-            >
-              {isAr ? 'EN' : 'عربي'}
-            </button>
-            <ThemeSwitcher />
+
+            {/* Quick Controls Dropdown Menu Popover */}
+            <AnimatePresence>
+              {isQuickHeaderMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsQuickHeaderMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className={`absolute top-12 ${isAr ? 'left-0' : 'right-0'} z-50 w-64 bg-slate-950/95 border border-white/10 backdrop-blur-2xl rounded-2xl p-3 shadow-2xl space-y-2.5 font-sans`}
+                    dir={isAr ? 'rtl' : 'ltr'}
+                  >
+                    <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                      <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                        ⚡ {isAr ? 'الإعدادات السريعة' : 'Quick Controls'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickHeaderMenuOpen(false)}
+                        className="text-slate-400 hover:text-white text-xs font-bold px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Theme Switcher */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-slate-400 font-bold block">
+                        🎨 {isAr ? 'تخصيص لون وثيم التطبيق:' : 'App Theme & Colors:'}
+                      </span>
+                      <ThemeSwitcher />
+                    </div>
+
+                    {/* Language Switcher */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        i18n.changeLanguage(isAr ? 'en' : 'ar');
+                        setIsQuickHeaderMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>{isAr ? 'لغة الواجهة' : 'Language'}</span>
+                      </span>
+                      <span className="text-[10px] font-black text-amber-400 uppercase">
+                        {isAr ? 'English (EN)' : 'العربية (AR)'}
+                      </span>
+                    </button>
+
+                    {/* APK Download Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        triggerApkDownload(e, 'apk');
+                        setIsQuickHeaderMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>📲</span>
+                        <span>{isAr ? 'تحميل تطبيق Android (APK)' : 'Download APK App'}</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-black">↓</span>
+                    </button>
+
+                    {/* App & Data Sync Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleManualSync();
+                        setIsQuickHeaderMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>🔄</span>
+                        <span>{isAr ? 'مزامنة وتحديث البيانات' : 'Sync & Refresh Data'}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">⚡</span>
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
