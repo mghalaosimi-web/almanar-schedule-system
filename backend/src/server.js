@@ -156,6 +156,7 @@ app.use('/api/goals', goalsRouter);
 app.use('/api', auditRouter);
 app.use('/api', searchRouter);
 app.use('/api', analyticsRouter);
+app.use('/api', aiRouter);
 
 // Self-healing database check & migrations
 async function runStartupMigrations() {
