@@ -6,6 +6,8 @@ import { API_URL } from './config';
 import { useTranslation } from 'react-i18next';
 import DevSignature from './DevSignature';
 import { scheduleOfflineNotifications } from './utils/localNotifications';
+import haptics from './utils/haptics';
+import soundEngine from './utils/soundEngine';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -99,9 +101,49 @@ export default function UserSettings({ onClose }) {
   const [isSaving, setIsSaving] = useState(false);
 
   // Accordion state
-  const [activeSection, setActiveSection] = useState('profile'); // 'profile' | 'academic' | 'security' | 'notifications'
+  const [activeSection, setActiveSection] = useState('profile'); // 'profile' | 'academic' | 'security' | 'notifications' | 'audio'
   const toggleSection = (name) => {
+    haptics.selection();
+    soundEngine.playClick();
     setActiveSection(prev => prev === name ? null : name);
+  };
+
+  // ── Sound & Haptics state ──────────────────────────────────────────────────
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('student_sound_enabled') !== 'false');
+  const [hapticsEnabled, setHapticsEnabled] = useState(() => localStorage.getItem('student_haptics_enabled') !== 'false');
+  const [soundVolume, setSoundVolume] = useState(() => parseFloat(localStorage.getItem('student_sound_volume') || '0.6'));
+  const [notificationTone, setNotificationTone] = useState(() => localStorage.getItem('student_notification_tone') || 'default');
+
+  const handleSoundToggle = (val) => {
+    setSoundEnabled(val);
+    localStorage.setItem('student_sound_enabled', val ? 'true' : 'false');
+    soundEngine.playToggle(val);
+    haptics.impactLight();
+  };
+
+  const handleHapticsToggle = (val) => {
+    setHapticsEnabled(val);
+    localStorage.setItem('student_haptics_enabled', val ? 'true' : 'false');
+    soundEngine.playToggle(val);
+    haptics.impactMedium();
+  };
+
+  const handleVolumeChange = (v) => {
+    setSoundVolume(v);
+    localStorage.setItem('student_sound_volume', v.toString());
+  };
+
+  const handleToneChange = (tone) => {
+    setNotificationTone(tone);
+    localStorage.setItem('student_notification_tone', tone);
+    soundEngine.playNotification(tone);
+    haptics.impactLight();
+  };
+
+  const handleTestAudioHaptics = () => {
+    soundEngine.playNotification(notificationTone);
+    haptics.success();
+    toast.success(isAr ? 'تم تشغيل الصوت والاهتزاز التجريبي!' : 'Audio & Haptic test played!', { icon: '🎵' });
   };
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -845,6 +887,112 @@ export default function UserSettings({ onClose }) {
                       </motion.div>
                     )}
                   </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Accordion 5: Sound & Haptic Feedback Settings */}
+        <div className="frosted-panel rounded-2xl overflow-hidden border border-[var(--border-color)]">
+          <button
+            type="button"
+            onClick={() => toggleSection('audio')}
+            className="w-full flex items-center justify-between px-5 py-4 bg-white/[0.015] hover:bg-white/[0.03] transition-colors text-right"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🔊</span>
+              <div className="text-right">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[var(--text-primary)]">
+                  {isAr ? 'إعدادات الصوت واهتزاز اللمس' : 'Audio & Touch Haptics'}
+                </h3>
+                <p className="text-[9px] text-[var(--text-secondary)] mt-0.5 font-bold">
+                  {isAr ? 'تخصيص الأصوات، نغمات التنبيه واهتزاز الشاشة' : 'Customize touch sounds, alert ringtones & vibrations'}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-[var(--text-secondary)] font-bold">{activeSection === 'audio' ? '▲' : '▼'}</span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {activeSection === 'audio' && (
+              <motion.div
+                key="audio-content"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="overflow-hidden"
+              >
+                <div className="p-5 border-t border-[var(--border-color)] space-y-4 bg-[var(--bg-elevated)]/60">
+                  {/* Sound FX Toggle */}
+                  <ToggleRow
+                    label={isAr ? 'أصوات اللمس والتفاعل' : 'Touch Sound Effects'}
+                    desc={isAr ? 'تشغيل تأثيرات صوتية عند النقر والتبديل' : 'Play audio feedback on clicks and toggles'}
+                    checked={soundEnabled}
+                    onChange={handleSoundToggle}
+                  />
+
+                  {/* Haptics Toggle */}
+                  <ToggleRow
+                    label={isAr ? 'اهتزاز اللمس (Haptics)' : 'Touch Vibration (Haptics)'}
+                    desc={isAr ? 'اهتزاز خفيف عند الضغط والتأكيد' : 'Vibro-tactile response on touch interactions'}
+                    checked={hapticsEnabled}
+                    onChange={handleHapticsToggle}
+                  />
+
+                  {/* Notification Tone Select */}
+                  <Field label={isAr ? 'نغمة الإشعارات والتنبيهات' : 'Notification Ringtone'}>
+                    <select
+                      value={notificationTone}
+                      onChange={e => handleToneChange(e.target.value)}
+                      className="cmd-input w-full px-4 font-bold cursor-pointer text-right"
+                      style={{ height: '52px' }}
+                    >
+                      <option value="default" className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                        🎵 {isAr ? 'النغمة الكلاسيكية (Default Chime)' : 'Default Chime'}
+                      </option>
+                      <option value="chime" className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                        🔔 {isAr ? 'رنين هادئ (Soft Chime)' : 'Soft Chime'}
+                      </option>
+                      <option value="bell" className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                        🛎️ {isAr ? 'جرس الكلية (College Bell)' : 'College Bell'}
+                      </option>
+                      <option value="futuristic" className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                        ⚡ {isAr ? 'نغمة مستقبليّة (Futuristic Pulse)' : 'Futuristic Pulse'}
+                      </option>
+                      <option value="success" className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                        🎉 {isAr ? 'معزوفة مبهجة (Fanfare Chord)' : 'Fanfare Chord'}
+                      </option>
+                    </select>
+                  </Field>
+
+                  {/* Volume Slider */}
+                  <Field label={isAr ? `مستوى الصوت (${Math.round(soundVolume * 100)}%)` : `Sound Volume (${Math.round(soundVolume * 100)}%)`}>
+                    <div className="flex items-center gap-3 bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-color)]">
+                      <span className="text-xs">🔈</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={e => handleVolumeChange(parseFloat(e.target.value))}
+                        className="w-full accent-[var(--accent)] cursor-pointer"
+                      />
+                      <span className="text-xs">🔊</span>
+                    </div>
+                  </Field>
+
+                  {/* Test Sound & Haptics Button */}
+                  <button
+                    type="button"
+                    onClick={handleTestAudioHaptics}
+                    className="w-full py-3 bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span>🎶</span>
+                    <span>{isAr ? 'تجربة الصوت والاهتزاز الآن' : 'Test Sound & Vibration Now'}</span>
+                  </button>
                 </div>
               </motion.div>
             )}

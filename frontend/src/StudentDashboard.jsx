@@ -12,6 +12,10 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from './config';
+import SideDrawer from './components/SideDrawer';
+import NotificationCenter from './NotificationCenter';
+import haptics from './utils/haptics';
+import soundEngine from './utils/soundEngine';
 import usePWAInstall from './usePWAInstall';
 import ThemeSwitcher from './ThemeSwitcher';
 import ConfirmationModal from './ConfirmationModal';
@@ -214,6 +218,8 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [alertFilter, setAlertFilter] = useState('All');
   const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
+  const [isSideDrawerOpen, setIsSideDrawerOpen] = useState(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   
   // Goals and Reminders states
   const [studentGoals, setStudentGoals] = useState([]);
@@ -588,8 +594,12 @@ export default function StudentDashboard() {
   useEffect(() => {
     fetchData();
 
-    // التحديث الفوري الموجه عبر قنوات SSE للأحداث الحية
-    const onUpdate = () => { fetchData(true); };
+    // التحديث الفوري الموجه عبر قنوات SSE للأحداث الحية مع التنبيه الصوتي
+    const onUpdate = () => {
+      soundEngine.playNotification();
+      haptics.warning();
+      fetchData(true);
+    };
     window.addEventListener('MANAR_SCHEDULE_UPDATE', onUpdate);
     window.addEventListener('MANAR_BROADCAST_RECEIVE', onUpdate);
     window.addEventListener('MANAR_ATTENDANCE_MARKED', onUpdate);
@@ -699,25 +709,46 @@ export default function StudentDashboard() {
     }
   }, [schedules, isAr]);
 
-  // ── معالجة حركة التحديث بالسحب (Pull to Refresh) ──
+  // ── معالجة حركة التحديث بالسحب وإيماءات السحب الجانبية ──
   const [pullDistance, setPullDistance] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const touchStartY = React.useRef(0);
+  const touchStartX = React.useRef(0);
   const PULL_THRESHOLD = 80;
 
   const handleTouchStart = (e) => {
     if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
+    if (e.touches && e.touches[0]) {
+      touchStartX.current = e.touches[0].clientX;
+    }
   };
 
   const handleTouchMove = (e) => {
     if (window.scrollY !== 0 || !touchStartY.current) return;
-    const dist = e.touches[0].clientY - touchStartY.current;
-    if (dist > 0 && dist < 200) setPullDistance(dist);
+    const distY = e.touches[0].clientY - touchStartY.current;
+    if (distY > 0 && distY < 200) setPullDistance(distY);
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    const touchEndX = e.changedTouches?.[0]?.clientX || 0;
+    const diffX = touchEndX - touchStartX.current;
+
+    // Swipe Right (diffX > 75) => Open Side Drawer
+    if (diffX > 75 && pullDistance < 20) {
+      soundEngine.playDrawerOpen();
+      haptics.impactMedium();
+      setIsSideDrawerOpen(true);
+    }
+    // Swipe Left (diffX < -75) => Close Side Drawer
+    else if (diffX < -75 && isSideDrawerOpen) {
+      haptics.impactLight();
+      setIsSideDrawerOpen(false);
+    }
+
     if (pullDistance >= PULL_THRESHOLD) {
       setIsPulling(true);
+      haptics.success();
+      soundEngine.playRelease();
       fetchData(true).finally(() => {
         setIsPulling(false);
         setPullDistance(0);
@@ -1302,10 +1333,70 @@ export default function StudentDashboard() {
   };
 
   const header = getHeaderDetails();
+  const unreadNotificationsCount = notifications.filter(n => !n.readAt).length;
 
   // ── المخطط البصري الأساسي والتصاميم ──
   return (
     <div className="flex-1 w-full flex items-center justify-center min-h-screen p-0 bg-[#070b13]" dir={isAr ? 'rtl' : 'ltr'}>
+      
+      {/* Side Navigation Drawer */}
+      <SideDrawer
+        isOpen={isSideDrawerOpen}
+        onClose={() => setIsSideDrawerOpen(false)}
+        profile={profile}
+        activeTab={activeTab}
+        onSelectTab={(tabId) => setActiveTab(tabId)}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        onOpenSettings={() => {
+          setActiveTab('profile');
+          setProfileViewMode('edit');
+        }}
+        onLogout={() => setIsLogoutModalOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
+        isDark={isDark}
+        onToggleTheme={() => {
+          const newMode = isDark ? 'light' : 'dark';
+          localStorage.setItem('manar_theme_mode', newMode);
+          setIsDark(!isDark);
+          window.dispatchEvent(new Event('themeModeChanged'));
+        }}
+      />
+
+      {/* Notification Center Full Screen Modal */}
+      <AnimatePresence>
+        {isNotificationCenterOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed inset-0 z-50 bg-[#070b13]/96 backdrop-blur-2xl flex flex-col p-4 overflow-y-auto"
+            dir={isAr ? 'rtl' : 'ltr'}
+          >
+            <div className="w-full max-w-md mx-auto flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.impactLight();
+                  soundEngine.playClick();
+                  setIsNotificationCenterOpen(false);
+                }}
+                className="px-3.5 py-2 text-xs font-black uppercase border border-white/10 hover:border-[var(--accent)] hover:text-black hover:bg-[var(--accent)] bg-white/5 rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <span>{isAr ? '← عودة' : '← Back'}</span>
+              </button>
+              <span className="text-xs font-black uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+                <span>🔔</span>
+                <span>{isAr ? 'مركز الإشعارات الأكاديمية' : 'Notification Center'}</span>
+              </span>
+            </div>
+
+            <div className="w-full max-w-md mx-auto pt-4 flex-1">
+              <NotificationCenter />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
         className="w-full max-w-[430px] h-[100dvh] flex flex-col relative pb-[76px] shadow-2xl border-x border-white/5 overflow-hidden bg-[#0b1120]"
         onTouchStart={handleTouchStart}
@@ -1324,7 +1415,21 @@ export default function StudentDashboard() {
         
         {/* رأس الصفحة الديناميكي الثابت — تصميم تطبيق هاتف زجاجي */}
         <header className="bg-[var(--bg-card)]/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 absolute top-0 w-full z-40 border-b border-[var(--border-color)] shadow-sm">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Drawer menu button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playDrawerOpen();
+                haptics.impactMedium();
+                setIsSideDrawerOpen(true);
+              }}
+              className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 hover:bg-[var(--accent-dim)] hover:border-[var(--accent-glow)] hover:text-[var(--accent)] flex items-center justify-center text-white font-black text-sm shrink-0 transition-all active:scale-95 shadow-sm"
+              title={isAr ? 'القائمة الجانبية (السحب لليمين)' : 'Side Menu'}
+            >
+              ☰
+            </button>
+
             {header.showAvatar && (
               <div className="w-9 h-9 rounded-2xl border border-[var(--accent)]/50 bg-[var(--bg-card)] flex items-center justify-center font-black text-xs text-[var(--accent)] shadow-[0_0_12px_var(--accent-glow)] shrink-0 active-press cursor-pointer">
                 {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
@@ -1347,6 +1452,24 @@ export default function StudentDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Notification Center Bell Button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                haptics.impactMedium();
+                setIsNotificationCenterOpen(true);
+              }}
+              className="relative p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 bg-[var(--bg-card)]/60 text-slate-300"
+              title={isAr ? 'مركز الإشعارات' : 'Notification Center'}
+            >
+              <span className="text-xs">🔔</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center animate-pulse border border-slate-900 shadow-md">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setShowPwaInstallModal(true)}
               className="p-2 border border-[var(--accent-glow)] hover:border-[var(--accent)] bg-[var(--accent-dim)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 text-[var(--accent)]"
@@ -1586,7 +1709,11 @@ export default function StudentDashboard() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  haptics.selection();
+                  soundEngine.playClick();
+                  setActiveTab(tab.id);
+                }}
                 className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active-press ${
                   active ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
                 }`}

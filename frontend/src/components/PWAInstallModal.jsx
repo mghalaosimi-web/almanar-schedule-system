@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function PWAInstallModal({ isOpen, onClose, deferredPrompt, onInstallPwa }) {
+export default function PWAInstallModal({ isOpen, onClose, deferredPrompt, onInstallPwa, initialTab = 'pwa' }) {
   const [isStandalone, setIsStandalone] = useState(false);
-  const [activeTab, setActiveTab] = useState('pwa'); // 'pwa' | 'apk' | 'ios'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'pwa' | 'apk' | 'ios'
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     const checkStandalone = () => {

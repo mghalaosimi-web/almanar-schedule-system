@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { API_URL } from '../../config';
+import haptics from '../../utils/haptics';
+import soundEngine from '../../utils/soundEngine';
 
 export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAddPersonalTask, onDeletePersonalTask, profile, setProfile }) {
   const [filterType, setFilterType] = useState('ALL');
@@ -306,11 +308,18 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
                 return (
                   <motion.div
                     layout
+                    drag="y"
+                    dragConstraints={{ top: 0, bottom: 0 }}
+                    dragElastic={0.2}
+                    onDragEnd={() => {
+                      soundEngine.playRelease();
+                      haptics.impactLight();
+                    }}
                     key={goal.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className={`p-4 rounded-2xl border transition-all duration-300 relative flex items-start gap-4 ${
+                    className={`p-4 rounded-2xl border transition-all duration-300 relative flex items-start gap-4 cursor-grab active:cursor-grabbing ${
                       goal.completed
                         ? 'border-slate-850 bg-slate-950/20 opacity-60'
                         : isOverdue
@@ -324,7 +333,16 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
                         <input
                           type="checkbox"
                           checked={goal.completed}
-                          onChange={() => onToggleGoal(goal.id)}
+                          onChange={() => {
+                            if (!goal.completed) {
+                              soundEngine.playSuccess();
+                              haptics.success();
+                            } else {
+                              soundEngine.playClick();
+                              haptics.impactLight();
+                            }
+                            onToggleGoal(goal.id);
+                          }}
                           className="sr-only"
                         />
                         <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
