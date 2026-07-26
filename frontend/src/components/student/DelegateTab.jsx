@@ -488,6 +488,24 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
     setExcuseNote('');
   };
 
+  // Filtered Students List
+  const filteredStudents = classmates.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
+                          s.idNumber.toLowerCase().includes(searchStudent.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    if (statusFilter === 'ALL') return true;
+    if (statusFilter === 'WARNING') return s.warning || s.attendanceRate < 75;
+    return s.status === statusFilter;
+  });
+
+  // Calculate live counters
+  const presentCount = classmates.filter(c => c.status === 'PRESENT').length;
+  const absentCount = classmates.filter(c => c.status === 'ABSENT').length;
+  const lateCount = classmates.filter(c => c.status === 'LATE').length;
+  const excusedCount = classmates.filter(c => c.status === 'EXCUSED').length;
+  const liveAttendancePercent = classmates.length > 0 ? Math.round((presentCount / classmates.length) * 100) : 100;
+
   return (
     <div className="space-y-4">
       {/* Crown Banner */}
