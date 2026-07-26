@@ -347,6 +347,23 @@ export default function PublicLandingWizard() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
+  const [pwaModalInitialTab, setPwaModalInitialTab] = useState('pwa');
+
+  const triggerApkDownload = (e, initialTab = 'apk') => {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+      const link = document.createElement('a');
+      link.href = '/Manar_Schedule.apk';
+      link.setAttribute('download', 'Manar_Schedule.apk');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.warn('Direct download link trigger:', err);
+    }
+    setPwaModalInitialTab(initialTab);
+    setShowPwaInstallModal(true);
+  };
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -807,9 +824,9 @@ export default function PublicLandingWizard() {
             {/* Top Utilities bar */}
             <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
               <button
-                onClick={() => setShowPwaInstallModal(true)}
+                onClick={(e) => triggerApkDownload(e, 'apk')}
                 className="px-3.5 py-2 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[11px] hover:bg-[var(--accent)] hover:text-slate-950 transition-all font-black flex items-center gap-1.5 text-[var(--accent)] shadow-sm cursor-pointer"
-                title={isAr ? "تحميل / تثبيت التطبيق" : "Download / Install App"}
+                title={isAr ? "تحميل ملف APK مباشر وتثبيت التطبيق" : "Download APK File"}
               >
                 <span>📲</span>
                 <span>{isAr ? 'تحميل التطبيق (APK/PWA)' : 'App (APK/PWA)'}</span>
@@ -1292,6 +1309,7 @@ export default function PublicLandingWizard() {
               isOpen={showPwaInstallModal}
               onClose={() => setShowPwaInstallModal(false)}
               deferredPrompt={deferredPrompt}
+              initialTab={pwaModalInitialTab || 'pwa'}
             />
           </motion.div>
         )}

@@ -216,10 +216,26 @@ export default function StudentDashboard() {
   const [attendanceStats, setAttendanceStats] = useState(null);
   const [subjectStats, setSubjectStats] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [alertFilter, setAlertFilter] = useState('All');
   const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
+  const [pwaModalInitialTab, setPwaModalInitialTab] = useState('pwa');
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+
+  const triggerApkDownload = (e, initialTab = 'apk') => {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+      const link = document.createElement('a');
+      link.href = '/Manar_Schedule.apk';
+      link.setAttribute('download', 'Manar_Schedule.apk');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.warn('Direct download link trigger:', err);
+    }
+    setPwaModalInitialTab(initialTab);
+    setShowPwaInstallModal(true);
+  };
   
   // Goals and Reminders states
   const [studentGoals, setStudentGoals] = useState([]);
@@ -1351,6 +1367,7 @@ export default function StudentDashboard() {
           setActiveTab('profile');
           setProfileViewMode('edit');
         }}
+        onDownloadApk={triggerApkDownload}
         onLogout={() => setIsLogoutModalOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
         isDark={isDark}
@@ -1471,9 +1488,9 @@ export default function StudentDashboard() {
               )}
             </button>
             <button
-              onClick={() => setShowPwaInstallModal(true)}
-              className="p-2 border border-[var(--accent-glow)] hover:border-[var(--accent)] bg-[var(--accent-dim)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 text-[var(--accent)]"
-              title={isAr ? 'تحميل / تثبيت التطبيق (APK/PWA)' : 'Download / Install App'}
+              onClick={(e) => triggerApkDownload(e, 'apk')}
+              className="p-2 border border-[var(--accent-glow)] hover:border-[var(--accent)] bg-[var(--accent-dim)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 text-[var(--accent)] cursor-pointer"
+              title={isAr ? 'تحميل ملف APK مباشر وتثبيت التطبيق' : 'Download APK File'}
             >
               <span className="text-xs font-bold">📲</span>
             </button>
@@ -1839,8 +1856,9 @@ export default function StudentDashboard() {
       <PWAInstallModal
         isOpen={showPwaInstallModal}
         onClose={() => setShowPwaInstallModal(false)}
-        deferredPrompt={null}
+        deferredPrompt={deferredPrompt}
         onInstallPwa={installApp}
+        initialTab={pwaModalInitialTab || 'pwa'}
       />
 
       {/* حقن حركات الرسوم البصرية الفاخرة للـ Marquee والنبض */}

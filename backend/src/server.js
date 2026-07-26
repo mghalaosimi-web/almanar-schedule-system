@@ -303,9 +303,21 @@ async function boot() {
 
 boot();
 
-// ==========================================
-// STATIC SERVING & ROUTING FOR SPA
-// ==========================================
+// Direct APK file download endpoint with proper MIME headers
+app.get(['/Manar_Schedule.apk', '/download/apk', '/api/public/download-apk'], (req, res) => {
+  const fs = require('fs');
+  const apkPath = path.join(__dirname, '../../frontend/dist/Manar_Schedule.apk');
+  const fallbackPath = path.join(__dirname, '../../frontend/public/Manar_Schedule.apk');
+  const targetPath = fs.existsSync(apkPath) ? apkPath : fallbackPath;
+
+  if (fs.existsSync(targetPath)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="Manar_Schedule.apk"');
+    return res.sendFile(targetPath);
+  } else {
+    return res.status(404).json({ success: false, error: 'APK file not found on server' });
+  }
+});
 
 // Serve static files from the React frontend app build directory
 app.use(express.static(path.join(__dirname, '../../frontend/dist')));

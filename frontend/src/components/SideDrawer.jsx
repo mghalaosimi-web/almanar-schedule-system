@@ -18,6 +18,7 @@ export default function SideDrawer({
   onSelectTab,
   onOpenNotifications,
   onOpenSettings,
+  onDownloadApk,
   onLogout,
   unreadNotificationsCount = 0,
   isDark,
@@ -275,12 +276,16 @@ export default function SideDrawer({
               {/* Android APK Button */}
               <a
                 href="/Manar_Schedule.apk"
-                download
-                onClick={() => {
+                download="Manar_Schedule.apk"
+                onClick={(e) => {
                   haptics.impactMedium();
                   soundEngine.playClick();
+                  if (onDownloadApk) {
+                    onDownloadApk(e);
+                    onClose();
+                  }
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black rounded-xl text-xs font-bold transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black rounded-xl text-xs font-bold transition-all cursor-pointer"
                 style={{ textDecoration: 'none' }}
               >
                 <span>🤖</span>
