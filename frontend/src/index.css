@@ -202,6 +202,16 @@ input, button, select, textarea {
 }
 .btn-neon:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── دعم بروتوكول WHCB للتباين العالي (Windows High Contrast Mode) ── */
+@media (forced-colors: active) {
+  .frosted-panel, .btn-neon, .command-card {
+    background: ButtonFace !important;
+    border: 1px solid ButtonText !important;
+    color: ButtonText !important;
+    forced-color-adjust: none;
+  }
+}
+
 /* Ghost Button */
 .btn-ghost {
   background: transparent;
