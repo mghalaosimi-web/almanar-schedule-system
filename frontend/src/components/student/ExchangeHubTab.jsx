@@ -539,7 +539,7 @@ export default function ExchangeHubTab({
 
       {/* ── View 1: Live Group Chat Mode ── */}
       {exchangeTab === 'chat' && (
-        <div className="flex flex-col h-[520px] bg-black/20 border border-white/5 rounded-3xl p-3 sm:p-4 justify-between space-y-3 overflow-hidden relative shadow-xl">
+        <div className="flex flex-col flex-1 min-h-[65vh] bg-black/20 border border-white/5 rounded-3xl p-3 sm:p-4 justify-between space-y-3 relative shadow-xl">
           
           {/* Smart Summarizer Banner */}
           <div className="shrink-0 flex flex-col gap-2">
