@@ -564,53 +564,53 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
       </div>
 
       {/* Main Sub-tab Navigation */}
-      <div className="flex bg-slate-950 p-1.5 rounded-xl border border-white/5 gap-1.5 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+      <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5 gap-1 select-none overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveSubTab('attendance')}
-          className={`shrink-0 snap-center py-2 px-3.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
             activeSubTab === 'attendance'
               ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           📋 {isAr ? 'تحضير الطلاب' : 'Manual Roster'}
         </button>
         <button
           onClick={() => setActiveSubTab('overview')}
-          className={`shrink-0 snap-center py-2 px-3.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
             activeSubTab === 'overview'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           ⚡ {isAr ? 'الإجراءات والتصويت' : 'Actions & Polls'}
         </button>
         <button
           onClick={() => setActiveSubTab('resources')}
-          className={`shrink-0 snap-center py-2 px-3.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
             activeSubTab === 'resources'
               ? 'bg-blue-500 text-slate-950 shadow-md shadow-blue-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           📚 {isAr ? 'ملخصات الشعبة' : 'Resources'}
         </button>
         <button
           onClick={() => setActiveSubTab('reschedule')}
-          className={`shrink-0 snap-center py-2 px-3.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
             activeSubTab === 'reschedule'
               ? 'bg-purple-500 text-slate-950 shadow-md shadow-purple-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           📅 {isAr ? 'تعديل المحاضرات' : 'Reschedule'}
         </button>
         <button
           onClick={() => setActiveSubTab('broadcast')}
-          className={`shrink-0 snap-center py-2 px-3.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
+          className={`flex-1 py-2 px-2.5 text-[10px] font-black rounded-lg transition-all whitespace-nowrap ${
             activeSubTab === 'broadcast'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           📢 {isAr ? 'التعميمات' : 'Alerts'}
@@ -712,27 +712,27 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
               <span className="absolute right-3 top-3 text-slate-500 text-sm">🔍</span>
             </div>
 
-            <div className="flex bg-slate-950 p-1.5 rounded-xl border border-white/5 gap-1.5 overflow-x-auto no-scrollbar snap-x snap-mandatory text-[9.5px]">
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5 gap-1 overflow-x-auto no-scrollbar text-[9.5px]">
               <button
                 onClick={() => setStatusFilter('ALL')}
-                className={`shrink-0 snap-center py-1.5 px-3.5 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  statusFilter === 'ALL' ? 'bg-slate-700 text-white font-black shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all whitespace-nowrap ${
+                  statusFilter === 'ALL' ? 'bg-slate-700 text-white font-black' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {isAr ? `الكل (${classmates.length})` : `All (${classmates.length})`}
               </button>
               <button
                 onClick={() => setStatusFilter('PRESENT')}
-                className={`shrink-0 snap-center py-1.5 px-3.5 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  statusFilter === 'PRESENT' ? 'bg-emerald-500/30 text-emerald-300 font-black border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all whitespace-nowrap ${
+                  statusFilter === 'PRESENT' ? 'bg-emerald-500/30 text-emerald-300 font-black border border-emerald-500/40' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {isAr ? `حاضر (${presentCount})` : `Present (${presentCount})`}
               </button>
               <button
                 onClick={() => setStatusFilter('ABSENT')}
-                className={`shrink-0 snap-center py-1.5 px-3.5 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  statusFilter === 'ABSENT' ? 'bg-red-500/30 text-red-300 font-black border border-red-500/40 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all whitespace-nowrap ${
+                  statusFilter === 'ABSENT' ? 'bg-red-500/30 text-red-300 font-black border border-red-500/40' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {isAr ? `غائب (${absentCount})` : `Absent (${absentCount})`}
