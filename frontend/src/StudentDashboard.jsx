@@ -174,7 +174,7 @@ export default function StudentDashboard() {
   const isAr = i18n.language === 'ar';
   const navigate = useNavigate();
   const location = useLocation();
-  const { isInstallable, installApp } = usePWAInstall();
+  const { isInstallable, installApp, deferredPrompt } = usePWAInstall();
 
   // ── Fix 3: URL Deep-Link Tab Sync ────────────────────────────────────────
   // Read ?tab= on mount so /student/home?tab=goals opens Goals tab directly.

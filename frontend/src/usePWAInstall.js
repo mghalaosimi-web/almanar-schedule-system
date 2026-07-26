@@ -56,5 +56,6 @@ export default function usePWAInstall() {
   };
 
   // Only show the install button if it's installable and not already installed
-  return { isInstallable: isInstallable && !isInstalled, installApp };
+  return { isInstallable: isInstallable && !isInstalled, installApp, deferredPrompt, isInstalled };
 }
+
