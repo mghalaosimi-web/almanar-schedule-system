@@ -132,3 +132,26 @@ export function resolveAudience({
   };
 }
 
+/**
+ * Workflow Resolver: Maps system event triggers (e.g. SCHEDULE_CHANGED) to automated target groups.
+ */
+export function resolveWorkflowAudience(eventData = {}, entitySnapshot = {}) {
+  const { event = 'SCHEDULE_CHANGED', groupId, lecturerId, subjectName } = eventData;
+  const resolvedGroup = resolveAudience({ type: AUDIENCE_TYPES.GROUP, id: groupId, ...entitySnapshot });
+  const resolvedLecturer = lecturerId ? resolveAudience({ type: AUDIENCE_TYPES.LECTURER, id: lecturerId, ...entitySnapshot }) : null;
+  const representatives = resolvedGroup.recipients.filter((s) => s.isRepresentative);
+
+  return Object.freeze({
+    event,
+    subjectName: subjectName || 'المحاضرة',
+    targets: [
+      { role: 'STUDENTS', count: resolvedGroup.count, recipients: resolvedGroup.recipients },
+      { role: 'LECTURER', count: resolvedLecturer ? resolvedLecturer.count : 0, recipients: resolvedLecturer ? resolvedLecturer.recipients : [] },
+      { role: 'REPRESENTATIVE', count: representatives.length, recipients: representatives },
+    ],
+    totalCount: resolvedGroup.count + (resolvedLecturer ? resolvedLecturer.count : 0),
+    groupSummary: resolvedGroup.humanReadable,
+  });
+}
+
+

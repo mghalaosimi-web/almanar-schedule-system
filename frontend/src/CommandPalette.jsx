@@ -123,7 +123,7 @@ export default function CommandPalette() {
     s.lecturerName.toLowerCase().includes(query.toLowerCase()) ||
     s.room.name.toLowerCase().includes(query.toLowerCase())
   );
-  const entityResults = entitySearch.search(query, 8);
+  const entityResults = entitySearch.search(query, 8, user);
 
   return (
     <AnimatePresence>

@@ -1,3 +1,5 @@
+import { hasPermission, PERMISSIONS } from './permissionRegistry';
+
 const ARABIC_MARKS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
 
 export function normalizeSearchText(value = '') {
@@ -69,14 +71,24 @@ export function createSearchIndex(entities = []) {
   });
 
   return Object.freeze({
-    search(query, limit = 20) {
+    search(query, limit = 20, user = null) {
       const tokens = normalizeSearchText(query).split(' ').filter(Boolean);
       if (!tokens.length) return [];
+
       return records
-        .filter(({ text }) => tokens.every((token) => text.includes(token)))
+        .filter(({ type, text }) => {
+          // Pre-rendering Security Gate
+          if (user) {
+            if (type === 'Student' && !hasPermission(user, PERMISSIONS.STUDENTS.VIEW) && user.role !== 'STUDENT') return false;
+            if (type === 'Lecturer' && !hasPermission(user, PERMISSIONS.LECTURERS.VIEW) && user.role !== 'LECTURER') return false;
+            if (type === 'System' && !hasPermission(user, PERMISSIONS.VIEW_SYSTEM_LOGS)) return false;
+          }
+          return tokens.every((token) => text.includes(token));
+        })
         .slice(0, limit);
     },
     size: records.length,
   });
 }
+
 
