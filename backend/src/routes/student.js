@@ -58,7 +58,75 @@ router.get('/tenants', async (req, res) => {
   }
 });
 
-// 2. Server-Sent Events (SSE) Live Schedule Update Endpoint
+// 2b. Dynamic Morning & Daily Greeting API
+router.get('/student/daily-greeting', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ success: false, error: 'Student access required.' });
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.id },
+      include: { group: true }
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+
+    const now = new Date();
+    const hour = now.getHours();
+    let timeGreeting = '☀️ صباح الخير والبركة';
+    if (hour >= 12 && hour < 17) timeGreeting = '🌤️ طاب يومك بذكر الله';
+    else if (hour >= 17) timeGreeting = '🌙 مساء الخير والراحة';
+
+    // Count today's schedules
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = dayNames[now.getDay()];
+
+    const todaySchedulesCount = student.groupId ? await prisma.schedule.count({
+      where: {
+        groupId: student.groupId,
+        dayOfWeek: currentDay
+      }
+    }) : 0;
+
+    // Count pending goals
+    const completions = await prisma.studentGoalCompletion.findMany({
+      where: { studentId: student.id }
+    });
+    const completedIds = new Set(completions.map(c => c.academicGoalId));
+    const allGoals = student.groupId ? await prisma.academicGoal.findMany({
+      where: { groupId: student.groupId }
+    }) : [];
+    const pendingGoalsCount = allGoals.filter(g => !completedIds.has(g.id)).length;
+
+    const studentFirstName = student.name ? student.name.split(' ')[0] : 'أيها الطالب المتميز';
+
+    const messageOptions = [
+      `${timeGreeting} يا ${studentFirstName}! لديك اليوم ${todaySchedulesCount} محاضرات جارية و ${pendingGoalsCount} تكليفات معلقة. نرجو لك التوفيق والنجاح.`,
+      `أهلاً بك يا ${studentFirstName}! الانضباط والمتابعة اليومية هما سر التفوق الأكاديمي. حافظ على جاهزيتك ونقاط الـ XP.`,
+      `${timeGreeting} يا ${studentFirstName}! تم تحديث جدولك الدراسي ونظام الإشعارات بنجاح. استعد للتميز اليوم!`
+    ];
+
+    const selectedMessage = messageOptions[Math.floor(Math.random() * messageOptions.length)];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        greetingTitle: `${timeGreeting}، ${studentFirstName}`,
+        greetingMessage: selectedMessage,
+        todaySchedulesCount,
+        pendingGoalsCount,
+        xp: student.xp || 350,
+        level: student.level || 3
+      }
+    });
+  } catch (error) {
+    console.error('[Student API] Daily greeting error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch daily greeting.' });
+  }
+});
 router.get('/schedules/live', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',

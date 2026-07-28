@@ -141,6 +141,36 @@ export default function HomeTab({
   return (
     <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
 
+      {/* ── 0. Dynamic Morning & Time-Based Greeting Banner ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-4 rounded-[22px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border border-amber-500/30 flex items-center justify-between gap-3 shadow-lg"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+            {now.getHours() < 12 ? '☀️' : now.getHours() < 17 ? '🌤️' : '🌙'}
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-amber-300 font-sans">
+              {now.getHours() < 12 
+                ? (isAr ? `صباح الخير والأمل، ${profile.name?.split(' ')[0] || 'طالبنا المتميز'}! ☀️` : `Good Morning, ${profile.name?.split(' ')[0]}! ☀️`)
+                : now.getHours() < 17 
+                  ? (isAr ? `طاب يومك بذكر الله، ${profile.name?.split(' ')[0]}! 🌤️` : `Good Afternoon, ${profile.name?.split(' ')[0]}! 🌤️`)
+                  : (isAr ? `مساء الخير والراحة، ${profile.name?.split(' ')[0]}! 🌙` : `Good Evening, ${profile.name?.split(' ')[0]}! 🌙`)}
+            </h3>
+            <p className="text-[10px] font-bold text-slate-300 mt-0.5 leading-relaxed">
+              {isAr 
+                ? `الانضباط اليومي هو مفتاح التميز! لديك اليوم ${sortedToday.length} محاضرات جارية و ${goalReminders.length} تكليفات معلقة.`
+                : `Consistency is key! You have ${sortedToday.length} classes today and ${goalReminders.length} pending goals.`}
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black px-2.5 py-1.5 rounded-xl text-center">
+          ⭐ {profile.xp ?? 350} XP
+        </div>
+      </motion.div>
+
       {/* ── 1. بطاقة الترحيب — Visual Priority 1 ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}

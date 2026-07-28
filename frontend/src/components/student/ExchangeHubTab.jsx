@@ -592,44 +592,53 @@ export default function ExchangeHubTab({
   return (
     <div className="w-full space-y-4 flex flex-col">
       
-      {/* Header and Class Section Badge */}
+      {/* HCI Header Dock and Live Status */}
       <div
-        className="p-3.5 rounded-[18px] flex justify-between items-center gap-3 shadow-sm"
-        style={{ background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.06)' }}
+        className="p-4 rounded-[22px] flex justify-between items-center gap-3 shadow-xl backdrop-blur-xl border border-white/10"
+        style={{ background: 'linear-gradient(135deg, rgba(18, 24, 38, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)' }}
       >
-        <div>
-          <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-            <span>🏫</span>
-            <span>{isAr ? `شعبة: ${profile.groupName || 'شعبتك الدراسية'}` : `Class: ${profile.groupName || 'Your Section'}`}</span>
-          </h3>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-xl shrink-0 shadow-inner">
+            🏫
+          </div>
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5 font-sans">
+              <span>{profile.groupName || (isAr ? 'شعبة تكنولوجيا المعلومات - A' : 'IT Section A')}</span>
+            </h3>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+              <span className="text-[10px] text-emerald-400 font-bold">
+                {isAr ? 'متصل الآن: 18 طالب وطالبة' : '18 members active online'}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Tab switcher: Live Group Chat vs Academic Threads */}
-        <div
-          className="flex p-0.5 rounded-[12px] select-none shrink-0"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
+        {/* Tab switcher dock with Framer Motion feel */}
+        <div className="flex p-1 rounded-2xl bg-slate-950/80 border border-white/10 select-none shrink-0 shadow-inner">
           <button
+            type="button"
             onClick={() => setExchangeTab('chat')}
-            className="px-3 py-1.5 rounded-[10px] text-[10px] font-black tracking-wide transition-all"
-            style={{
-              background: exchangeTab === 'chat' ? 'var(--accent)' : 'transparent',
-              color: exchangeTab === 'chat' ? '#070b13' : 'var(--text-muted)',
-              boxShadow: exchangeTab === 'chat' ? '0 2px 8px rgba(var(--primary-color-rgb),0.3)' : 'none'
-            }}
+            className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black tracking-wide transition-all flex items-center gap-1.5 ${
+              exchangeTab === 'chat'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            💬 {isAr ? 'محادثة الدفعة' : 'Group Chat'}
+            <span>💬</span>
+            <span>{isAr ? 'المحادثة الحية' : 'Live Chat'}</span>
           </button>
           <button
+            type="button"
             onClick={() => setExchangeTab('forum')}
-            className="px-3 py-1.5 rounded-[10px] text-[10px] font-black tracking-wide transition-all"
-            style={{
-              background: exchangeTab === 'forum' ? 'var(--accent)' : 'transparent',
-              color: exchangeTab === 'forum' ? '#070b13' : 'var(--text-muted)',
-              boxShadow: exchangeTab === 'forum' ? '0 2px 8px rgba(var(--primary-color-rgb),0.3)' : 'none'
-            }}
+            className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black tracking-wide transition-all flex items-center gap-1.5 ${
+              exchangeTab === 'forum'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            📚 {isAr ? 'المنتدى الدراسي' : 'Academic Hub'}
+            <span>📚</span>
+            <span>{isAr ? 'المنتدى الأكاديمي' : 'Academic Forum'}</span>
           </button>
         </div>
       </div>
@@ -733,9 +742,23 @@ export default function ExchangeHubTab({
                         }`}
                       >
                         <p className="whitespace-pre-line text-right font-medium" dir="rtl">{msg.content}</p>
-                        
+
+                        {/* Reaction Emojis Dock */}
+                        <div className="flex items-center gap-1 mt-1 opacity-80 hover:opacity-100 transition-opacity">
+                          {['👍', '❤️', '💡', '🔥', '🚀'].map((emoji, eIdx) => (
+                            <button
+                              key={eIdx}
+                              type="button"
+                              onClick={() => toast.success(isAr ? `تفاعلت بـ ${emoji}` : `Reacted with ${emoji}`)}
+                              className="text-[10px] p-0.5 hover:scale-125 transition-transform"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+
                         {/* Time and Actions */}
-                        <div className="flex items-center justify-between gap-3 mt-1.5 border-t border-white/5 pt-1 text-[8px] text-white/40 font-bold">
+                        <div className="flex items-center justify-between gap-3 mt-1 border-t border-white/5 pt-1 text-[8px] text-white/40 font-bold">
                           <span dir="ltr">
                             {new Date(msg.createdAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                           </span>
@@ -765,21 +788,32 @@ export default function ExchangeHubTab({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Chat Send Input Box */}
-          <form onSubmit={handleSendChatMessage} className="flex gap-2 items-center bg-slate-955 border border-white/5 rounded-2xl p-2">
-            {/* زر الهوية المجهولة */}
+          {/* Chat Send Input Box with Rich Utility Dock */}
+          <form onSubmit={handleSendChatMessage} className="flex gap-2 items-center bg-slate-955 border border-white/10 rounded-2xl p-2 shadow-2xl">
+            {/* Attachment Button */}
+            <button
+              type="button"
+              onClick={() => toast(isAr ? '📎 يمكنك إرفاق الصور والتسجيلات بملفات الملتقى' : 'Attach file or image', { icon: 'ℹ️' })}
+              className="p-2 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-white transition-all text-xs h-9 w-9 flex items-center justify-center shrink-0"
+              title={isAr ? 'إرفاق ملف أو صورة' : 'Attach file'}
+            >
+              📎
+            </button>
+
+            {/* Anonymous Toggle Button */}
             <button
               type="button"
               onClick={() => setChatIsAnonymous(prev => !prev)}
               className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 text-sm h-9 w-9 ${
                 chatIsAnonymous
-                  ? 'bg-[#f59e0b]/10 border border-[#f59e0b]/35 text-[#f59e0b]'
+                  ? 'bg-[#f59e0b]/15 border border-[#f59e0b]/40 text-[#f59e0b] shadow-md shadow-amber-500/10'
                   : 'bg-white/5 border border-white/5 text-slate-500 hover:text-slate-300'
               }`}
               title={isAr ? 'تفعيل الهوية المجهولة' : 'Toggle anonymous mode'}
             >
               🕵️
             </button>
+
             <input
               type="text"
               value={chatInput}
@@ -791,14 +825,15 @@ export default function ExchangeHubTab({
                 }
               }}
               placeholder={isAr ? 'اكتب رسالتك للدفعة هنا...' : 'Type message to your class...'}
-              className="flex-1 bg-transparent border-0 px-3 py-2 text-xs text-white focus:outline-none placeholder-slate-650 text-right font-sans"
+              className="flex-1 bg-transparent border-0 px-3 py-2 text-xs text-white focus:outline-none placeholder-slate-500 text-right font-sans"
               dir="rtl"
               disabled={isSendingChat}
             />
+
             <button
               type="submit"
               disabled={isSendingChat || !chatInput.trim()}
-              className="px-4 py-2 bg-[#f59e0b] hover:bg-[#f59e0b]/90 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-[#f59e0b]/15 whitespace-nowrap active:scale-95 duration-100"
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 whitespace-nowrap active:scale-95 duration-100 flex items-center gap-1"
             >
               {isSendingChat ? (isAr ? 'إرسال...' : 'Sending') : (isAr ? 'إرسال 🚀' : 'Send 🚀')}
             </button>

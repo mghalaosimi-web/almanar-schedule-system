@@ -11,7 +11,12 @@ export default function AlertsTab({ isAr, allAlerts }) {
   const [alertFilter, setAlertFilter] = useState('All');
 
   const filteredAlerts = allAlerts.filter(alert => {
-    if (alertFilter === 'Urgent') return alert.type === 'Urgent';
+    if (alertFilter === 'Urgent') return alert.type === 'Urgent' || (alert.title || '').includes('تكليف') || (alert.title || '').includes('عاجل');
+    if (alertFilter === 'Morning') {
+      const title = (alert.title || '').toLowerCase();
+      const msg = (alert.message || '').toLowerCase();
+      return title.includes('صباح') || msg.includes('صباح') || title.includes('طاب') || title.includes('تذكير');
+    }
     if (alertFilter === 'Academic') {
       const msg = (alert.message || '').toLowerCase();
       return (
@@ -25,8 +30,9 @@ export default function AlertsTab({ isAr, allAlerts }) {
 
   const filters = [
     { id: 'All', ar: 'الكل', en: 'All', icon: '📋' },
-    { id: 'Urgent', ar: 'عاجل', en: 'Urgent', icon: '🚨' },
-    { id: 'Academic', ar: 'أكاديمي', en: 'Academic', icon: '📚' }
+    { id: 'Urgent', ar: '⏰ عاجل وتكاليف', en: 'Urgent Tasks', icon: '🚨' },
+    { id: 'Morning', ar: '🌞 رسائل الصباح', en: 'Morning Daily', icon: '☀️' },
+    { id: 'Academic', ar: '📚 إعلانات المحاضرات', en: 'Academic', icon: '📚' }
   ];
 
   const getAlertStyle = (alert) => {
