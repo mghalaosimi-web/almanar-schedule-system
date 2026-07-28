@@ -2,7 +2,7 @@
  * @file HomeTab.jsx
  * @description المكون الرئيسي لتبويب الصفحة الرئيسية (Home) في بوابة الطالب.
  * يعرض الترحيب المخصص، مؤشر العد التنازلي للمحاضرة القادمة، حالة الحضور، تنبيهات الحرمان، وجدول اليوم الإرشادي.
- * @author أنتيجرافيتي (Antigravity)
+ * @author أنتيجرافيتي (Antigravity) — HCI Overhaul v2
  */
 
 import React from 'react';
@@ -11,35 +11,8 @@ import { toast } from 'react-hot-toast';
 
 /**
  * مكون الصفحة الرئيسية المخصص للطلاب.
- * 
- * الميزات:
- * 1. لوحة ترحيب تفاعلية تعرض الاسم والتخصص والمستوى الأكاديمي.
- * 2. تنبيهات الأمان والتوثيق في حال كان الحساب معلقاً أو بانتظار موافقة الإدارة.
- * 3. لوحة تحذيرات الغياب والحرمان التلقائية (تنبيهات تجاوز الغياب لنسب 15% و 25%).
- * 4. شريط عد تنازلي ديناميكي يعرض الوقت المتبقي لأقرب محاضرة قادمة.
- * 5. تقويم مصغر أسبوعي تفاعلي يوضح أيام الدراسة والحضور.
- * 6. شريط إعلانات متحرك (Marquee) لعرض التعميمات العاجلة من الإدارة.
- * 7. عرض جدول محاضرات اليوم مصنفاً حسب الحالة (نشطة حالياً، مكتملة، قادمة) مع مؤشرات البث المباشر.
- * 8. شبكة الإجراءات السريعة (التحضير الجغرافي، الإعلانات، المقررات، جدول الامتحانات).
- * 
- * @param {Object} props - خصائص المكون.
- * @param {boolean} props.isAr - لغة المكون (عربي/إنجليزي).
- * @param {Object} props.profile - كائن ملف الطالب المحتوي على بياناته الأكاديمية والتوثيقية.
- * @param {Array<Object>} props.todayLectures - قائمة محاضرات اليوم الفعلي.
- * @param {Object} props.attendanceStats - إحصائيات الغياب والحضور العامة للطالب.
- * @param {Array<Object>} props.subjectStats - إحصائيات تفصيلية لكل مادة دراسية لتحديد الإنذارات والحرمان.
- * @param {string} props.countdownDisplay - نص العد التنازلي المنسق للمحاضرة التالية.
- * @param {string} props.countdownSubText - النص الفرعي المصاحب للعد التنازلي.
- * @param {Array<Object>} props.schedules - إجمالي الجدول الدراسي للطالب لتحديد أيام الدراسة.
- * @param {Object|null} props.activeLectureNow - كائن المحاضرة النشطة حالياً إن وجدت لتسجيل الحضور الفوري.
- * @param {boolean} props.sandboxMode - حالة وضع المحاكاة والاختبار المحلي للجدول.
- * @param {Function} props.toggleSandbox - دالة تبديل وضع محاكي التعديل.
- * @param {boolean} props.isInstallable - ما إذا كان التطبيق قابلاً للتثبيت كـ PWA على جهاز الطالب.
- * @param {Function} props.installApp - دالة بدء تثبيت تطبيق الـ PWA.
- * @param {Array<Object>} props.allAlerts - قائمة جميع الإشعارات الموجهة لتحديد عددها.
- * @param {Function} props.navigate - دالة التنقل والتوجيه بين المسارات.
- * @param {Function} props.setProfileViewMode - دالة التحكم في الشاشات الفرعية للملف الشخصي.
- * @param {Function} props.setActiveTab - دالة التنقل بين التبويب الرئيسي للوحة التحكم.
+ * — تحسين HCI كامل: تسلسل بصري واضح، touch targets ≥44px، انيميشن احترافي،
+ *   بطاقات ذات أولوية مرئية، live lecture indicator، وQR quick actions.
  */
 export default function HomeTab({
   isAr,
@@ -108,348 +81,509 @@ export default function HomeTab({
   const dayNamesAr = { SATURDAY: 'س', SUNDAY: 'ح', MONDAY: 'ن', TUESDAY: 'ث', WEDNESDAY: 'ر', THURSDAY: 'خ' };
   const dayNamesEn = { SATURDAY: 'Sa', SUNDAY: 'Su', MONDAY: 'Mo', TUESDAY: 'Tu', WEDNESDAY: 'We', THURSDAY: 'Th' };
 
+  // ── مؤشر الحضور الكلي ──
+  const attendancePct = attendanceStats?.totalSessions > 0
+    ? Math.round((attendanceStats.present / attendanceStats.totalSessions) * 100)
+    : null;
+
+  const attendanceColor = attendancePct === null
+    ? '#64748b'
+    : attendancePct >= 85 ? '#10b981'
+    : attendancePct >= 75 ? 'var(--accent)'
+    : '#ef4444';
+
+  // ── إجراءات سريعة ──
+  const quickActions = [
+    {
+      id: 'checkin',
+      icon: '📍',
+      titleAr: 'تحضير GPS',
+      titleEn: 'GPS Check-In',
+      descAr: 'تسجيل حضور تلقائي',
+      descEn: 'Verify presence via GPS',
+      onClick: () => {
+        if (activeLectureNow) {
+          toast.success(isAr ? 'تم تسجيل الحضور بالـ GPS بنجاح!' : 'GPS Check-In marked successfully!');
+        } else {
+          toast.error(isAr ? 'لا توجد محاضرة نشطة حالياً' : 'No active lecture now');
+        }
+      }
+    },
+    {
+      id: 'forum',
+      icon: '💬',
+      titleAr: 'الملتقى الطلابي',
+      titleEn: 'Class Forum',
+      descAr: 'نقاشات الدفعة',
+      descEn: 'Discuss with classmates',
+      onClick: () => setActiveTab('exchange')
+    },
+    {
+      id: 'tasks',
+      icon: '✅',
+      titleAr: 'المهام والتركيز',
+      titleEn: 'Tasks & Focus',
+      descAr: 'إنجاز التكاليف',
+      descEn: 'Complete assignments',
+      onClick: () => setActiveTab('goals')
+    },
+    {
+      id: 'print',
+      icon: '🖨️',
+      titleAr: 'طباعة الجدول',
+      titleEn: 'Print Schedule',
+      descAr: 'حفظ الجدول كـ PDF',
+      descEn: 'Save weekly timetable',
+      onClick: () => window.print()
+    }
+  ];
+
   return (
-    <div className="space-y-5">
-      {/* ── 1. لوحة الترحيب بالطالب ── */}
-      <div className="bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-card)]/70 p-5 rounded-[24px] border border-[var(--border-color)] shadow-glass relative overflow-hidden mb-5">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[var(--accent-dim)] rounded-full blur-2xl"></div>
-        <div className="flex items-center justify-between relative z-10 mb-3">
-          <div>
-            <h3 className="text-lg font-bold text-white mb-0.5">{profile.name || (isAr ? 'طالب منار' : 'Manar Student')}</h3>
-            <p className="text-[var(--accent)] text-xs font-medium">{profile.department || (isAr ? 'هندسة وتكنولوجيا المعلومات' : 'Engineering & IT')}</p>
-          </div>
-          {/* Daily Streak Badge */}
-          <div className="bg-orange-500/20 border border-orange-500/50 px-2 py-1 rounded-xl flex items-center gap-1 shadow-glow cursor-pointer hover:bg-orange-500/30 transition">
-            <span className="text-orange-400 font-bold text-sm">{profile.streak ?? 7}</span>
-            <span className="text-lg">🔥</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-[#94a3b8] relative z-10 bg-[var(--bg-primary)]/50 p-2 rounded-xl">
-          <span>{profile.level ? ((isAr ? 'مستوى ' : 'Level ') + profile.level) : (isAr ? 'مستوى 3' : 'Level 3')}</span>
-          <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
-          <span>{profile.groupName || 'Group A'}</span>
-          <div className="w-1 h-1 bg-slate-650 rounded-full"></div>
-          <span className="font-mono text-[var(--accent)]/80">{profile.xp ?? 350} XP 🏆</span>
-        </div>
-      </div>
+    <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
 
-      {/* ── 2. تنبيه عدم توثيق الحساب الدراسي ── */}
-      {false && (!profile.isEmailVerified || !profile.isPhoneVerified) && (
+      {/* ── 1. بطاقة الترحيب — Visual Priority 1 ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="relative overflow-hidden rounded-[22px] p-5"
+        style={{
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(var(--primary-color-rgb, 245,158,11),0.04) 100%)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.3)'
+        }}
+      >
+        {/* خلفية ضوئية زخرفية */}
         <div
-          className="p-4 rounded-2xl border border-amber-500/30 bg-amber-550/10 text-amber-200 text-xs font-bold shadow-lg space-y-2"
-          dir={isAr ? 'rtl' : 'ltr'}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            <span className="font-black text-amber-400 uppercase tracking-wide">
-              {isAr ? 'الحساب قيد المراجعة والتوثيق' : 'Account Under Verification'}
-            </span>
+          className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(var(--primary-color-rgb,245,158,11),0.12) 0%, transparent 70%)' }}
+          aria-hidden="true"
+        />
+
+        {/* صف العنوان */}
+        <div className="flex items-start justify-between relative z-10 mb-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
+              {isAr
+                ? (new Date().getHours() < 12 ? '☀️ صباح الخير' : new Date().getHours() < 17 ? '🌤 طاب يومك' : '🌙 مساء الخير')
+                : (new Date().getHours() < 12 ? '☀️ Good morning' : new Date().getHours() < 17 ? '🌤 Good afternoon' : '🌙 Good evening')}
+            </p>
+            <h2 className="text-[18px] font-black leading-tight" style={{ color: 'var(--text-primary)' }}>
+              {profile.name?.split(' ')[0] || (isAr ? 'الطالب' : 'Student')}
+            </h2>
+            <p className="text-[11px] font-semibold mt-0.5 truncate" style={{ color: 'var(--accent)' }}>
+              {profile.department || (isAr ? 'هندسة وتكنولوجيا المعلومات' : 'Engineering & IT')}
+            </p>
           </div>
-          <p className="text-[10px] text-slate-350 leading-relaxed font-bold">
-            {isAr
-              ? 'حسابك غير مفعل بالكامل بعد من قبل إدارة الكلية. يرجى تعديل الإعدادات ورفع صورة بطاقتك الجامعية لتسجيل طلب التوثيق والقبول.'
-              : 'Your profile has not been fully verified by administration. Please go to settings and upload your student ID photo to submit for verification.'}
-          </p>
-          <div className={isAr ? 'text-left mt-2' : 'text-right mt-2'}>
-            <button
-              onClick={() => {
-                setActiveTab('profile');
-                setProfileViewMode('edit');
+
+          {/* Streak Badge */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] shrink-0"
+            style={{
+              background: 'rgba(249,115,22,0.12)',
+              border: '1px solid rgba(249,115,22,0.3)'
+            }}
+            title={isAr ? 'أيام التسجيل المتتالية' : 'Login streak'}
+          >
+            <span style={{ fontSize: '18px' }}>🔥</span>
+            <div className="text-center">
+              <p className="text-[15px] font-black leading-none" style={{ color: '#f97316' }}>
+                {profile.streak ?? 7}
+              </p>
+              <p className="text-[8px] font-bold" style={{ color: '#f97316', opacity: 0.8 }}>
+                {isAr ? 'يوم' : 'days'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* شريط المعلومات السفلي */}
+        <div
+          className="flex items-center gap-0 text-[10.5px] font-bold rounded-[12px] overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          {[
+            {
+              label: profile.level ? (isAr ? `م ${profile.level}` : `Lvl ${profile.level}`) : (isAr ? 'مستوى 3' : 'Level 3'),
+              icon: '🎓'
+            },
+            {
+              label: profile.groupName || 'Group A',
+              icon: '👥'
+            },
+            {
+              label: `${profile.xp ?? 350} XP`,
+              icon: '⭐',
+              accent: true
+            }
+          ].map((item, i) => (
+            <div
+              key={i}
+              className="flex-1 flex items-center justify-center gap-1 py-2"
+              style={{
+                borderRight: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                color: item.accent ? 'var(--accent)' : 'var(--text-secondary)'
               }}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black rounded-lg transition-all active:scale-95"
             >
-              ⚙️ {isAr ? 'الانتقال لرفع الوثيقة' : 'Go to ID Upload'}
-            </button>
-          </div>
+              <span style={{ fontSize: '11px' }}>{item.icon}</span>
+              <span>{item.label}</span>
+            </div>
+          ))}
         </div>
-      )}
+      </motion.div>
 
+      {/* ── 2. تنبيهات المهام المعلقة والحرمان ── */}
       {goalReminders.length > 0 && (
-        <div
-          className="p-4 rounded-2xl border border-amber-500/25 bg-amber-950/10 text-amber-200 text-xs font-bold shadow-lg space-y-2.5"
-          dir={isAr ? 'rtl' : 'ltr'}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="card-warning p-4 space-y-2.5"
+          role="alert"
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            <span className="font-black text-amber-400 uppercase tracking-wide">
-              {isAr ? 'لديك مهام معلقة لم تنجزها بعد!' : 'You have pending tasks to complete!'}
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span className="text-[11px] font-black" style={{ color: '#fbbf24' }}>
+              {isAr
+                ? `لديك ${goalReminders.length} مهمة معلقة`
+                : `${goalReminders.length} pending tasks`}
             </span>
           </div>
-          <p className="text-[10px] text-slate-350 leading-relaxed font-bold">
-            {isAr
-              ? `لديك عدد (${goalReminders.length}) تكاليف معلقة من المحاضرات السابقة أو الأسابيع الماضية. يرجى إنجازها في أقرب وقت:`
-              : `You have (${goalReminders.length}) pending tasks from previous lectures or weeks. Please complete them as soon as possible:`}
-          </p>
-          <div className="space-y-1.5 pt-1">
-            {goalReminders.slice(0, 3).map(g => (
-              <div key={g.id} className="flex justify-between items-center bg-black/10 px-3 py-1.5 rounded-lg text-[9.5px] border border-white/5">
-                <span className="text-white truncate max-w-[70%]">{g.title} ({g.subject?.name})</span>
-                <span className="text-slate-400 text-[8.5px] font-mono font-bold">
-                  {g.weekNumber ? (isAr ? `الأسبوع ${g.weekNumber}` : `Week ${g.weekNumber}`) : (isAr ? 'محاضرة سابقة' : 'Past Lecture')}
+          <div className="space-y-1.5">
+            {goalReminders.slice(0, 2).map(g => (
+              <div
+                key={g.id}
+                className="flex justify-between items-center rounded-[10px] px-3 py-1.5"
+                style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                <span className="text-[10px] font-bold truncate max-w-[65%]" style={{ color: '#f8fafc' }}>
+                  {g.title} <span style={{ color: '#94a3b8' }}>({g.subject?.name})</span>
+                </span>
+                <span className="text-[9px] font-black" style={{ color: '#94a3b8' }}>
+                  {g.weekNumber ? (isAr ? `أسبوع ${g.weekNumber}` : `Wk ${g.weekNumber}`) : (isAr ? 'سابق' : 'Past')}
                 </span>
               </div>
             ))}
-            {goalReminders.length > 3 && (
-              <p className="text-[9px] text-slate-500 font-bold px-1">
-                {isAr ? `+ وعدد ${goalReminders.length - 3} مهام أخرى معلقة` : `+ and ${goalReminders.length - 3} more pending tasks`}
+            {goalReminders.length > 2 && (
+              <p className="text-[9px] font-bold px-1" style={{ color: '#64748b' }}>
+                {isAr ? `+ ${goalReminders.length - 2} مهام أخرى` : `+ ${goalReminders.length - 2} more`}
               </p>
             )}
           </div>
-          <div className={isAr ? 'text-left mt-2.5' : 'text-right mt-2.5'}>
-            <button
-              onClick={() => setActiveTab('goals')}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-450 text-slate-950 text-[10px] font-black rounded-lg transition-all active:scale-95"
-            >
-              🎯 {isAr ? 'عرض وإنجاز التكاليف والمهام' : 'View & Complete Tasks'}
-            </button>
-          </div>
-        </div>
+          <button
+            onClick={() => setActiveTab('goals')}
+            className="active-press w-full py-2 rounded-[12px] text-[11px] font-black text-center transition-all"
+            style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24' }}
+          >
+            🎯 {isAr ? 'إنجاز التكاليف والمهام' : 'View & Complete Tasks'}
+          </button>
+        </motion.div>
       )}
 
-      {/* ── 3. تنبيهات وإنذارات الحرمان بسبب الغياب ── */}
-      {/* إنذارات الحرمان القطعي (الغياب > 25%) */}
+      {/* تنبيه الحرمان القطعي */}
       {subjectStats.filter(s => s.hasDeprivation).length > 0 && (
-        <div className="p-4 rounded-2xl border border-red-500/30 bg-red-950/20 text-red-200 text-xs font-bold shadow-lg space-y-2 animate-pulse">
+        <div className="card-danger p-4 space-y-2" role="alert">
           <div className="flex items-center gap-2">
-            <span className="text-lg">❌</span>
-            <span className="font-black text-red-400 uppercase tracking-wide">
-              {isAr ? 'تنبيه حرمان (تجاوز الغياب 25%)' : 'Deprivation Alert (Absences > 25%)'}
+            <span style={{ fontSize: '18px' }}>❌</span>
+            <span className="text-[11px] font-black" style={{ color: '#f87171' }}>
+              {isAr ? 'تنبيه حرمان — الغياب تجاوز 25%' : 'Deprivation Alert — Absences > 25%'}
             </span>
           </div>
-          <p className="text-[10px] text-slate-300 leading-relaxed font-bold">
-            {isAr
-              ? 'لقد تجاوزت نسبة الغياب المسموح بها في المقررات التالية وقد تتعرض للحرمان من دخول الامتحان:'
-              : 'You have exceeded the maximum allowed absence rate in the following courses and may be deprived from examinations:'}
-          </p>
-          <ul className="list-disc list-inside space-y-1 text-[10.5px] font-mono text-red-300">
+          <ul className="space-y-1 text-[10px] font-bold" style={{ color: '#fca5a5' }}>
             {subjectStats.filter(s => s.hasDeprivation).map(s => (
-              <li key={s.subjectCode}>
-                {s.subjectName} ({s.subjectCode}) - {isAr ? 'نسبة الغياب:' : 'Absence rate:'} {s.absenceRate}%
+              <li key={s.subjectCode} className="flex justify-between">
+                <span>{s.subjectName} ({s.subjectCode})</span>
+                <span className="font-mono">{s.absenceRate}%</span>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* إنذارات الاقتراب والتحذير (الغياب بين 15% و 25%) */}
+      {/* تنبيه الإنذار (15%-25%) */}
       {subjectStats.filter(s => s.hasWarning && !s.hasDeprivation).length > 0 && (
-        <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs font-bold shadow-lg space-y-2">
+        <div className="card-warning p-4 space-y-2" role="alert">
           <div className="flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            <span className="font-black text-amber-400 uppercase tracking-wide">
-              {isAr ? 'إنذار غياب (تجاوز الغياب 15%)' : 'Absence Warning (Absences > 15%)'}
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span className="text-[11px] font-black" style={{ color: '#fbbf24' }}>
+              {isAr ? 'إنذار غياب — اقتراب من حد الحرمان' : 'Absence Warning — Approaching limit'}
             </span>
           </div>
-          <p className="text-[10px] text-slate-300 leading-relaxed font-bold">
-            {isAr
-              ? 'يرجى الحذر، لقد اقتربت نسبة الغياب من حد الحرمان في المقررات التالية:'
-              : 'Please be cautious, your absence rate is approaching the deprivation limit in the following courses:'}
-          </p>
-          <ul className="list-disc list-inside space-y-1 text-[10.5px] font-mono text-amber-300">
+          <ul className="space-y-1 text-[10px] font-bold" style={{ color: '#fde68a' }}>
             {subjectStats.filter(s => s.hasWarning && !s.hasDeprivation).map(s => (
-              <li key={s.subjectCode}>
-                {s.subjectName} ({s.subjectCode}) - {isAr ? 'نسبة الغياب:' : 'Absence rate:'} {s.absenceRate}%
+              <li key={s.subjectCode} className="flex justify-between">
+                <span>{s.subjectName} ({s.subjectCode})</span>
+                <span className="font-mono">{s.absenceRate}%</span>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* ── 4. مؤشرات العد التنازلي والتقويم المصغر الأسبوعي ── */}
+      {/* ── 3. شريط العد التنازلي + مؤشر الحضور ── */}
       <div className="grid grid-cols-2 gap-3">
-        {/* بطاقة العد التنازلي لأقرب محاضرة */}
-        <div className="relative overflow-hidden rounded-[20px] frosted-panel border-[#2979ff]/20 p-4 shadow-lg">
-          <div className="absolute top-0 left-0 w-full h-full bg-[#2979ff]/3 pointer-events-none" />
-          <p className="text-[8px] font-black uppercase tracking-wider text-[#2979ff] mb-1">
+        {/* بطاقة العد التنازلي */}
+        <div
+          className="card-base p-4 flex flex-col gap-2"
+          style={{ borderTop: '2px solid rgba(41,121,255,0.6)' }}
+        >
+          <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#2979ff' }}>
             {isAr ? '⏱ المحاضرة القادمة' : '⏱ Next Lecture'}
           </p>
           {countdownDisplay ? (
             <>
-              <p className="text-xl font-black text-white leading-none">{countdownDisplay}</p>
-              <p className="text-[8px] text-slate-400 font-bold mt-1 truncate">{countdownSubText}</p>
+              <p className="countdown-display">{countdownDisplay}</p>
+              <p className="text-[9px] font-semibold truncate" style={{ color: 'var(--text-muted)' }}>
+                {countdownSubText}
+              </p>
             </>
           ) : (
-            <p className="text-sm font-black text-[var(--accent)]">{isAr ? 'لا توجد محاضرات اليوم' : 'No more today'}</p>
+            <p className="text-[12px] font-black" style={{ color: 'var(--accent)' }}>
+              {isAr ? 'لا توجد اليوم' : 'None today'}
+            </p>
           )}
         </div>
 
-        {/* التقويم المصغر الأسبوعي */}
-        <div className="relative overflow-hidden rounded-[20px] frosted-panel p-4 shadow-lg">
-          <p className="text-[8px] font-black uppercase tracking-wider text-slate-500 mb-2">
-            {isAr ? '📅 أيام الدراسة' : '📅 Week'}
+        {/* بطاقة الحضور + التقويم الأسبوعي */}
+        <div className="card-base p-4 flex flex-col gap-2">
+          <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            {isAr ? '📅 أيام الأسبوع' : '📅 This Week'}
           </p>
-          <div className="flex gap-1.5 justify-between">
+          <div className="flex gap-1 justify-between">
             {weekDays.map(day => {
               const isToday = day === todayName;
               const hasClass = schedules.some(s => (s.overrides?.[0]?.dayOfWeek || s.dayOfWeek) === day);
               return (
                 <div key={day} className="flex flex-col items-center gap-1">
-                  <span className={'text-[8px] font-black ' + (isToday ? 'text-[var(--accent)]' : 'text-slate-500')}>
+                  <span
+                    className="text-[8px] font-black"
+                    style={{ color: isToday ? 'var(--accent)' : 'var(--text-muted)' }}
+                  >
                     {isAr ? dayNamesAr[day] : dayNamesEn[day]}
                   </span>
-                  <div className={'w-6 h-6 rounded-full flex items-center justify-center ' +
-                    (isToday
-                      ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]'
-                      : hasClass
-                        ? 'bg-[#2979ff]/20 border border-[#2979ff]/30'
-                        : 'bg-white/5 border border-white/5')}>
-                    {hasClass && !isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#2979ff]" />}
-                    {isToday && <span className="text-[8px] font-black text-slate-950">✓</span>}
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                    style={{
+                      background: isToday
+                        ? 'var(--accent)'
+                        : hasClass
+                        ? 'rgba(41,121,255,0.15)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: isToday
+                        ? '2px solid var(--accent)'
+                        : hasClass
+                        ? '1px solid rgba(41,121,255,0.3)'
+                        : '1px solid rgba(255,255,255,0.05)',
+                      boxShadow: isToday ? '0 0 10px var(--accent-glow)' : 'none'
+                    }}
+                  >
+                    {hasClass && !isToday && (
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#2979ff' }} />
+                    )}
+                    {isToday && (
+                      <span className="text-[8px] font-black" style={{ color: '#070b13' }}>✓</span>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
+          {/* مؤشر نسبة الحضور */}
+          {attendancePct !== null && (
+            <div className="mt-1 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-[8.5px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                  {isAr ? 'الحضور' : 'Attendance'}
+                </span>
+                <span className="text-[8.5px] font-black" style={{ color: attendanceColor }}>
+                  {attendancePct}%
+                </span>
+              </div>
+              <div className="attendance-bar-track">
+                <div
+                  className="attendance-bar-fill"
+                  style={{
+                    width: `${attendancePct}%`,
+                    background: `linear-gradient(90deg, ${attendanceColor}, ${attendanceColor}88)`
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── 5. شريط إعلانات وتنبيهات الكلية ── */}
-      <div className="frosted-panel border-orange-500/15 rounded-2xl p-3 flex items-center gap-3 backdrop-blur-sm overflow-hidden">
-        <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider whitespace-nowrap">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-500" />
+      {/* ── 4. شريط الإعلانات الحية ── */}
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 rounded-[14px] overflow-hidden"
+        style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)' }}
+        role="marquee"
+        aria-live="polite"
+        aria-label={isAr ? 'إعلانات الكلية' : 'College announcements'}
+      >
+        <div
+          className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full"
+          style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.25)' }}
+        >
+          <span className="live-dot" />
+          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#f97316', whiteSpace: 'nowrap' }}>
+            {isAr ? 'مباشر' : 'Live'}
           </span>
-          {isAr ? 'مباشر' : 'Live'}
         </div>
-        <div className="min-w-0 flex-1 overflow-hidden relative h-4">
-          <div className="animate-marquee whitespace-nowrap text-[10px] text-slate-300 font-bold absolute">
+        <div className="flex-1 overflow-hidden relative h-[14px]">
+          <div className="animate-marquee whitespace-nowrap absolute text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
             {announcementsText}
           </div>
         </div>
       </div>
 
-      {/* ── 6. جدول محاضرات اليوم ── */}
-      <div className="space-y-3">
-        <div className="flex justify-between items-center px-1">
-          <h4 className="text-sm font-black text-white tracking-wide">
-            {isAr ? 'جدول اليوم' : "Today's Schedule"}
-          </h4>
-          <span className="text-[9px] font-black text-[var(--accent)] bg-[var(--accent-dim)] border border-[var(--accent-glow)] px-2.5 py-0.5 rounded-full">
+      {/* ── 5. جدول محاضرات اليوم ── */}
+      <div className="space-y-2.5">
+        <div className="section-header">
+          <h3 className="section-title">{isAr ? 'جدول اليوم' : "Today's Schedule"}</h3>
+          <span className="chip chip-accent">
             {lectureCount} {isAr ? 'محاضرات' : 'classes'}
           </span>
         </div>
-        <div className="space-y-3">
-          {lecturesToRender.map((lec) => {
+
+        <div className="space-y-2.5">
+          {lecturesToRender.map((lec, idx) => {
             const isActive = lec.isActiveNow;
-            const isCompleted = lec.isCompleted;
-            let cardClass = 'relative overflow-hidden rounded-[20px] frosted-panel p-4 border transition-all duration-300';
-            let borderGlow = 'border-white/5';
-            let leftIndicator = 'bg-[#2979ff]';
-            if (isActive) {
-              cardClass += ' shadow-[0_0_20px_var(--accent-glow)]';
-              borderGlow = 'border-[var(--accent)]/60';
-              leftIndicator = 'bg-[var(--accent)]';
-            } else if (isCompleted) {
-              cardClass += ' opacity-40';
-              borderGlow = 'border-white/3';
-              leftIndicator = 'bg-slate-700';
-            }
+            const isDone = lec.isCompleted;
+
             return (
-              <div key={lec.id} className={cardClass + ' ' + borderGlow}>
-                <div className={'absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[20px] ' + leftIndicator} />
-                <div className="pl-3 flex justify-between items-start gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={'text-[11px] font-bold ' + (isActive ? 'text-[var(--accent)]' : 'text-slate-400')}>{lec.timeStr}</span>
-                      {!isActive && <span className="text-[11px] font-black text-white truncate">{lec.title}</span>}
+              <motion.div
+                key={lec.id}
+                initial={{ opacity: 0, x: isAr ? 12 : -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.06, duration: 0.25 }}
+                className="relative overflow-hidden rounded-[18px] flex gap-0"
+                style={{
+                  background: isActive
+                    ? 'linear-gradient(135deg, rgba(var(--primary-color-rgb,245,158,11),0.06) 0%, var(--bg-card) 60%)'
+                    : 'var(--bg-card)',
+                  border: isActive
+                    ? '1px solid rgba(var(--primary-color-rgb,245,158,11),0.3)'
+                    : '1px solid rgba(255,255,255,0.05)',
+                  opacity: isDone ? 0.45 : 1,
+                  boxShadow: isActive ? '0 0 20px rgba(var(--primary-color-rgb,245,158,11),0.08)' : '0 2px 8px rgba(0,0,0,0.2)'
+                }}
+              >
+                {/* شريط الجانب الملوّن (Status Indicator) */}
+                <div
+                  className="w-[3px] rounded-full shrink-0"
+                  style={{
+                    background: isActive
+                      ? 'var(--accent)'
+                      : isDone
+                      ? '#334155'
+                      : '#2979ff',
+                    margin: '10px 0 10px 10px'
+                  }}
+                />
+
+                {/* محتوى البطاقة */}
+                <div className="flex-1 p-3 pl-2 flex justify-between items-start gap-2">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className="text-[10px] font-black font-mono"
+                        style={{ color: isActive ? 'var(--accent)' : '#64748b' }}
+                      >
+                        {lec.timeStr}
+                      </span>
+                      {isActive && (
+                        <span className="live-badge">
+                          <span className="live-dot" />
+                          LIVE
+                        </span>
+                      )}
                     </div>
-                    {isActive && <h4 className="text-sm font-black text-white leading-snug">{lec.title}</h4>}
-                    {lec.lecturer && <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{lec.lecturer}</p>}
+                    <p
+                      className="text-[12px] font-black truncate leading-tight"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {lec.title}
+                    </p>
+                    {lec.lecturer && (
+                      <p className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                        {lec.lecturer}
+                      </p>
+                    )}
                   </div>
-                  <div className="shrink-0 flex flex-col items-end gap-1.5">
-                    {isActive && (
-                      <span className="bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-ping" /> LIVE NOW
+
+                  {/* القاعة */}
+                  <div className="shrink-0 text-right flex flex-col items-end gap-1.5">
+                    <span
+                      className="chip chip-slate"
+                      style={{ fontSize: '9px', fontWeight: 800, fontFamily: 'monospace' }}
+                    >
+                      {lec.room}
+                    </span>
+                    {isDone && (
+                      <span className="text-[8px] font-bold" style={{ color: '#334155' }}>
+                        {isAr ? 'انتهت' : 'Done'}
                       </span>
                     )}
-                    <span className="text-[11px] font-bold text-slate-400 font-mono">{lec.room}</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
+
+          {lecturesToRender.length === 0 && (
+            <div className="card-subtle p-6 text-center space-y-2">
+              <span style={{ fontSize: '28px' }}>😴</span>
+              <p className="text-[12px] font-black" style={{ color: 'var(--text-secondary)' }}>
+                {isAr ? 'لا توجد محاضرات اليوم' : 'No lectures today'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── 7. أزرار الإجراءات السريعة ── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-sm font-black text-[var(--text-primary)] tracking-wide">{isAr ? 'إجراءات سريعة' : 'Quick Actions'}</h4>
+      {/* ── 6. الإجراءات السريعة ── */}
+      <div className="space-y-2.5">
+        <div className="section-header">
+          <h3 className="section-title">{isAr ? 'إجراءات سريعة' : 'Quick Actions'}</h3>
           <button
             onClick={() => {
               if (onOpenPwaModal) onOpenPwaModal();
               else if (installApp) installApp();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-dim)] border border-[var(--accent-glow)] hover:bg-[var(--accent)] hover:text-slate-950 rounded-full text-[10px] font-black text-[var(--accent)] transition-all cursor-pointer shadow-sm active:scale-95"
+            className="chip chip-accent active-press"
+            style={{ cursor: 'pointer' }}
+            aria-label={isAr ? 'تثبيت التطبيق' : 'Install app'}
           >
-            <span>📲</span> {isAr ? 'تثبيت / تحميل التطبيق (APK/PWA)' : 'App (APK/PWA)'}
+            📲 {isAr ? 'تثبيت التطبيق' : 'Install App'}
           </button>
         </div>
+
         <div className="grid grid-cols-2 gap-3">
-          {/* GPS Check-In */}
-          <button
-            onClick={() => {
-              if (activeLectureNow) {
-                toast.success(isAr ? 'تم تسجيل الحضور بالـ GPS بنجاح!' : 'GPS Check-In marked successfully!');
-              } else {
-                toast.error(isAr ? 'لا توجد محاضرة نشطة حالياً للتحضير' : 'No active lecture now to check in');
-              }
-            }}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
-          >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <i className="ph ph-map-pin text-[var(--accent)] text-lg"></i>
-            </div>
-            <div>
-              <span className="text-[11px] font-black text-white block">{isAr ? 'تحضير الـ GPS' : 'GPS Check-In'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'تسجيل الحضور التلقائي بالقاعة' : 'Verify presence via GPS'}</span>
-            </div>
-          </button>
-
-          {/* Class Hub */}
-          <button
-            onClick={() => setActiveTab('exchange')}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
-          >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <i className="ph ph-chats text-[var(--accent)] text-lg"></i>
-            </div>
-            <div>
-              <span className="text-[11px] font-black text-white block">{isAr ? 'الملتقى الطلابي' : 'Class Forum'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'محادثات ونقاشات الدفعة' : 'Discuss with classmates'}</span>
-            </div>
-          </button>
-
-          {/* Focus Mode & Tasks */}
-          <button
-            onClick={() => setActiveTab('goals')}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
-          >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <i className="ph ph-checks text-[var(--accent)] text-lg"></i>
-            </div>
-            <div>
-              <span className="text-[11px] font-black text-white block">{isAr ? 'المهام والتركيز' : 'Tasks & Pomodoro'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'إنجاز التكاليف ومؤقت بومودورو' : 'Complete assignments'}</span>
-            </div>
-          </button>
-
-          {/* Print Schedule */}
-          <button
-            onClick={() => {
-              window.print();
-            }}
-            className="relative overflow-hidden rounded-[20px] p-4 border border-[var(--border-color)] hover:border-[var(--accent)] hover:shadow-[0_0_14px_var(--accent-glow)] bg-[var(--bg-card)] flex flex-col items-start gap-2 shadow-lg text-left active:scale-95 duration-150 transition-all"
-          >
-            <div className="p-2 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl">
-              <i className="ph ph-printer text-[var(--accent)] text-lg"></i>
-            </div>
-            <div>
-              <span className="text-[11px] font-black text-white block">{isAr ? 'طباعة الجدول' : 'Print Timetable'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'حفظ أو طباعة الجدول الأسبوعي' : 'Print weekly timeline'}</span>
-            </div>
-          </button>
+          {quickActions.map((action, idx) => (
+            <motion.button
+              key={action.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 + 0.1, duration: 0.22 }}
+              onClick={action.onClick}
+              className="quick-action-btn"
+              aria-label={isAr ? action.titleAr : action.titleEn}
+            >
+              {/* أيقونة */}
+              <div className="quick-action-icon" aria-hidden="true">
+                {action.icon}
+              </div>
+              {/* نص */}
+              <div className="space-y-0.5 text-left">
+                <p className="text-[12px] font-black leading-tight" style={{ color: 'var(--text-primary)' }}>
+                  {isAr ? action.titleAr : action.titleEn}
+                </p>
+                <p className="text-[9.5px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  {isAr ? action.descAr : action.descEn}
+                </p>
+              </div>
+            </motion.button>
+          ))}
         </div>
       </div>
     </div>

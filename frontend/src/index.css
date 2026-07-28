@@ -405,3 +405,473 @@ input, button, select, textarea {
   table { max-width: 100%; }
   .truncate { max-width: 100%; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — MOBILE TOUCH TARGETS (Apple HIG: minimum 44×44pt)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Every interactive element that might be too small gets an invisible
+   touch area expansion via ::before pseudo-element */
+.touch-target {
+  position: relative;
+}
+.touch-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — BOTTOM NAVIGATION DOCK (Pill Indicator System)
+   ══════════════════════════════════════════════════════════════ */
+
+.nav-dock {
+  background: rgba(7, 11, 19, 0.96);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.04), 0 -16px 40px rgba(0,0,0,0.5);
+}
+
+.nav-tab-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 52px; /* HCI: 44px minimum touch target */
+  padding: 6px 2px 4px;
+  border-radius: 16px;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+.nav-tab-btn:active {
+  transform: scale(0.90);
+}
+
+/* Active pill background */
+.nav-tab-active-bg {
+  position: absolute;
+  inset: 2px 4px;
+  border-radius: 14px;
+  background: rgba(var(--primary-color-rgb, 245, 158, 11), 0.12);
+  border: 1px solid rgba(var(--primary-color-rgb, 245, 158, 11), 0.18);
+  transition: opacity 0.2s ease;
+}
+
+.nav-tab-icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+.nav-tab-btn.active .nav-tab-icon {
+  transform: translateY(-1px) scale(1.1);
+}
+
+.nav-tab-label {
+  font-size: 9px;
+  font-weight: 700;
+  margin-top: 2px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  position: relative;
+  z-index: 1;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — HEADER BAR
+   ══════════════════════════════════════════════════════════════ */
+
+.app-header-bar {
+  background: rgba(7, 11, 19, 0.92);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Header icon buttons — HCI 44px touch target */
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+.header-icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.header-icon-btn:active {
+  transform: scale(0.93);
+  background: rgba(var(--primary-color-rgb, 245, 158, 11), 0.12);
+  border-color: rgba(var(--primary-color-rgb, 245, 158, 11), 0.3);
+  color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — CARD SYSTEM (Visual Hierarchy)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Level 1: Primary card (most important, full accent border top) */
+.card-primary {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 2px solid var(--accent);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.card-primary:active {
+  transform: scale(0.98);
+}
+
+/* Level 2: Standard content card */
+.card-base {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Level 3: Subtle / secondary card */
+.card-subtle {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+}
+
+/* Status cards */
+.card-success {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 16px;
+}
+.card-warning {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 16px;
+}
+.card-danger {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — SKELETON LOADERS (Content Perception)
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes skeleton-wave {
+  0%   { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 400px 100%;
+  animation: skeleton-wave 1.4s ease infinite;
+  border-radius: 8px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — ATTENDANCE PROGRESS BAR
+   ══════════════════════════════════════════════════════════════ */
+
+.attendance-bar-track {
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.attendance-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: linear-gradient(90deg, var(--accent), rgba(var(--primary-color-rgb), 0.7));
+  box-shadow: 0 0 8px rgba(var(--primary-color-rgb), 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — LIVE LECTURE INDICATOR (Active State)
+   ══════════════════════════════════════════════════════════════ */
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(var(--primary-color-rgb, 245, 158, 11), 0.12);
+  border: 1px solid rgba(var(--primary-color-rgb, 245, 158, 11), 0.3);
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.6); opacity: 0.5; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — QUICK ACTION GRID BUTTONS
+   ══════════════════════════════════════════════════════════════ */
+
+.quick-action-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+  min-height: 100px;
+  width: 100%;
+  overflow: hidden;
+}
+.quick-action-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(var(--primary-color-rgb, 245, 158, 11), 0);
+  transition: background 0.2s ease;
+}
+.quick-action-btn:active {
+  transform: scale(0.96);
+  border-color: rgba(var(--primary-color-rgb, 245, 158, 11), 0.3);
+  box-shadow: 0 0 0 1px rgba(var(--primary-color-rgb, 245, 158, 11), 0.15), 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.quick-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(var(--primary-color-rgb, 245, 158, 11), 0.1);
+  border: 1px solid rgba(var(--primary-color-rgb, 245, 158, 11), 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — PULL-TO-REFRESH INDICATOR
+   ══════════════════════════════════════════════════════════════ */
+
+.ptr-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(var(--primary-color-rgb), 0.15) 0%, transparent 100%);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 50;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — SCROLL CONTAINER (Content Padding)
+   ══════════════════════════════════════════════════════════════ */
+
+.main-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-padding-top: 16px;
+}
+.main-scroll::-webkit-scrollbar { display: none; }
+
+/* Content padding respects nav + header heights */
+.content-pad {
+  padding-top: calc(64px + 8px); /* header height */
+  padding-bottom: calc(68px + max(8px, env(safe-area-inset-bottom))); /* nav dock */
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — MICRO-INTERACTION: RIPPLE ON TOUCH
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  transform: scale(0);
+  animation: ripple 0.5s linear;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — COUNTDOWN DISPLAY (Visual Emphasis)
+   ══════════════════════════════════════════════════════════════ */
+
+.countdown-display {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--accent) 0%, rgba(var(--primary-color-rgb), 0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — CHIP / BADGE (Status Labels)
+   ══════════════════════════════════════════════════════════════ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.chip-accent {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.25);
+  color: var(--accent);
+}
+.chip-emerald {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+.chip-red {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+.chip-slate {
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — SECTION HEADER (Consistent Spacing)
+   ══════════════════════════════════════════════════════════════ */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.section-subtitle {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — LIGHT MODE OVERRIDES FOR NEW CLASSES
+   ══════════════════════════════════════════════════════════════ */
+
+:root.light .nav-dock {
+  background: rgba(252, 251, 247, 0.96);
+  border-top-color: rgba(184, 134, 11, 0.15);
+}
+:root.light .app-header-bar {
+  background: rgba(252, 251, 247, 0.94);
+  border-bottom-color: rgba(184, 134, 11, 0.12);
+}
+:root.light .card-base,
+:root.light .card-primary {
+  background: #ffffff;
+  border-color: rgba(184, 134, 11, 0.15);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+:root.light .header-icon-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  color: #5c5545;
+}
+:root.light .quick-action-btn {
+  background: #ffffff;
+  border-color: rgba(184, 134, 11, 0.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}

@@ -1452,23 +1452,25 @@ export default function StudentDashboard() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* مؤشر التحديث بالسحب */}
+        {/* ── مؤشر التحديث بالسحب (HCI: Pull-to-Refresh) ── */}
         {pullDistance > 0 && (
           <div
-            className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center bg-[var(--accent-dim)] text-[var(--accent)] text-[10px] font-black uppercase tracking-wider transition-all"
-            style={{ height: `${Math.min(pullDistance, PULL_THRESHOLD)}px`, opacity: pullDistance / PULL_THRESHOLD }}
+            className="ptr-indicator"
+            style={{ height: `${Math.min(pullDistance, PULL_THRESHOLD)}px`, opacity: Math.min(pullDistance / PULL_THRESHOLD, 1) }}
           >
-            <span>{isAr ? '↓ اسحب للتحديث' : '↓ Pull to refresh'}</span>
+            <span style={{ fontSize: '16px', transition: `transform ${pullDistance >= PULL_THRESHOLD ? '0.2s' : '0s'}`, transform: pullDistance >= PULL_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)' }}>↓</span>
+            <span>{isAr ? 'اسحب للتحديث' : 'Pull to refresh'}</span>
           </div>
         )}
         
-        {/* رأس الصفحة الديناميكي الثابت — تصميم تطبيق هاتف زجاجي أنيق وبسيط */}
+        {/* ══ رأس الصفحة الثابت — HCI: Visual Clarity + Touch Targets ══ */}
         <header
-          className="bg-[var(--bg-card)]/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 fixed w-full max-w-[430px] z-40 border-b border-[var(--border-color)] shadow-sm transition-all"
+          className="app-header-bar h-16 flex items-center justify-between px-4 fixed w-full max-w-[430px] z-40 transition-all"
           style={{ top: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}
         >
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            {/* Drawer menu button */}
+          {/* الجانب الأيسر: زر القائمة + الأفاتار + عنوان الصفحة */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Hamburger / Drawer Button — HCI 44px target */}
             <button
               type="button"
               onClick={() => {
@@ -1476,37 +1478,41 @@ export default function StudentDashboard() {
                 haptics.impactMedium();
                 setIsSideDrawerOpen(true);
               }}
-              className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 hover:bg-[var(--accent-dim)] hover:border-[var(--accent-glow)] hover:text-[var(--accent)] flex items-center justify-center text-white font-black text-sm shrink-0 transition-all active:scale-95 shadow-sm"
+              className="header-icon-btn shrink-0"
               title={isAr ? 'القائمة الجانبية' : 'Side Menu'}
+              aria-label={isAr ? 'فتح القائمة' : 'Open menu'}
             >
-              ☰
+              <span style={{ fontSize: '14px', lineHeight: 1 }}>☰</span>
             </button>
 
+            {/* Avatar (Home only) */}
             {header.showAvatar && (
-              <div className="w-9 h-9 rounded-2xl border border-[var(--accent)]/50 bg-[var(--bg-card)] flex items-center justify-center font-black text-xs text-[var(--accent)] shadow-[0_0_12px_var(--accent-glow)] shrink-0 active-press cursor-pointer">
-                {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
+              <div className="w-9 h-9 rounded-[14px] bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/5 border border-[var(--accent)]/30 flex items-center justify-center font-black text-xs text-[var(--accent)] shrink-0" aria-hidden="true">
+                {profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : 'ST'}
               </div>
             )}
+
+            {/* Page Title + Subtitle */}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-xs font-black text-white truncate leading-tight">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h1 className="text-[13px] font-black text-[var(--text-primary)] truncate leading-tight">
                   {header.title}
-                </h2>
-                {profile.isRepresentative && (
-                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase px-1.5 py-0.2 rounded-full shrink-0">
-                    👑 {isAr ? 'مندوب' : 'Rep'}
-                  </span>
+                </h1>
+                {profile.isRepresentative && activeTab === 'home' && (
+                  <span className="chip chip-emerald shrink-0">👑 {isAr ? 'مندوب' : 'Rep'}</span>
                 )}
               </div>
-              <p className="text-[9px] text-slate-400 font-bold mt-0.5 truncate">
-                {header.subtitle}
-              </p>
+              {header.subtitle && (
+                <p className="text-[9.5px] text-[var(--text-muted)] font-semibold mt-0.5 truncate leading-tight">
+                  {header.subtitle}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* أزرار الإجراءات السريعة المنظمة والمتناسقة */}
+          {/* الجانب الأيمن: الإشعارات + الإعدادات السريعة */}
           <div className="flex items-center gap-2 shrink-0 relative">
-            {/* Notification Center Bell Button */}
+            {/* زر الإشعارات */}
             <button
               type="button"
               onClick={() => {
@@ -1514,18 +1520,31 @@ export default function StudentDashboard() {
                 haptics.impactMedium();
                 setIsNotificationCenterOpen(true);
               }}
-              className="relative p-2 border border-[var(--border-color)] hover:border-[var(--accent)] rounded-xl shrink-0 flex items-center justify-center transition-all active-press active:scale-95 bg-[var(--bg-card)]/60 text-slate-300"
-              title={isAr ? 'مركز الإشعارات' : 'Notification Center'}
+              className="header-icon-btn"
+              title={isAr ? 'مركز الإشعارات' : 'Notifications'}
+              aria-label={isAr ? `الإشعارات، ${unreadNotificationsCount} غير مقروءة` : `Notifications, ${unreadNotificationsCount} unread`}
             >
-              <span className="text-xs">🔔</span>
+              <span style={{ fontSize: '15px' }}>🔔</span>
               {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center animate-pulse border border-slate-900 shadow-md">
-                  {unreadNotificationsCount}
+                <span
+                  className="absolute flex items-center justify-center font-black"
+                  style={{
+                    top: '-4px', right: '-4px',
+                    width: '17px', height: '17px',
+                    borderRadius: '999px',
+                    background: '#ef4444',
+                    color: '#fff',
+                    fontSize: '8px',
+                    border: '2px solid var(--bg-primary)',
+                    boxShadow: '0 0 8px rgba(239,68,68,0.5)'
+                  }}
+                >
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                 </span>
               )}
             </button>
 
-            {/* Quick Settings & Appearance Dropdown Toggle */}
+            {/* زر الإعدادات السريعة */}
             <button
               type="button"
               onClick={() => {
@@ -1533,102 +1552,87 @@ export default function StudentDashboard() {
                 haptics.impactLight();
                 setIsQuickHeaderMenuOpen(!isQuickHeaderMenuOpen);
               }}
-              className={`p-2 border rounded-xl shrink-0 flex items-center justify-center transition-all active:scale-95 ${
-                isQuickHeaderMenuOpen
-                  ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
-                  : 'border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)]/60 text-slate-300'
-              }`}
-              title={isAr ? 'إعدادات سريعة والمظهر' : 'Quick Settings'}
+              className="header-icon-btn"
+              style={isQuickHeaderMenuOpen ? {
+                background: 'rgba(var(--primary-color-rgb, 245, 158, 11), 0.12)',
+                borderColor: 'rgba(var(--primary-color-rgb, 245, 158, 11), 0.3)',
+                color: 'var(--accent)'
+              } : {}}
+              title={isAr ? 'إعدادات سريعة' : 'Quick Settings'}
+              aria-label={isAr ? 'الإعدادات السريعة' : 'Quick settings'}
+              aria-expanded={isQuickHeaderMenuOpen}
             >
-              <span className="text-xs">⚙️</span>
+              <span style={{ fontSize: '15px' }}>⚙️</span>
             </button>
 
-            {/* Quick Controls Dropdown Menu Popover */}
+            {/* قائمة الإعدادات السريعة المنسدلة */}
             <AnimatePresence>
               {isQuickHeaderMenuOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsQuickHeaderMenuOpen(false)}
-                  />
+                  <div className="fixed inset-0 z-40" onClick={() => setIsQuickHeaderMenuOpen(false)} aria-hidden="true" />
                   <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className={`absolute top-12 ${isAr ? 'left-0' : 'right-0'} z-50 w-64 bg-slate-950/95 border border-white/10 backdrop-blur-2xl rounded-2xl p-3 shadow-2xl space-y-2.5 font-sans`}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.14, ease: 'easeOut' }}
+                    className={`absolute top-[calc(100%+6px)] ${isAr ? 'left-0' : 'right-0'} z-50 w-64`}
+                    style={{
+                      background: 'rgba(10,15,28,0.97)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      backdropFilter: 'blur(24px) saturate(180%)',
+                      borderRadius: '18px',
+                      padding: '12px',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03) inset'
+                    }}
                     dir={isAr ? 'rtl' : 'ltr'}
+                    role="menu"
+                    aria-label={isAr ? 'الإعدادات السريعة' : 'Quick controls'}
                   >
-                    <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                      <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
-                        ⚡ {isAr ? 'الإعدادات السريعة' : 'Quick Controls'}
+                    <div className="flex justify-between items-center pb-2.5 mb-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        ⚡ {isAr ? 'إعدادات سريعة' : 'Quick Controls'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuickHeaderMenuOpen(false)}
-                        className="text-slate-400 hover:text-white text-xs font-bold px-1"
-                      >
+                      <button type="button" onClick={() => setIsQuickHeaderMenuOpen(false)}
+                        className="header-icon-btn" style={{ width: '24px', height: '24px', minWidth: '24px', borderRadius: '8px', fontSize: '11px', color: '#64748b' }}>
                         ✕
                       </button>
                     </div>
 
-                    {/* Theme Switcher */}
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-slate-400 font-bold block">
-                        🎨 {isAr ? 'تخصيص لون وثيم التطبيق:' : 'App Theme & Colors:'}
-                      </span>
-                      <ThemeSwitcher />
+                    <div className="space-y-1.5">
+                      {/* Theme Switcher */}
+                      <div style={{ marginBottom: '4px' }}>
+                        <p style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, marginBottom: '6px' }}>🎨 {isAr ? 'ثيم التطبيق:' : 'App Theme:'}</p>
+                        <ThemeSwitcher />
+                      </div>
+
+                      {[{
+                        icon: '🌐',
+                        label: isAr ? 'لغة الواجهة' : 'Language',
+                        badge: isAr ? 'EN' : 'AR',
+                        onClick: () => { i18n.changeLanguage(isAr ? 'en' : 'ar'); setIsQuickHeaderMenuOpen(false); }
+                      }, {
+                        icon: '📲',
+                        label: isAr ? 'تحميل APK' : 'Download APK',
+                        badge: '↓',
+                        onClick: (e) => { triggerApkDownload(e, 'apk'); setIsQuickHeaderMenuOpen(false); }
+                      }, {
+                        icon: '🔄',
+                        label: isAr ? 'مزامنة البيانات' : 'Sync Data',
+                        badge: '⚡',
+                        onClick: () => { handleManualSync(); setIsQuickHeaderMenuOpen(false); }
+                      }].map((item, i) => (
+                        <button key={i} type="button" onClick={item.onClick} role="menuitem"
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-[12px] text-xs font-bold text-slate-200 transition-all"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)' }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span>{item.icon}</span>
+                            <span style={{ fontSize: '11px' }}>{item.label}</span>
+                          </span>
+                          <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900 }}>{item.badge}</span>
+                        </button>
+                      ))}
                     </div>
-
-                    {/* Language Switcher */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        i18n.changeLanguage(isAr ? 'en' : 'ar');
-                        setIsQuickHeaderMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>🌐</span>
-                        <span>{isAr ? 'لغة الواجهة' : 'Language'}</span>
-                      </span>
-                      <span className="text-[10px] font-black text-amber-400 uppercase">
-                        {isAr ? 'English (EN)' : 'العربية (AR)'}
-                      </span>
-                    </button>
-
-                    {/* APK Download Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        triggerApkDownload(e, 'apk');
-                        setIsQuickHeaderMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>📲</span>
-                        <span>{isAr ? 'تحميل تطبيق Android (APK)' : 'Download APK App'}</span>
-                      </span>
-                      <span className="text-[10px] text-emerald-400 font-black">↓</span>
-                    </button>
-
-                    {/* App & Data Sync Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleManualSync();
-                        setIsQuickHeaderMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-slate-200 transition-all"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>🔄</span>
-                        <span>{isAr ? 'مزامنة وتحديث البيانات' : 'Sync & Refresh Data'}</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400">⚡</span>
-                    </button>
                   </motion.div>
                 </>
               )}
@@ -1807,73 +1811,77 @@ export default function StudentDashboard() {
           )}
         </main>
 
-        {/* شريط الملاحة والتنقل السفلي للتطبيق (Native Bottom Navigation Bar) */}
-        <nav className="bottom-nav-dock fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto backdrop-blur-md bg-[#0f172a]/95 border-t border-white/10 h-[70px] px-1 pb-2 pt-1 flex justify-around items-center rounded-t-3xl z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.4)] select-none">
+        {/* ══ شريط التنقل السفلي — HCI: Pill Indicator + 52px Touch Targets ══ */}
+        <nav
+          className="nav-dock fixed bottom-0 left-0 right-0 w-full max-w-[430px] mx-auto z-40 flex items-center pt-1 px-1 select-none"
+          style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px' }}
+          role="tablist"
+          aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'}
+        >
           {[
-            {
-              id: 'home',
-              label: isAr ? 'الرئيسية' : 'Home',
-              iconActive: 'ph-fill ph-house',
-              iconInactive: 'ph ph-house'
-            },
-            {
-              id: 'schedule',
-              label: isAr ? 'المقررات' : 'Courses',
-              iconActive: 'ph-fill ph-book-open',
-              iconInactive: 'ph ph-book-open'
-            },
-            {
-              id: 'goals',
-              label: isAr ? 'المهام' : 'Tasks',
-              iconActive: 'ph-fill ph-checks',
-              iconInactive: 'ph ph-checks'
-            },
-            {
-              id: 'representative',
-              label: isAr ? 'المندوب' : 'Delegate',
-              iconActive: 'ph-fill ph-users-three',
-              iconInactive: 'ph ph-users-three'
-            },
-            {
-              id: 'exchange',
-              label: isAr ? 'الملتقى' : 'Forum',
-              iconActive: 'ph-fill ph-chats',
-              iconInactive: 'ph ph-chats'
-            },
-            {
-              id: 'profile',
-              label: isAr ? 'الملف' : 'Profile',
-              iconActive: 'ph-fill ph-user',
-              iconInactive: 'ph ph-user'
-            }
+            { id: 'home',           label: isAr ? 'الرئيسية' : 'Home',     iconActive: 'ph-fill ph-house',       iconInactive: 'ph ph-house' },
+            { id: 'schedule',       label: isAr ? 'الجدول'   : 'Schedule', iconActive: 'ph-fill ph-calendar',    iconInactive: 'ph ph-calendar' },
+            { id: 'goals',          label: isAr ? 'المهام'   : 'Tasks',    iconActive: 'ph-fill ph-checks',      iconInactive: 'ph ph-checks' },
+            { id: 'exchange',       label: isAr ? 'الملتقى'  : 'Forum',    iconActive: 'ph-fill ph-chats',       iconInactive: 'ph ph-chats' },
+            { id: 'representative', label: isAr ? 'المندوب'  : 'Delegate', iconActive: 'ph-fill ph-users-three', iconInactive: 'ph ph-users-three' },
+            { id: 'profile',        label: isAr ? 'الملف'    : 'Profile',  iconActive: 'ph-fill ph-user-circle', iconInactive: 'ph ph-user-circle' },
           ].map(tab => {
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={active}
+                aria-label={tab.label}
                 onClick={() => {
                   haptics.selection();
                   soundEngine.playClick();
                   setActiveTab(tab.id);
                 }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 transition-all duration-200 active-press ${
-                  active ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-                }`}
+                className={`nav-tab-btn ${active ? 'active' : ''}`}
               >
-                <div className="relative flex flex-col items-center justify-center">
-                  <i className={`${active ? tab.iconActive : tab.iconInactive} text-lg transition-all duration-200 ${
-                    active ? 'drop-shadow-[0_0_10px_rgba(245,158,11,0.7)] scale-110' : ''
-                  }`} />
-                  <span className={`text-[9px] sm:text-[10px] mt-0.5 truncate max-w-[55px] font-sans ${active ? 'font-black text-amber-400' : 'font-semibold'}`}>
-                    {tab.label}
-                  </span>
-                  {active && (
-                    <motion.span
-                      layoutId="activeTabIndicator"
-                      className="absolute -bottom-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]"
-                    />
-                  )}
-                </div>
+                {/* Active pill background — uses layoutId for smooth shared transition */}
+                {active && (
+                  <motion.div
+                    layoutId="navPillBg"
+                    className="nav-tab-active-bg"
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+
+                {/* Icon */}
+                <i
+                  className={`${active ? tab.iconActive : tab.iconInactive} nav-tab-icon`}
+                  style={{ color: active ? 'var(--accent)' : '#64748b' }}
+                  aria-hidden="true"
+                />
+
+                {/* Label */}
+                <span
+                  className="nav-tab-label"
+                  style={{
+                    color: active ? 'var(--accent)' : '#64748b',
+                    fontWeight: active ? 900 : 600
+                  }}
+                >
+                  {tab.label}
+                </span>
+
+                {/* Notification dot on profile (unread count) */}
+                {tab.id === 'profile' && unreadNotificationsCount > 0 && !active && (
+                  <span
+                    className="absolute"
+                    style={{
+                      top: '8px', right: 'calc(50% - 14px)',
+                      width: '8px', height: '8px',
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      border: '1.5px solid var(--bg-primary)',
+                      boxShadow: '0 0 6px rgba(239,68,68,0.6)'
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             );
           })}
