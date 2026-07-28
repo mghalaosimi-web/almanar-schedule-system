@@ -506,33 +506,41 @@ export default function ExchangeHubTab({
     <div className="w-full space-y-4 flex flex-col">
       
       {/* Header and Class Section Badge */}
-      <div className="bg-slate-900/80 border border-white/10 p-3 rounded-2xl flex justify-between items-center gap-3 shadow-md">
+      <div
+        className="p-3.5 rounded-[18px] flex justify-between items-center gap-3 shadow-sm"
+        style={{ background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
         <div>
-          <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+          <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
             <span>🏫</span>
             <span>{isAr ? `شعبة: ${profile.groupName || 'شعبتك الدراسية'}` : `Class: ${profile.groupName || 'Your Section'}`}</span>
           </h3>
         </div>
 
         {/* Tab switcher: Live Group Chat vs Academic Threads */}
-        <div className="flex bg-slate-955 border border-white/5 rounded-xl p-0.5 select-none shrink-0">
+        <div
+          className="flex p-0.5 rounded-[12px] select-none shrink-0"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+        >
           <button
             onClick={() => setExchangeTab('chat')}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all ${
-              exchangeTab === 'chat'
-                ? 'bg-[#f59e0b] text-slate-950 shadow-md shadow-[#f59e0b]/10'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className="px-3 py-1.5 rounded-[10px] text-[10px] font-black tracking-wide transition-all"
+            style={{
+              background: exchangeTab === 'chat' ? 'var(--accent)' : 'transparent',
+              color: exchangeTab === 'chat' ? '#070b13' : 'var(--text-muted)',
+              boxShadow: exchangeTab === 'chat' ? '0 2px 8px rgba(var(--primary-color-rgb),0.3)' : 'none'
+            }}
           >
             💬 {isAr ? 'محادثة الدفعة' : 'Group Chat'}
           </button>
           <button
             onClick={() => setExchangeTab('forum')}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wide transition-all ${
-              exchangeTab === 'forum'
-                ? 'bg-[#f59e0b] text-slate-950 shadow-md shadow-[#f59e0b]/10'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className="px-3 py-1.5 rounded-[10px] text-[10px] font-black tracking-wide transition-all"
+            style={{
+              background: exchangeTab === 'forum' ? 'var(--accent)' : 'transparent',
+              color: exchangeTab === 'forum' ? '#070b13' : 'var(--text-muted)',
+              boxShadow: exchangeTab === 'forum' ? '0 2px 8px rgba(var(--primary-color-rgb),0.3)' : 'none'
+            }}
           >
             📚 {isAr ? 'المنتدى الدراسي' : 'Academic Hub'}
           </button>

@@ -201,8 +201,8 @@ export default function GoalsTab({ isAr, goals, goalsLoading, onToggleGoal, onAd
 
       {/* ── 1. Progress Metric Card ── */}
       <div 
-        className="relative overflow-hidden rounded-[24px] p-5 border border-white/5 bg-slate-900/60 shadow-xl"
-        style={{ borderColor: 'var(--accent-glow)' }}
+        className="relative overflow-hidden rounded-[24px] p-5 border shadow-xl"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
       >
         <div className="absolute top-0 right-0 w-28 h-28 bg-[var(--accent)]/5 rounded-full blur-2xl pointer-events-none" />
         

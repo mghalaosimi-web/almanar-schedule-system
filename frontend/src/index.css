@@ -47,17 +47,48 @@
 :root.light {
   --bg-primary:   #fcfbf7;
   --bg-card:      #ffffff;
-  --bg-elevated:  #fdfcf7;
-  --border-color: rgba(184, 134, 11, 0.4);
-  --border-hover: rgba(184, 134, 11, 0.85);
-  --text-primary:   #1c1a14;
-  --text-secondary: #5c5545;
-  --text-muted:     #8c8575;
+  --bg-elevated:  #f8fafc;
+  --border-color: rgba(184, 134, 11, 0.22);
+  --border-hover: rgba(184, 134, 11, 0.6);
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #64748b;
   --accent:         #b8860b;
   --accent-dim:     rgba(218, 165, 32, 0.12);
-  --accent-glow:    rgba(218, 165, 32, 0.35);
+  --accent-glow:    rgba(218, 165, 32, 0.25);
   --glow-lime:    rgba(218, 165, 32, 0.12);
   --glow-emerald: rgba(218, 165, 32, 0.10);
+}
+
+/* ── Light Mode Component Adaptation Overrides ────────────────── */
+:root.light .bg-slate-900,
+:root.light .bg-slate-950,
+:root.light .bg-slate-955,
+:root.light .bg-slate-850,
+:root.light .bg-slate-800,
+:root.light .bg-\[\#0f172a\],
+:root.light .bg-\[\#070b13\],
+:root.light .bg-\[\#121824\] {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+:root.light .text-slate-200,
+:root.light .text-slate-300,
+:root.light .text-white {
+  color: var(--text-primary) !important;
+}
+
+:root.light .text-slate-400,
+:root.light .text-slate-500 {
+  color: var(--text-secondary) !important;
+}
+
+:root.light .border-white\/5,
+:root.light .border-white\/10,
+:root.light .border-slate-800,
+:root.light .border-slate-700 {
+  border-color: var(--border-color) !important;
 }
 
 /* ── Theme variants (for ThemeSwitcher) ──────────────────────── */
@@ -875,3 +906,35 @@ input, button, select, textarea {
   border-color: rgba(184, 134, 11, 0.15);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — GLOBAL THEME BRIDGE FOR HARDCODED UTILITIES
+   ══════════════════════════════════════════════════════════════ */
+
+:root.light .bg-slate-900,
+:root.light .bg-slate-950,
+:root.light .bg-slate-955,
+:root.light .bg-\[\#0f172a\],
+:root.light .bg-\[\#070b13\],
+:root.light .bg-\[\#0b1120\],
+:root.light .bg-black\/20,
+:root.light .bg-black\/60 {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+}
+
+:root.light .text-white {
+  color: #0f172a !important;
+}
+
+:root.light .text-slate-300,
+:root.light .text-slate-400 {
+  color: #475569 !important;
+}
+
+:root.light .border-white\/5,
+:root.light .border-white\/10,
+:root.light .border-slate-800 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+

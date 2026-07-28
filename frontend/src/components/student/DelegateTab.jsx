@@ -842,54 +842,62 @@ ${excusedList.map((s, i) => `${i + 1}. ${s.name} (${s.note || 'عذر رسمي'}
                       </div>
                     </div>
 
-                    {/* Interactive Status Selector Bar */}
-                    <div className="flex items-center gap-1 self-end sm:self-center bg-slate-950 p-1 rounded-xl border border-white/10">
+                    {/* Interactive Status Selector Bar — HCI 38px Touch Target */}
+                    <div className="flex items-center gap-1.5 self-stretch sm:self-center p-1 rounded-2xl border" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
                       <button
+                        type="button"
                         onClick={() => setStudentStatus(student.id, 'PRESENT')}
-                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-black transition-all active:scale-95 ${
+                        className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1 ${
                           student.status === 'PRESENT'
-                            ? 'bg-emerald-500 text-slate-955 shadow'
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
                             : 'text-slate-400 hover:text-emerald-400'
                         }`}
+                        style={{ minHeight: '36px' }}
                       >
-                        {isAr ? '✓ حاضر' : 'Present'}
+                        ✓ {isAr ? 'حاضر' : 'Present'}
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => setStudentStatus(student.id, 'ABSENT')}
-                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-black transition-all active:scale-95 ${
+                        className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1 ${
                           student.status === 'ABSENT'
-                            ? 'bg-red-500 text-white shadow'
+                            ? 'bg-red-500 text-white shadow-md shadow-red-500/20'
                             : 'text-slate-400 hover:text-red-400'
                         }`}
+                        style={{ minHeight: '36px' }}
                       >
-                        {isAr ? '✕ غائب' : 'Absent'}
+                        ✕ {isAr ? 'غائب' : 'Absent'}
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => setStudentStatus(student.id, 'LATE')}
-                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-black transition-all active:scale-95 ${
+                        className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1 ${
                           student.status === 'LATE'
-                            ? 'bg-amber-500 text-slate-955 shadow'
+                            ? 'bg-amber-500 text-slate-955 shadow-md shadow-amber-500/20'
                             : 'text-slate-400 hover:text-amber-400'
                         }`}
+                        style={{ minHeight: '36px' }}
                       >
-                        {isAr ? '⏰ متأخر' : 'Late'}
+                        ⏰ {isAr ? 'متأخر' : 'Late'}
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => {
                           setSelectedStudentForExcuse(student);
                           setExcuseNote(student.note || '');
                           setIsExcuseModalOpen(true);
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-black transition-all active:scale-95 ${
+                        className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1 ${
                           student.status === 'EXCUSED'
-                            ? 'bg-blue-500 text-white shadow'
+                            ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
                             : 'text-slate-400 hover:text-blue-400'
                         }`}
+                        style={{ minHeight: '36px' }}
                       >
-                        {isAr ? '📝 بعذر' : 'Excused'}
+                        📝 {isAr ? 'بعذر' : 'Excused'}
                       </button>
                     </div>
                   </div>
