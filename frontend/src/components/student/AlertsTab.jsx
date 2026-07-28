@@ -30,7 +30,19 @@ export default function AlertsTab({ isAr, allAlerts }) {
   ];
 
   const getAlertStyle = (alert) => {
-    if (alert.type === 'Urgent') return {
+    const msg = (alert.message || '').toLowerCase();
+    const title = (alert.title || '').toLowerCase();
+    const isPreLectureTaskWarning = title.includes('تكليف معلق') || msg.includes('تكليف/مشروع معلق') || msg.includes('تكليف من الأسبوع السابق');
+
+    if (isPreLectureTaskWarning) return {
+      borderColor: 'rgba(245,158,11,0.4)',
+      background: 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(245,158,11,0.08) 100%)',
+      accentColor: '#f59e0b',
+      badge: isAr ? '⏰ تنبيه محاضرة وتكليف' : '⏰ Class & Task Alert',
+      icon: '⚡',
+      badgeStyle: { background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24' }
+    };
+    if (alert.type === 'Urgent' || title.includes('عاجل')) return {
       borderColor: 'rgba(239,68,68,0.25)',
       background: 'rgba(239,68,68,0.04)',
       accentColor: '#f87171',

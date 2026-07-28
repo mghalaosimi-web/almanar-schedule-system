@@ -33,6 +33,7 @@ const auditRouter = require('./routes/audit');
 const searchRouter = require('./routes/search');
 const analyticsRouter = require('./routes/analytics');
 const aiRouter = require('./routes/aiRoutes');
+const aiCopilotRouter = require('./routes/aiCopilot');
 
 const { activityLogger } = require('./middleware/activityLogger');
 const { requestLoggerMiddleware } = require('./middleware/requestLogger');
@@ -157,6 +158,7 @@ app.use('/api', auditRouter);
 app.use('/api', searchRouter);
 app.use('/api', analyticsRouter);
 app.use('/api', aiRouter);
+app.use('/api', aiCopilotRouter);
 
 // Self-healing database check & migrations
 async function runStartupMigrations() {

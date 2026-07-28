@@ -217,6 +217,7 @@ model Schedule {
   rescheduleRequests RescheduleRequest[]
   attendanceRecords  AttendanceRecord[]
   attendances        Attendance[]
+  academicGoals      AcademicGoal[]
   collegeId          Int
   college            College             @relation(fields: [collegeId], references: [id])
 
@@ -633,6 +634,9 @@ model AcademicGoal {
   groupId Int?
   group   Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
+  scheduleId Int?
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
   completions StudentGoalCompletion[]
 
   createdAt DateTime @default(now())
@@ -640,6 +644,7 @@ model AcademicGoal {
 
   @@index([subjectId])
   @@index([groupId])
+  @@index([scheduleId])
 }
 
 model StudentGoalCompletion {

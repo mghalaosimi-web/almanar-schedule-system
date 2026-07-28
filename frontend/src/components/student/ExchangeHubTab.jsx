@@ -56,6 +56,93 @@ export default function ExchangeHubTab({
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
+  // AI Forum Co-Pilot & Quiz Generator States
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiSubjectName, setAiSubjectName] = useState('');
+  const [aiTopic, setAiTopic] = useState('');
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [aiSummaryResult, setAiSummaryResult] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
+  const handleGenerateAiQuiz = async () => {
+    if (!aiSubjectName.trim()) {
+      toast.error(isAr ? 'يرجى كتابة اسم المادة أولاً' : 'Please enter subject name');
+      return;
+    }
+    setQuizLoading(true);
+    setQuizQuestions([]);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/quiz/generate`, {
+        subjectName: aiSubjectName.trim()
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.success) {
+        setQuizQuestions(res.data.questions || []);
+        toast.success(isAr ? 'تم توليد الاختبار التجريبي بنجاح!' : 'Quiz generated successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل توليد الاختبار' : 'Failed to generate quiz');
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleGenerateAiExplain = async () => {
+    if (!aiTopic.trim()) {
+      toast.error(isAr ? 'يرجى كتابة موضوع الشرح' : 'Please enter topic');
+      return;
+    }
+    setAiSummaryLoading(true);
+    setAiSummaryResult('');
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/copilot/explain`, {
+        topic: aiTopic.trim(),
+        subjectName: aiSubjectName.trim()
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.success) {
+        setAiSummaryResult(res.data.summary);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? 'فشل إعداد التلخيص' : 'Failed to generate summary');
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
+  const handleShareQuizToForum = async () => {
+    if (quizQuestions.length === 0) return;
+    const title = `🤖 كويز تجريبي في مادة: ${aiSubjectName}`;
+    let content = `أسئلة اختبار تجريبي لمقرر ${aiSubjectName}:\n\n`;
+    quizQuestions.forEach((q, idx) => {
+      content += `س${idx + 1}: ${q.question}\nالخيارات: ${q.options.join(' | ')}\n\n`;
+    });
+    content += `شجّع زملائك على إجابة الأسئلة ومقارنة النتيجة! 🚀`;
+
+    const success = await handleCreatePost(title, content, 'HELP', false);
+    if (success) {
+      toast.success(isAr ? 'تم نشر الكويز الذكي في الملتقى بنجاح!' : 'Quiz posted to forum successfully!');
+      setIsAiModalOpen(false);
+    }
+  };
+
+  const handleShareSummaryToForum = async () => {
+    if (!aiSummaryResult) return;
+    const title = `💡 ملخص ومراجعة ذكية: ${aiTopic} (${aiSubjectName || 'دراسي'})`;
+    const success = await handleCreatePost(title, aiSummaryResult, 'RESOURCE', false);
+    if (success) {
+      toast.success(isAr ? 'تم نشر التلخيص الذكي في الملتقى بنجاح!' : 'Summary posted to forum successfully!');
+      setIsAiModalOpen(false);
+    }
+  };
+
   const handleSummarizeChat = async () => {
     setSummaryLoading(true);
     setSummary('');
@@ -727,12 +814,21 @@ export default function ExchangeHubTab({
             <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
               {isAr ? 'المنتدى الأكاديمي للدفعة' : 'Academic Class Forum'}
             </h4>
-            <button
-              onClick={() => setIsNewPostModalOpen(true)}
-              className="px-3 py-1.5 bg-[#00f59b] hover:bg-[#00d484] text-slate-955 font-black text-[10px] rounded-lg active:scale-95 shadow-md shadow-[#00f59b]/20 whitespace-nowrap transition-transform"
-            >
-              ➕ {isAr ? 'منشور جديد' : 'New Post'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(true)}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-955 font-black text-[10px] rounded-lg active:scale-95 shadow-md shadow-amber-500/20 whitespace-nowrap transition-transform flex items-center gap-1"
+              >
+                <span>🤖</span> {isAr ? 'مساعد الملتقى وكويزات الذكاء الاصطناعي' : 'AI Forum Assistant & Quizzes'}
+              </button>
+              <button
+                onClick={() => setIsNewPostModalOpen(true)}
+                className="px-3 py-1.5 bg-[#00f59b] hover:bg-[#00d484] text-slate-955 font-black text-[10px] rounded-lg active:scale-95 shadow-md shadow-[#00f59b]/20 whitespace-nowrap transition-transform"
+              >
+                ➕ {isAr ? 'منشور جديد' : 'New Post'}
+              </button>
+            </div>
           </div>
 
           {/* Forum search input */}
@@ -949,6 +1045,194 @@ export default function ExchangeHubTab({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── AI Forum Assistant & Quiz Generator Modal ── */}
+      <AnimatePresence>
+        {isAiModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="frosted-panel w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-white bg-slate-900 border border-amber-500/30 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-amber-500/20 pb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5 font-sans">
+                  🤖 {isAr ? 'مساعد الدراسة واختبارات الذكاء الاصطناعي' : 'AI Study & Quiz Assistant'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors text-lg leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 text-right font-sans" dir="rtl">
+                {/* Subject & Topic Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs text-amber-300 font-bold block">
+                    {isAr ? 'المادة الأكاديمية' : 'Course Subject'}
+                  </label>
+                  <input
+                    type="text"
+                    value={aiSubjectName}
+                    onChange={(e) => setAiSubjectName(e.target.value)}
+                    placeholder={isAr ? 'مثال: شبكات الكمبيوتر / هندسة البرمجيات' : 'e.g. Computer Networks'}
+                    className="w-full bg-slate-955 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 text-right"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiQuiz}
+                    disabled={quizLoading}
+                    className="py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs rounded-xl hover:opacity-90 transition-all disabled:opacity-50 active:scale-95 shadow-md flex items-center justify-center gap-1"
+                  >
+                    {quizLoading ? (
+                      <div className="h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>⚡</span>
+                        {isAr ? 'توليد كويز (5 أسئلة)' : 'Generate 5-Q Quiz'}
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiExplain}
+                    disabled={aiSummaryLoading}
+                    className="py-3 bg-slate-800 border border-slate-700 text-amber-400 hover:text-amber-300 font-black text-xs rounded-xl transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-1"
+                  >
+                    {aiSummaryLoading ? (
+                      <div className="h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>💡</span>
+                        {isAr ? 'تلخيص وشرح الدرس' : 'Summarize Topic'}
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Topic field for summary */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">
+                    {isAr ? 'عنوان الدرس أو الموضوع للشرح (اختياري)' : 'Topic / Lesson Title (Optional)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    placeholder={isAr ? 'مثال: نموذج OSI / التشفير بـ RSA' : 'e.g. OSI Model'}
+                    className="w-full bg-slate-955 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 text-right"
+                  />
+                </div>
+
+                {/* Render Generated Quiz */}
+                {quizQuestions.length > 0 && (
+                  <div className="bg-slate-950 border border-amber-500/30 rounded-2xl p-4 space-y-3 mt-3">
+                    <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                      <span className="text-xs font-black text-amber-400">
+                        {isAr ? `🎯 كويز مادة: ${aiSubjectName}` : `🎯 Quiz: ${aiSubjectName}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleShareQuizToForum}
+                        className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-bold hover:bg-emerald-500/30 transition-all flex items-center gap-1"
+                      >
+                        <span>📢</span> {isAr ? 'مشاركة في المنشورات' : 'Share to Forum'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                      {quizQuestions.map((q, qIdx) => (
+                        <div key={qIdx} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
+                          <p className="font-bold text-white leading-relaxed">
+                            {qIdx + 1}. {q.question}
+                          </p>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {q.options.map((opt, optIdx) => {
+                              const isSelected = quizAnswers[qIdx] === optIdx;
+                              const isCorrect = q.correctAnswer === optIdx;
+                              let btnClass = 'bg-slate-800 border-slate-700 text-slate-200';
+
+                              if (quizSubmitted) {
+                                if (isCorrect) btnClass = 'bg-emerald-500/20 border-emerald-500 text-emerald-300';
+                                else if (isSelected) btnClass = 'bg-red-500/20 border-red-500 text-red-300';
+                              } else if (isSelected) {
+                                btnClass = 'bg-amber-500/20 border-amber-500 text-amber-300';
+                              }
+
+                              return (
+                                <button
+                                  key={optIdx}
+                                  type="button"
+                                  disabled={quizSubmitted}
+                                  onClick={() => setQuizAnswers({ ...quizAnswers, [qIdx]: optIdx })}
+                                  className={`p-2 rounded-lg border text-right font-semibold text-[11px] transition-all ${btnClass}`}
+                                >
+                                  {opt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {quizSubmitted && q.explanation && (
+                            <p className="text-[10px] text-amber-300 bg-amber-500/10 p-2 rounded-lg mt-1 font-bold">
+                              💡 {q.explanation}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {!quizSubmitted ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuizSubmitted(true);
+                          toast.success(isAr ? 'تم تقييم الإجابات منح +50 XP!' : 'Quiz submitted, +50 XP awarded!');
+                        }}
+                        className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-transform"
+                      >
+                        {isAr ? 'تصحيح ومراجعة النتيجة' : 'Submit Quiz'}
+                      </button>
+                    ) : (
+                      <div className="text-center text-xs font-black text-emerald-400 py-1">
+                        🏆 {isAr ? 'عاش! استمر في التمارين اليومية.' : 'Great job! Keep practicing.'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Render Generated AI Summary */}
+                {aiSummaryResult && (
+                  <div className="bg-slate-950 border border-amber-500/30 rounded-2xl p-4 space-y-3 mt-3">
+                    <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                      <span className="text-xs font-black text-amber-400">
+                        {isAr ? '💡 التلخيص الذكي لموضوعك' : '💡 AI Concept Summary'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleShareSummaryToForum}
+                        className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-bold hover:bg-emerald-500/30 transition-all flex items-center gap-1"
+                      >
+                        <span>📢</span> {isAr ? 'نشر بالملتقى' : 'Share to Forum'}
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-200 leading-relaxed font-semibold whitespace-pre-line text-right bg-slate-900/60 p-3 rounded-xl">
+                      {aiSummaryResult}
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}

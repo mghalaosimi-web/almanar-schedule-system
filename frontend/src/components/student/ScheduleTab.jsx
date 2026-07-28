@@ -272,14 +272,22 @@ export default function ScheduleTab({
                                   </p>
                                 )}
                                 {pendingGoals.length > 0 && (
-                                  <div className="mt-1.5 space-y-1">
+                                  <div className="mt-2 space-y-1">
                                     {pendingGoals.map(g => (
                                       <div
                                         key={g.id}
-                                        className="flex items-center gap-1 text-[9px] font-black px-2 py-1 rounded-[8px]"
-                                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
+                                        className="flex items-center justify-between gap-1 text-[9px] font-black px-2.5 py-1 rounded-[10px]"
+                                        style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}
                                       >
-                                        ⚠️ <span className="truncate">{g.title}</span>
+                                        <div className="flex items-center gap-1 min-w-0">
+                                          <span>{g.type === 'PROJECT' ? '📁' : g.type === 'EXAM' ? '📅' : '📝'}</span>
+                                          <span className="truncate">{g.title}</span>
+                                        </div>
+                                        {g.weekNumber && (
+                                          <span className="text-[8px] bg-red-950/80 text-amber-300 px-1.5 py-0.5 rounded font-mono shrink-0">
+                                            W{g.weekNumber}
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
@@ -519,14 +527,31 @@ export default function ScheduleTab({
                         </div>
 
                         {pendingGoals.length > 0 && (
-                          <div className="mt-2.5 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            {pendingGoals.slice(0, 2).map(g => (
+                          <div className="mt-2.5 pt-2 space-y-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div className="flex items-center justify-between text-[8.5px] font-black text-amber-400">
+                              <span>⚠️ {isAr ? 'تكاليف معلقة لهذه المحاضرة:' : 'Pending Tasks for Class:'}</span>
+                              <span className="text-slate-400 font-mono">({pendingGoals.length})</span>
+                            </div>
+                            {pendingGoals.map(g => (
                               <div
                                 key={g.id}
-                                className="flex items-center gap-1.5 text-[9px] font-black px-2 py-1 rounded-[8px]"
-                                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: '#f87171' }}
+                                className="flex items-center justify-between gap-1.5 text-[9.5px] font-black px-2.5 py-1.5 rounded-[10px]"
+                                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}
                               >
-                                ⚠️ <span className="truncate">{g.title}</span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span>{g.type === 'PROJECT' ? '📁' : g.type === 'EXAM' ? '📅' : '📝'}</span>
+                                  <span className="truncate">{g.title}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {g.weekNumber && (
+                                    <span className="text-[8px] bg-red-950/90 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                                      W{g.weekNumber}
+                                    </span>
+                                  )}
+                                  <span className="text-[8px] text-red-300 font-bold">
+                                    {isAr ? 'من الأسبوع السابق' : 'Past Week'}
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>

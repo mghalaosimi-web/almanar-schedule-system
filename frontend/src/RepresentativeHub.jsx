@@ -63,6 +63,7 @@ export default function RepresentativeHub() {
   const [goalDueDate, setGoalDueDate] = useState('');
   const [goalWeekNumber, setGoalWeekNumber] = useState('');
   const [goalSubjectId, setGoalSubjectId] = useState('');
+  const [goalScheduleId, setGoalScheduleId] = useState('');
 
   // ── Offline-First Engine ──────────────────────────────────────────
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -295,7 +296,8 @@ export default function RepresentativeHub() {
         type: goalType,
         dueDate: goalDueDate || null,
         weekNumber: goalWeekNumber || null,
-        subjectId: goalSubjectId
+        subjectId: goalSubjectId,
+        scheduleId: goalScheduleId || null
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -307,6 +309,7 @@ export default function RepresentativeHub() {
         setGoalDueDate('');
         setGoalWeekNumber('');
         setGoalSubjectId('');
+        setGoalScheduleId('');
         fetchGoals();
       }
     } catch (err) {
@@ -1399,6 +1402,24 @@ export default function RepresentativeHub() {
                   <option value="" disabled>{isAr ? '-- اختر المقرر --' : '-- Select Subject --'}</option>
                   {uniqueSubjects.map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  {isAr ? 'ربط بمحاضرة محددة في الجدول (اختياري)' : 'Link to Specific Schedule Slot (Optional)'}
+                </label>
+                <select
+                  value={goalScheduleId}
+                  onChange={e => setGoalScheduleId(e.target.value)}
+                  className="bg-slate-950 text-xs font-bold text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none w-full cursor-pointer h-12"
+                >
+                  <option value="">{isAr ? '-- جميع محاضرات المقرر --' : '-- All Course Sessions --'}</option>
+                  {schedules.filter(s => !goalSubjectId || s.subjectId === parseInt(goalSubjectId)).map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.subject?.name} ({isAr ? ({SUNDAY:'الأحد',MONDAY:'الاثنين',TUESDAY:'الثلاثاء',WEDNESDAY:'الأربعاء',THURSDAY:'الخميس',FRIDAY:'الجمعة',SATURDAY:'السبت'}[s.dayOfWeek]) : s.dayOfWeek} · {s.startTime})
+                    </option>
                   ))}
                 </select>
               </div>

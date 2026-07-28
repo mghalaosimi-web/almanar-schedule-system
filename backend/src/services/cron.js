@@ -237,11 +237,38 @@ async function checkUpcomingClassesAndNotify() {
         });
 
         if (!existingLog) {
-          const messageAr = `تذكير: تبدأ محاضرة ${schedule.subject.name} للشعبة ${schedule.group.name} بعد 30 دقيقة (الساعة ${schedule.startTime}) في قاعة ${schedule.room.name}.`;
-          const messageEn = `Reminder: Lecture ${schedule.subject.name} for group ${schedule.group.name} starts in 30 minutes (${schedule.startTime}) in Room ${schedule.room.name}.`;
+          // Fetch pending academic goals (assignments/projects) for this subject & group
+          const pendingGoals = await prisma.academicGoal.findMany({
+            where: {
+              subjectId: schedule.subjectId,
+              OR: [
+                { groupId: schedule.groupId },
+                { groupId: null },
+                { scheduleId: schedule.id }
+              ]
+            },
+            take: 3,
+            orderBy: { createdAt: 'desc' }
+          });
+
+          let taskAlertAr = '';
+          let taskAlertEn = '';
+
+          if (pendingGoals.length > 0) {
+            const goalTitles = pendingGoals.map(g => `${g.title}${g.weekNumber ? ` (الأسبوع ${g.weekNumber})` : ''}`).join('، ');
+            const goalTitlesEn = pendingGoals.map(g => `${g.title}${g.weekNumber ? ` (Week ${g.weekNumber})` : ''}`).join(', ');
+            taskAlertAr = `\n⚠️ تنبيه هام: لديك تكليف/مشروع معلق لهذه المادة: [${goalTitles}] لم يكتمل بعد! يرجى تحضيره للمحاضرة.`;
+            taskAlertEn = `\n⚠️ Important Notice: You have pending task(s) for this class: [${goalTitlesEn}]. Please prepare before class!`;
+          }
+
+          let messageAr = `تذكير: تبدأ محاضرة ${schedule.subject.name} للشعبة ${schedule.group.name} بعد 30 دقيقة (الساعة ${schedule.startTime}) في قاعة ${schedule.room.name}.${taskAlertAr}`;
+          let messageEn = `Reminder: Lecture ${schedule.subject.name} for group ${schedule.group.name} starts in 30 minutes (${schedule.startTime}) in Room ${schedule.room.name}.${taskAlertEn}`;
           const alertMessage = `${messageAr}\n${messageEn}`;
 
           const broadcastId = require('crypto').randomUUID();
+          const notificationTitle = pendingGoals.length > 0 
+            ? `تذكير بالمحاضرة ⏰ + ⚠️ تكليف معلق!` 
+            : `تذكير بمحاضرة ⏰`;
 
           // Query all students in this group
           const classmates = await prisma.student.findMany({
@@ -254,7 +281,7 @@ async function checkUpcomingClassesAndNotify() {
               data: classmates.map(student => ({
                 studentId: student.id,
                 groupId: schedule.groupId,
-                title: 'تذكير بمحاضرة ⏰',
+                title: notificationTitle,
                 message: alertMessage,
                 status: 'SENT',
                 broadcastId,
@@ -265,7 +292,7 @@ async function checkUpcomingClassesAndNotify() {
             await prisma.notificationLog.create({
               data: {
                 groupId: schedule.groupId,
-                title: 'تذكير بمحاضرة ⏰',
+                title: notificationTitle,
                 message: alertMessage,
                 status: 'SENT',
                 broadcastId,
@@ -283,13 +310,13 @@ async function checkUpcomingClassesAndNotify() {
           });
 
           sendPushNotification(schedule.groupId, {
-            title: `تذكير بمحاضرة ⏰`,
+            title: notificationTitle,
             body: messageAr,
             url: '/student/home',
             broadcastId
           });
 
-          console.log(`[CRON] Sent 30-minute reminder for class: ${schedule.subject.name} (Group: ${schedule.group.name})`);
+          console.log(`[CRON] Sent 30-minute reminder for class: ${schedule.subject.name} (Group: ${schedule.group.name}) with ${pendingGoals.length} linked pending tasks.`);
         }
       }
     }

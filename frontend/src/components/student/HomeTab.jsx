@@ -232,7 +232,157 @@ export default function HomeTab({
         </div>
       </motion.div>
 
-      {/* ── 2. تنبيهات المهام المعلقة والحرمان ── */}
+      {/* ── 1b. مؤشر الجاهزية التراكمي للاختبارات (Exam Readiness Hub) ── */}
+      {(() => {
+        const pendingCount = goalReminders.length;
+        const absentCount = attendanceStats?.absent || 0;
+        const computedScore = Math.max(45, Math.min(100, 100 - (pendingCount * 7) - (absentCount * 4)));
+        const isGood = computedScore >= 80;
+        const isWarn = computedScore >= 65 && computedScore < 80;
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-[22px] relative overflow-hidden space-y-3"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(14,165,233,0.08) 100%)',
+              border: '1px solid rgba(16,185,129,0.25)',
+              boxShadow: '0 4px 20px rgba(16,185,129,0.08)'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[12px] font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                  <span>🎯</span>
+                  <span>{isAr ? 'مؤشر الجاهزية للاختبارات (Exam Readiness)' : 'Exam Readiness Score'}</span>
+                </h3>
+                <p className="text-[9.5px] font-bold text-slate-300 mt-0.5">
+                  {isAr 
+                    ? `معدل استعدادك الحالي للاختبارات النهائية بناءً على الحضور والتكاليف` 
+                    : `Your predicted readiness for upcoming exams`}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className={`text-2xl font-black font-mono block ${
+                  isGood ? 'text-emerald-400' : isWarn ? 'text-amber-400' : 'text-red-400'
+                }`}>
+                  {computedScore}%
+                </span>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/5">
+              <motion.div
+                className={`h-full ${
+                  isGood 
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400' 
+                    : isWarn 
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-400' 
+                      : 'bg-gradient-to-r from-red-500 to-rose-400'
+                }`}
+                initial={{ width: 0 }}
+                animate={{ width: `${computedScore}%` }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-bold">
+              <div className="p-1.5 rounded-xl bg-black/20 border border-white/5">
+                <span className="text-slate-400 block">{isAr ? 'حضور المحاضرات' : 'Attendance'}</span>
+                <span className="text-emerald-400 font-mono font-black">{attendancePct ?? 100}%</span>
+              </div>
+              <div className="p-1.5 rounded-xl bg-black/20 border border-white/5">
+                <span className="text-slate-400 block">{isAr ? 'التكاليف المعلقة' : 'Pending Tasks'}</span>
+                <span className="text-amber-400 font-mono font-black">{pendingCount}</span>
+              </div>
+              <div className="p-1.5 rounded-xl bg-black/20 border border-white/5">
+                <span className="text-slate-400 block">{isAr ? 'التقييم التراكمي' : 'Status'}</span>
+                <span className="text-emerald-300 font-black">{isGood ? (isAr ? 'ممتاز 🚀' : 'Excellent') : (isAr ? 'تحتاج تحسين ⚡' : 'Improve')}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('exchange')}
+              className="w-full py-2 rounded-[12px] text-[10.5px] font-black text-center transition-all bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 active:scale-95"
+            >
+              🤖 {isAr ? 'حل كويزات الممارسة الفورية في الملتقى لرفع النسبة' : 'Practice AI Quizzes in Forum to Raise Score'}
+            </button>
+          </motion.div>
+        );
+      })()}
+
+      {/* ── 2. تنبيه ذكي قبل المحاضرة: التكاليف والمشاريع المعلقة ── */}
+      {(() => {
+        const upcomingLecWithPending = sortedToday.map(lec => {
+          const end = (lec.overrides?.[0]?.endTime || lec.endTime) || '';
+          if (end < currentTimeStr) return null;
+          const pendingForLec = goalReminders.filter(g => g.subjectId === lec.subjectId || (g.subject && lec.subject && g.subject.code === lec.subject.code));
+          return pendingForLec.length > 0 ? { lec, pendingGoals: pendingForLec } : null;
+        }).find(Boolean);
+
+        if (!upcomingLecWithPending) return null;
+        const { lec, pendingGoals } = upcomingLecWithPending;
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-[20px] relative overflow-hidden space-y-3"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(245,158,11,0.12) 100%)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              boxShadow: '0 4px 20px rgba(239,68,68,0.15)'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="animate-bounce" style={{ fontSize: '20px' }}>⚡</span>
+                <div>
+                  <h4 className="text-[12px] font-black text-red-400">
+                    {isAr ? `تنبيه مسبق قبل محاضرة ${lec.subject.name}` : `Pre-Lecture Alert: ${lec.subject.name}`}
+                  </h4>
+                  <p className="text-[9.5px] font-bold text-slate-300">
+                    {isAr ? `تبدأ الساعة ${lec.startTime} • لديك ${pendingGoals.length} تكليف معلق من الأسبوع السابق!` : `Starts ${lec.startTime} • You have ${pendingGoals.length} pending task(s)!`}
+                  </p>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase bg-red-500/20 text-red-300 border border-red-500/30">
+                {isAr ? 'عاجل' : 'Urgent'}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              {pendingGoals.map(g => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between p-2 rounded-[12px] bg-slate-950/60 border border-red-500/20 text-[10px]"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-amber-400">📝</span>
+                    <span className="font-bold text-white truncate">{g.title}</span>
+                  </div>
+                  {g.weekNumber && (
+                    <span className="text-[8.5px] font-black font-mono bg-white/10 px-1.5 py-0.5 rounded text-amber-300">
+                      W{g.weekNumber}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setActiveTab('goals')}
+              className="w-full py-2.5 rounded-[12px] text-[11px] font-black text-center transition-all bg-gradient-to-r from-amber-500 to-red-500 text-slate-950 active:scale-95 shadow-md"
+            >
+              🚀 {isAr ? 'عرض وإنجاز التكليف فوراً' : 'View & Complete Task Now'}
+            </button>
+          </motion.div>
+        );
+      })()}
+
+      {/* ── تنبيهات المهام المعلقة العامة والحرمان ── */}
       {goalReminders.length > 0 && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
@@ -244,8 +394,8 @@ export default function HomeTab({
             <span style={{ fontSize: '18px' }}>⚠️</span>
             <span className="text-[11px] font-black" style={{ color: '#fbbf24' }}>
               {isAr
-                ? `لديك ${goalReminders.length} مهمة معلقة`
-                : `${goalReminders.length} pending tasks`}
+                ? `إجمالي المهام المعلقة: ${goalReminders.length}`
+                : `Total pending tasks: ${goalReminders.length}`}
             </span>
           </div>
           <div className="space-y-1.5">

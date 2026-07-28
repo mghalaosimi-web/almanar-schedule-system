@@ -70,6 +70,9 @@ router.get('/', verifyToken, async (req, res) => {
       include: {
         subject: {
           select: { id: true, name: true, code: true, type: true }
+        },
+        schedule: {
+          select: { id: true, dayOfWeek: true, startTime: true, endTime: true }
         }
       },
       orderBy: { dueDate: 'asc' }
@@ -206,13 +209,14 @@ router.get('/reminders', verifyToken, async (req, res) => {
 // 4. POST create a new academic goal for the cohort
 router.post('/rep', verifyToken, isRep, async (req, res) => {
   try {
-    const { title, description, type, dueDate, weekNumber, subjectId } = req.body;
+    const { title, description, type, dueDate, weekNumber, subjectId, scheduleId } = req.body;
 
     if (!title || !type || !subjectId) {
       return res.status(400).json({ success: false, error: 'Title, Type, and Subject are required.' });
     }
 
     const parsedSubjectId = parseInt(subjectId);
+    const parsedScheduleId = scheduleId ? parseInt(scheduleId) : null;
     const parsedWeekNumber = weekNumber ? parseInt(weekNumber) : null;
     const parsedDueDate = dueDate ? new Date(dueDate) : null;
 
@@ -232,10 +236,12 @@ router.post('/rep', verifyToken, isRep, async (req, res) => {
         dueDate: parsedDueDate,
         weekNumber: parsedWeekNumber,
         subjectId: parsedSubjectId,
+        scheduleId: parsedScheduleId,
         groupId: req.user.groupId
       },
       include: {
-        subject: true
+        subject: true,
+        schedule: true
       }
     });
 
@@ -297,7 +303,7 @@ router.post('/rep', verifyToken, isRep, async (req, res) => {
 router.put('/rep/:id', verifyToken, isRep, async (req, res) => {
   try {
     const goalId = parseInt(req.params.id);
-    const { title, description, type, dueDate, weekNumber, subjectId } = req.body;
+    const { title, description, type, dueDate, weekNumber, subjectId, scheduleId } = req.body;
 
     const existingGoal = await prisma.academicGoal.findFirst({
       where: { id: goalId, groupId: req.user.groupId }
@@ -315,10 +321,12 @@ router.put('/rep/:id', verifyToken, isRep, async (req, res) => {
         type: type !== undefined ? type : existingGoal.type,
         dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : existingGoal.dueDate,
         weekNumber: weekNumber !== undefined ? (weekNumber ? parseInt(weekNumber) : null) : existingGoal.weekNumber,
-        subjectId: subjectId !== undefined ? parseInt(subjectId) : existingGoal.subjectId
+        subjectId: subjectId !== undefined ? parseInt(subjectId) : existingGoal.subjectId,
+        scheduleId: scheduleId !== undefined ? (scheduleId ? parseInt(scheduleId) : null) : existingGoal.scheduleId
       },
       include: {
-        subject: true
+        subject: true,
+        schedule: true
       }
     });
 
