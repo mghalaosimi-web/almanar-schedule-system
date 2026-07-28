@@ -1,7 +1,6 @@
 /**
  * @file ProfileTab.jsx
- * @description تبويب الهوية الرقمية والملف الشخصي (Profile & Digital ID) في بوابة الطالب.
- * متوافق 100% مع كافة مقاسات الهواتف المحمولة (Mobile Responsive).
+ * @description تبويب الهوية الرقمية والملف الشخصي — HCI Phase 2 Overhaul
  * @author أنتيجرافيتي (Antigravity)
  */
 
@@ -13,31 +12,18 @@ import ThemeSwitcher from '../../ThemeSwitcher';
 import ConfirmationModal from '../../ConfirmationModal';
 
 export default function ProfileTab({
-  isAr,
-  profile,
-  setProfile,
-  systemSettings,
-  sandboxMode,
-  toggleSandboxFromButton,
-  handleTestNotification,
-  handleCheckUpdates,
-  handleExportICS,
-  handlePrintPDF,
-  handleShareSchedule,
-  confirmLogout,
-  allAlerts,
-  fetchData,
-  t
+  isAr, profile, setProfile, systemSettings, sandboxMode,
+  toggleSandboxFromButton, handleTestNotification, handleCheckUpdates,
+  handleExportICS, handlePrintPDF, handleShareSchedule,
+  confirmLogout, allAlerts, fetchData, t
 }) {
-  const [profileViewMode, setProfileViewMode] = useState('main'); // 'main' | 'edit' | 'feedback' | 'library' | 'map'
-  const [showSecurityDetails, setShowSecurityDetails] = useState(false);
+  const [profileViewMode, setProfileViewMode] = useState('main');
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
-
-  // Feedback form states
   const [feedbackCategory, setFeedbackCategory] = useState('Suggestion');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
 
   const handleSendFeedbackLocal = async (e) => {
     e.preventDefault();
@@ -45,24 +31,16 @@ export default function ProfileTab({
     setFeedbackLoading(true);
     try {
       const token = localStorage.getItem('manar_token');
-      const res = await fetch(`${window.location.origin}/api/feedback`, {
+      await fetch(`${window.location.origin}/api/feedback`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          category: feedbackCategory,
-          message: feedbackMessage
-        })
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ category: feedbackCategory, message: feedbackMessage })
       });
-      const data = await res.json();
-      if (data.success || true) {
-        toast.success(t('feedback.successMsg') || (isAr ? 'تم إرسال ملاحظاتك بنجاح للمطور!' : 'Feedback sent successfully!'));
-        setFeedbackMessage('');
-      }
-    } catch (err) {
-      toast.success(isAr ? 'تم استلام ملاحظاتك بنجاح!' : 'Feedback received!');
+      toast.success(isAr ? 'تم إرسال ملاحظاتك بنجاح!' : 'Feedback sent!');
+      setFeedbackMessage('');
+      setExpandedSection(null);
+    } catch {
+      toast.success(isAr ? 'تم استلام ملاحظاتك!' : 'Feedback received!');
       setFeedbackMessage('');
     } finally {
       setFeedbackLoading(false);
@@ -75,249 +53,471 @@ export default function ProfileTab({
         onClose={() => {
           setProfileViewMode('main');
           const saved = localStorage.getItem('student_profile');
-          if (saved) {
-            try { 
-              setProfile(JSON.parse(saved)); 
-              fetchData(true);
-            } catch {}
-          }
+          if (saved) { try { setProfile(JSON.parse(saved)); fetchData(true); } catch {} }
         }}
       />
     );
   }
 
+  // إجراءات سريعة للملف
+  const quickActions = [
+    {
+      id: 'export',
+      icon: '📥',
+      labelAr: 'تصدير الجدول',
+      labelEn: 'Export Timetable',
+      subAr: 'PDF أو ICS',
+      subEn: 'PDF or ICS',
+      color: '#2979ff',
+      onClick: () => setShowExportDropdown(!showExportDropdown),
+      hasDropdown: true
+    },
+    {
+      id: 'share',
+      icon: '🔗',
+      labelAr: 'مشاركة',
+      labelEn: 'Share',
+      subAr: 'مشاركة الجدول',
+      subEn: 'Share schedule',
+      color: '#e879f9',
+      onClick: handleShareSchedule
+    },
+    {
+      id: 'sandbox',
+      icon: '🧪',
+      labelAr: sandboxMode ? 'إيقاف المحاكاة' : 'محاكي الجدول',
+      labelEn: sandboxMode ? 'Exit Sim' : 'Simulator',
+      subAr: sandboxMode ? 'استعادة الجدول' : 'تجربة التعديلات',
+      subEn: sandboxMode ? 'Restore original' : 'Test changes',
+      color: sandboxMode ? '#f59e0b' : '#10b981',
+      active: sandboxMode,
+      onClick: toggleSandboxFromButton
+    },
+    {
+      id: 'notify',
+      icon: '🔔',
+      labelAr: 'اختبار تنبيه',
+      labelEn: 'Test Alert',
+      subAr: 'إشعار تجريبي',
+      subEn: 'Mock notification',
+      color: '#f59e0b',
+      onClick: handleTestNotification
+    }
+  ];
+
+  // عناصر الإعدادات
+  const settingsItems = [
+    {
+      id: 'account',
+      icon: '👤',
+      labelAr: 'تعديل الحساب',
+      labelEn: 'Account & Profile',
+      subAr: 'البيانات الشخصية والصورة',
+      subEn: 'Personal data & photo',
+      color: '#a855f7',
+      action: () => setProfileViewMode('edit')
+    },
+    {
+      id: 'theme',
+      icon: '🎨',
+      labelAr: 'مظهر التطبيق',
+      labelEn: 'App Appearance',
+      subAr: 'الألوان والثيم',
+      subEn: 'Colors & dark mode',
+      color: '#f59e0b',
+      expandable: true,
+      expandId: 'theme'
+    },
+    {
+      id: 'feedback',
+      icon: '💡',
+      labelAr: 'اقتراحات وتواصل',
+      labelEn: 'Developer Feedback',
+      subAr: 'تحسينات وإبلاغ عن أخطاء',
+      subEn: 'Improvements & bugs',
+      color: '#10b981',
+      expandable: true,
+      expandId: 'feedback'
+    },
+    {
+      id: 'updates',
+      icon: '🔄',
+      labelAr: 'تحديثات النظام',
+      labelEn: 'Check Updates',
+      subAr: 'آخر إصدار متاح',
+      subEn: 'Latest version',
+      color: '#38bdf8',
+      action: handleCheckUpdates
+    }
+  ];
+
   return (
-    <div className="space-y-4 max-w-full overflow-hidden" dir={isAr ? 'rtl' : 'ltr'}>
-      
-      {/* ── 1. بطاقة الهوية الجامعية الرقمية (Digital Student ID Card) ── */}
-      <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-3xl border border-slate-700/60 overflow-hidden shadow-2xl relative transition-all">
-        {/* Card Header Banner */}
-        <div className="h-20 bg-slate-800/90 flex items-center justify-between px-5 relative border-b border-white/5">
-          <div className="text-right w-full">
-            <h3 className="text-amber-400 text-xs font-black tracking-wider uppercase">
+    <div className="space-y-5 max-w-full overflow-hidden" dir={isAr ? 'rtl' : 'ltr'}>
+
+      {/* ── 1. بطاقة الهوية الجامعية الرقمية (Premium Design) ── */}
+      <div
+        className="relative overflow-hidden rounded-[24px]"
+        style={{
+          background: 'linear-gradient(145deg, #0f172a 0%, #0a0f1e 60%, #070b13 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset'
+        }}
+      >
+        {/* نمط الخلفية الزخرفي */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+          style={{
+            background: 'radial-gradient(ellipse at top right, rgba(var(--primary-color-rgb,245,158,11),0.08) 0%, transparent 60%)',
+          }}
+        />
+
+        {/* شريط رأس البطاقة */}
+        <div
+          className="flex items-center justify-between px-5 py-4 relative"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          <div>
+            <h2
+              className="text-[11px] font-black uppercase tracking-widest"
+              style={{ color: 'var(--accent)' }}
+            >
               {isAr ? 'جامعة المنار الأهلية' : 'AL-MANAR UNIVERSITY'}
-            </h3>
-            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">
-              {isAr ? 'بطاقة الهوية الأكاديمية الرقمية' : 'Digital Academic Student ID'}
+            </h2>
+            <p className="text-[9px] font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {isAr ? 'الهوية الأكاديمية الرقمية' : 'Digital Academic ID'}
             </p>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg shrink-0">
+          <div
+            className="w-10 h-10 rounded-[14px] flex items-center justify-center text-xl"
+            style={{
+              background: 'rgba(var(--primary-color-rgb,245,158,11),0.1)',
+              border: '1px solid rgba(var(--primary-color-rgb,245,158,11),0.25)'
+            }}
+          >
             🎓
           </div>
         </div>
 
-        {/* Card Body */}
-        <div className="flex flex-col items-center pb-5 px-5 relative -mt-8">
-          {/* Student Avatar */}
-          <div className="w-18 h-18 w-20 h-20 bg-slate-950 rounded-2xl border-4 border-slate-700 flex items-center justify-center mb-2.5 shadow-xl relative z-10 text-amber-400 font-black text-xl">
-            {profile.idPhotoUrl ? (
-              <img src={profile.idPhotoUrl} alt="ID" className="w-full h-full object-cover rounded-xl" />
-            ) : (
-              profile.name ? profile.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'
-            )}
-          </div>
-
-          <h2 className="text-base font-black text-white text-center tracking-tight truncate max-w-full">
-            {profile.name || 'Mohammed Ghaleb Al-Osimi'}
-          </h2>
-
-          <div className="flex items-center gap-2 mt-1 mb-4 flex-wrap justify-center text-[10px] font-bold">
-            <span className="text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">
-              {profile.department || (isAr ? 'أمن سيبراني' : 'Cyber Security')}
-            </span>
-            <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-            <span className="text-slate-300">
-              {isAr ? `مستوى ${profile.level || '3'}` : `Level ${profile.level || '3'}`} · {profile.groupName || 'Group A'}
-            </span>
-          </div>
-
-          {/* الباركود عالي التباين الناصع (High Contrast Scanable Barcode) */}
-          <div className="w-full bg-white rounded-2xl p-3.5 flex flex-col items-center justify-center border-2 border-slate-300 shadow-inner">
+        {/* محتوى البطاقة */}
+        <div className="px-5 py-5 flex items-start gap-4">
+          {/* الأفاتار */}
+          <div className="relative shrink-0">
             <div
-              className="font-mono text-black text-3xl tracking-tighter flex items-center justify-center h-11 overflow-hidden opacity-90 select-none w-full"
-              style={{ fontFamily: "'Courier New', Courier, monospace", letterSpacing: '-2.5px' }}
+              className="w-16 h-16 rounded-[16px] flex items-center justify-center font-black text-lg overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(var(--primary-color-rgb),0.2) 0%, rgba(var(--primary-color-rgb),0.05) 100%)',
+                border: '2px solid rgba(var(--primary-color-rgb,245,158,11),0.4)',
+                color: 'var(--accent)'
+              }}
             >
-              ||| | ||| || ||| | || || |||| | ||| ||
+              {profile.idPhotoUrl
+                ? <img src={profile.idPhotoUrl} alt="Student Photo" className="w-full h-full object-cover" />
+                : profile.name?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || 'ST'
+              }
             </div>
-            <span className="text-slate-900 font-black font-mono text-[11px] tracking-widest mt-1 uppercase">
-              *STU-{profile.groupId || '1'}-{String(profile.name || 'MOH').substring(0, 3).toUpperCase()}*
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 2. أزرار الإجراءات السريعة (2x2 Grid Layout for Mobile) ── */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Export Schedule Button & Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowExportDropdown(!showExportDropdown)}
-            className="w-full h-full bg-slate-900 border border-slate-700/70 hover:border-blue-500/50 transition-all p-3.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-lg active:scale-95 text-center"
-          >
-            <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center text-lg">
-              📥
-            </div>
-            <div>
-              <span className="text-xs font-bold text-white block">{isAr ? 'تصدير الجدول' : 'Export Timetable'}</span>
-              <span className="text-[9px] text-slate-400 block font-bold mt-0.5">{isAr ? 'تنزيل PDF / ICS' : 'PDF or ICS'}</span>
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {showExportDropdown && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="absolute bottom-full mb-2 right-0 left-0 z-50 bg-slate-900 border border-slate-700 rounded-2xl p-2 shadow-2xl space-y-1 text-xs"
-                >
-                  <button
-                    onClick={() => { setShowExportDropdown(false); handleExportICS(); }}
-                    className="w-full text-right py-2 px-3 hover:bg-slate-800 rounded-xl text-slate-200 flex items-center justify-between font-bold"
-                  >
-                    <span>{isAr ? 'تصدير إلى التقويم (.ics)' : 'Export ICS'}</span>
-                    <span>🗓️</span>
-                  </button>
-                  <button
-                    onClick={() => { setShowExportDropdown(false); handlePrintPDF(); }}
-                    className="w-full text-right py-2 px-3 hover:bg-slate-800 rounded-xl text-slate-200 flex items-center justify-between font-bold"
-                  >
-                    <span>{isAr ? 'تحميل كـ PDF' : 'Print PDF'}</span>
-                    <span>📄</span>
-                  </button>
-                </motion.div>
-              </>
+            {profile.isRepresentative && (
+              <div
+                className="absolute -bottom-1 -end-1 w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                style={{ background: '#10b981', border: '2px solid #070b13' }}
+                title={isAr ? 'مندوب الشعبة' : 'Class Representative'}
+              >
+                👑
+              </div>
             )}
-          </AnimatePresence>
+          </div>
+
+          {/* معلومات الطالب */}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div>
+              <h3 className="text-[16px] font-black leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
+                {profile.name || 'Mohammed Al-Osimi'}
+              </h3>
+              <p className="text-[10px] font-semibold mt-0.5" style={{ color: 'var(--accent)' }}>
+                {profile.department || (isAr ? 'أمن سيبراني' : 'Cyber Security')}
+              </p>
+            </div>
+
+            {/* شارات المعلومات */}
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: isAr ? `م${profile.level || '3'}` : `Lvl ${profile.level || '3'}`, icon: '🎓' },
+                { label: profile.groupName || 'Group A', icon: '👥' },
+                { label: `${profile.xp ?? 350} XP`, icon: '⭐', accent: true },
+                { label: `🔥 ${profile.streak ?? 7}`, accent: false }
+              ].map((b, i) => (
+                <span
+                  key={i}
+                  className="text-[9px] font-black px-2 py-1 rounded-full"
+                  style={{
+                    background: b.accent ? 'rgba(var(--primary-color-rgb),0.12)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${b.accent ? 'rgba(var(--primary-color-rgb),0.25)' : 'rgba(255,255,255,0.08)'}`,
+                    color: b.accent ? 'var(--accent)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {b.icon && `${b.icon} `}{b.label}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Share Schedule Button */}
-        <button
-          onClick={handleShareSchedule}
-          className="bg-slate-900 border border-slate-700/70 hover:border-pink-500/50 transition-all p-3.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-lg active:scale-95 text-center"
+        {/* الباركود */}
+        <div
+          className="mx-5 mb-5 rounded-[16px] p-3.5 flex flex-col items-center"
+          style={{ background: '#ffffff' }}
         >
-          <div className="w-9 h-9 rounded-xl bg-pink-500/15 text-pink-400 border border-pink-500/30 flex items-center justify-center text-lg">
-            🔗
+          <div
+            className="font-mono text-black text-3xl tracking-tighter flex items-center justify-center h-10 w-full overflow-hidden select-none"
+            style={{ fontFamily: "'Courier New', monospace", letterSpacing: '-2.5px', opacity: 0.85 }}
+            aria-label={isAr ? 'الباركود الجامعي' : 'University barcode'}
+          >
+            ||| | ||| || ||| | || || |||| | ||| ||
           </div>
-          <div>
-            <span className="text-xs font-bold text-white block">{isAr ? 'مشاركة الجدول' : 'Share Schedule'}</span>
-            <span className="text-[9px] text-slate-400 block font-bold mt-0.5">{isAr ? 'مشاركة فورية' : 'Instant Share'}</span>
-          </div>
-        </button>
-
-        {/* Simulator Toggle Button */}
-        <button
-          onClick={toggleSandboxFromButton}
-          className={`bg-slate-900 border transition-all p-3.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-lg active:scale-95 text-center ${
-            sandboxMode ? 'border-amber-500/60 bg-amber-500/10' : 'border-slate-700/70 hover:border-emerald-500/50'
-          }`}
-        >
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg">
-            🧪
-          </div>
-          <div>
-            <span className="text-xs font-bold text-white block">
-              {sandboxMode ? (isAr ? 'إنهاء المحاكاة' : 'Exit Sim') : (isAr ? 'محاكي التعديل' : 'Reschedule Sim')}
-            </span>
-            <span className="text-[9px] text-slate-400 block font-bold mt-0.5">
-              {sandboxMode ? (isAr ? 'استعادة الجدول' : 'Restore') : (isAr ? 'تجربة محلية' : 'Local test')}
-            </span>
-          </div>
-        </button>
-
-        {/* Test Notification Button */}
-        <button
-          onClick={handleTestNotification}
-          className="bg-slate-900 border border-slate-700/70 hover:border-amber-500/50 transition-all p-3.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-lg active:scale-95 text-center"
-        >
-          <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center text-lg">
-            🔔
-          </div>
-          <div>
-            <span className="text-xs font-bold text-white block">{isAr ? 'اختبار التنبيه' : 'Test Alert'}</span>
-            <span className="text-[9px] text-slate-400 block font-bold mt-0.5">{isAr ? 'تنبيه تجريبي' : 'Mock Alert'}</span>
-          </div>
-        </button>
+          <span className="text-slate-800 font-black font-mono text-[10px] tracking-widest mt-1 uppercase">
+            *STU-{profile.groupId || '1'}-{String(profile.name || 'MOH').substring(0, 3).toUpperCase()}*
+          </span>
+        </div>
       </div>
 
-      {/* ── 3. قائمة إعدادات الحساب والتخصيص ── */}
-      <div className="bg-slate-900 rounded-3xl border border-slate-700/50 overflow-hidden shadow-lg divide-y divide-slate-800">
-        {/* Account Settings */}
-        <button
-          onClick={() => setProfileViewMode('edit')}
-          className="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors text-right"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-lg shrink-0">
-              👤
-            </div>
-            <div>
-              <span className="text-xs font-bold text-white block leading-tight">{isAr ? 'تعديل الحساب والإعدادات' : 'Account & Profile Settings'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'البيانات الشخصية، الصورة، التنبيهات' : 'Personal data, photo & alerts'}</span>
-            </div>
-          </div>
-          <span className="text-xs text-slate-500 font-bold">{isAr ? '←' : '→'}</span>
-        </button>
+      {/* ── 2. شبكة الإجراءات السريعة (2×2) ── */}
+      <div className="space-y-2.5">
+        <div className="section-header">
+          <h3 className="section-title">{isAr ? 'إجراءات سريعة' : 'Quick Actions'}</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {quickActions.map((action, idx) => (
+            <div key={action.id} className="relative">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={action.onClick}
+                className="quick-action-btn w-full"
+                style={{
+                  borderColor: action.active ? `${action.color}44` : 'rgba(255,255,255,0.06)',
+                  background: action.active ? `${action.color}10` : 'var(--bg-card)'
+                }}
+                aria-label={isAr ? action.labelAr : action.labelEn}
+              >
+                <div
+                  className="quick-action-icon"
+                  style={{
+                    background: `${action.color}15`,
+                    border: `1px solid ${action.color}30`,
+                    color: action.color
+                  }}
+                >
+                  {action.icon}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[12px] font-black leading-tight text-start" style={{ color: 'var(--text-primary)' }}>
+                    {isAr ? action.labelAr : action.labelEn}
+                  </p>
+                  <p className="text-[9.5px] font-semibold text-start" style={{ color: 'var(--text-muted)' }}>
+                    {isAr ? action.subAr : action.subEn}
+                  </p>
+                </div>
+              </motion.button>
 
-        {/* Color Theme Customization */}
-        <div className="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg shrink-0">
-              🎨
+              {/* Export Dropdown */}
+              {action.id === 'export' && (
+                <AnimatePresence>
+                  {showExportDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                        className="absolute bottom-full mb-2 z-50 w-full rounded-[16px] overflow-hidden"
+                        style={{
+                          background: 'rgba(10,15,28,0.97)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          backdropFilter: 'blur(20px)',
+                          boxShadow: '0 -8px 24px rgba(0,0,0,0.4)'
+                        }}
+                      >
+                        {[
+                          { label: isAr ? 'تصدير إلى التقويم (.ics)' : 'Export to Calendar (.ics)', icon: '🗓️', fn: handleExportICS },
+                          { label: isAr ? 'تحميل كـ PDF' : 'Download as PDF', icon: '📄', fn: handlePrintPDF }
+                        ].map((opt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { setShowExportDropdown(false); opt.fn(); }}
+                            className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold transition-all"
+                            style={{
+                              color: 'var(--text-primary)',
+                              borderBottom: i === 0 ? '1px solid rgba(255,255,255,0.05)' : 'none'
+                            }}
+                          >
+                            <span>{opt.label}</span>
+                            <span style={{ fontSize: '16px' }}>{opt.icon}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
-            <div>
-              <span className="text-xs font-bold text-white block leading-tight">{isAr ? 'مظهر الألوان المخصصة' : 'Theme Customization'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'تخصيص ألوان البوابة والأيقونات' : 'Customize theme mode & colors'}</span>
-            </div>
-          </div>
-          <ThemeSwitcher />
+          ))}
+        </div>
+      </div>
+
+      {/* ── 3. قائمة الإعدادات (Accordion Style) ── */}
+      <div className="space-y-2.5">
+        <div className="section-header">
+          <h3 className="section-title">{isAr ? 'الإعدادات والتخصيص' : 'Settings & Customization'}</h3>
         </div>
 
-        {/* Feedback & Suggestions */}
-        <button
-          onClick={() => setProfileViewMode('feedback')}
-          className="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors text-right"
+        <div
+          className="rounded-[20px] overflow-hidden"
+          style={{ background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg shrink-0">
-              💡
+          {settingsItems.map((item, idx) => (
+            <div key={item.id}>
+              {/* الصف الرئيسي للإعداد */}
+              <button
+                onClick={() => {
+                  if (item.action) { item.action(); }
+                  else if (item.expandable) {
+                    setExpandedSection(expandedSection === item.expandId ? null : item.expandId);
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 transition-all text-start"
+                style={{
+                  background: expandedSection === item.expandId ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  borderBottom: idx < settingsItems.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none'
+                }}
+                aria-expanded={item.expandable ? expandedSection === item.expandId : undefined}
+              >
+                {/* أيقونة */}
+                <div
+                  className="w-9 h-9 rounded-[12px] flex items-center justify-center text-base shrink-0"
+                  style={{ background: `${item.color}15`, border: `1px solid ${item.color}30` }}
+                >
+                  {item.icon}
+                </div>
+
+                {/* النص */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-black leading-tight" style={{ color: 'var(--text-primary)' }}>
+                    {isAr ? item.labelAr : item.labelEn}
+                  </p>
+                  <p className="text-[9.5px] font-semibold mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                    {isAr ? item.subAr : item.subEn}
+                  </p>
+                </div>
+
+                {/* سهم أو مؤشر */}
+                <span
+                  className="shrink-0 transition-transform duration-200"
+                  style={{
+                    color: 'var(--text-muted)',
+                    fontSize: '12px',
+                    transform: item.expandable && expandedSection === item.expandId ? 'rotate(90deg)' : 'none'
+                  }}
+                >
+                  {isAr ? '←' : '→'}
+                </span>
+              </button>
+
+              {/* محتوى قابل للتوسع (Accordion) */}
+              <AnimatePresence>
+                {item.expandable && expandedSection === item.expandId && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ overflow: 'hidden', borderBottom: idx < settingsItems.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                  >
+                    <div className="px-4 pb-4">
+                      {/* Theme Switcher */}
+                      {item.expandId === 'theme' && (
+                        <div className="pt-2">
+                          <p className="text-[9px] font-bold mb-3" style={{ color: 'var(--text-muted)' }}>
+                            {isAr ? 'اختر لون ومظهر التطبيق:' : 'Choose app theme & color:'}
+                          </p>
+                          <ThemeSwitcher />
+                        </div>
+                      )}
+
+                      {/* Feedback Form */}
+                      {item.expandId === 'feedback' && (
+                        <form onSubmit={handleSendFeedbackLocal} className="space-y-3 pt-2">
+                          <div className="flex gap-1.5">
+                            {['Suggestion', 'Bug', 'Question'].map(cat => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setFeedbackCategory(cat)}
+                                className="flex-1 py-1.5 rounded-[10px] text-[9px] font-black transition-all"
+                                style={{
+                                  background: feedbackCategory === cat ? 'rgba(var(--primary-color-rgb),0.15)' : 'rgba(255,255,255,0.04)',
+                                  border: `1px solid ${feedbackCategory === cat ? 'rgba(var(--primary-color-rgb),0.3)' : 'rgba(255,255,255,0.06)'}`,
+                                  color: feedbackCategory === cat ? 'var(--accent)' : 'var(--text-muted)'
+                                }}
+                              >
+                                {cat === 'Suggestion' ? (isAr ? '💡 اقتراح' : '💡 Suggest') :
+                                 cat === 'Bug' ? (isAr ? '🐛 خطأ' : '🐛 Bug') :
+                                 (isAr ? '❓ سؤال' : '❓ Question')}
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            value={feedbackMessage}
+                            onChange={e => setFeedbackMessage(e.target.value)}
+                            placeholder={isAr ? 'اكتب ملاحظتك أو اقتراحك هنا...' : 'Type your feedback or suggestion...'}
+                            rows={3}
+                            className="w-full text-xs font-semibold resize-none rounded-[12px] px-3 py-2.5 outline-none transition-all"
+                            style={{
+                              background: 'rgba(255,255,255,0.04)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              color: 'var(--text-primary)',
+                              fontSize: '11px'
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            disabled={feedbackLoading || !feedbackMessage.trim()}
+                            className="w-full py-2.5 rounded-[12px] text-xs font-black transition-all disabled:opacity-50"
+                            style={{
+                              background: 'var(--accent)',
+                              color: '#070b13'
+                            }}
+                          >
+                            {feedbackLoading ? '⏳...' : (isAr ? '📤 إرسال الملاحظة' : '📤 Send Feedback')}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <div>
-              <span className="text-xs font-bold text-white block leading-tight">{isAr ? 'مركز الاقتراحات والتواصل' : 'Developer Feedback'}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5 font-bold">{isAr ? 'إرسال اقتراحات أو الإبلاغ عن أخطاء' : 'Send feedback or bug report'}</span>
-            </div>
-          </div>
-          <span className="text-xs text-slate-500 font-bold">{isAr ? '←' : '→'}</span>
-        </button>
+          ))}
+        </div>
       </div>
 
-      {/* ── 4. أزرار تحديث النظام وتسجيل الخروج ── */}
-      <div className="space-y-2.5 pt-1">
-        <button
-          type="button"
-          onClick={handleCheckUpdates}
-          className="w-full py-3 bg-slate-900 border border-slate-700/60 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
-        >
-          <span>📥</span>
-          <span>{isAr ? 'التحقق من التحديثات الفورية' : 'Check for Updates'}</span>
-        </button>
-
-        <button
-          onClick={() => setIsLogoutModalOpen(true)}
-          className="w-full py-3 rounded-2xl bg-red-500/10 text-red-400 border border-red-500/20 font-black text-xs hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 active:scale-98"
-        >
-          <span>🚪</span>
-          <span>{isAr ? 'تسجيل الخروج من البوابة' : 'Sign Out'}</span>
-        </button>
-      </div>
+      {/* ── 4. زر تسجيل الخروج ── */}
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setIsLogoutModalOpen(true)}
+        className="w-full py-3.5 rounded-[16px] text-[12px] font-black flex items-center justify-center gap-2 transition-all"
+        style={{
+          background: 'rgba(239,68,68,0.06)',
+          border: '1px solid rgba(239,68,68,0.2)',
+          color: '#f87171'
+        }}
+      >
+        🚪 {isAr ? 'تسجيل الخروج من البوابة' : 'Sign Out from Portal'}
+      </motion.button>
 
       {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={isLogoutModalOpen}
         title={isAr ? 'تأكيد الخروج' : 'Confirm Sign Out'}
-        message={isAr ? 'هل أنت متأكد من الخروج من بوابة الطالب؟' : 'Are you sure you want to sign out of the student portal?'}
+        message={isAr ? 'هل أنت متأكد من الخروج من بوابة الطالب؟' : 'Are you sure you want to sign out?'}
         onConfirm={confirmLogout}
         onCancel={() => setIsLogoutModalOpen(false)}
         confirmText={isAr ? 'خروج' : 'Sign Out'}
