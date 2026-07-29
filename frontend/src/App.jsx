@@ -99,6 +99,17 @@ axios.interceptors.response.use(
       // Admin users & Developers are NEVER blocked or redirected to /license-suspended by license revocation
       if (!isAdmin) {
         SessionService.logout();
+        window.location.href = '/license-suspended';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
     .replace(/_/g, '/');
 
   const rawData = window.atob(base64);
@@ -115,6 +126,7 @@ axios.interceptors.response.use(
 // The online-synced banner auto-dismisses after 3.5 seconds.
 function OfflineBanner() {
   const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
+
   const [showSynced, setShowSynced] = React.useState(false);
   const syncTimerRef = React.useRef(null);
 
@@ -261,33 +273,6 @@ function AppLayout() {
   };
 
 
-  // Admin secure gateway passcode lock
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(sessionStorage.getItem('manar_admin_unlocked') === 'true');
-  const [adminPasscode, setAdminPasscode] = useState('');
-  const [adminVerifying, setAdminVerifying] = useState(false);
-  const [adminPasscodeError, setAdminPasscodeError] = useState('');
-
-  const handleVerifyAdminPasscode = async (e) => {
-    e.preventDefault();
-    setAdminVerifying(true);
-    setAdminPasscodeError('');
-    try {
-      const res = await axios.post(`${API_URL}/api/admin/dev/verify-key`, 
-        { passcode: adminPasscode },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.data?.success) {
-        sessionStorage.setItem('manar_admin_unlocked', 'true');
-        setIsAdminUnlocked(true);
-        toast.success(isAr ? 'تم فتح لوحة التحكم بنجاح' : 'Admin Panel unlocked successfully');
-      }
-    } catch (err) {
-      setAdminPasscodeError(err.response?.data?.error || (isAr ? 'رمز المرور غير صحيح' : 'Incorrect passcode'));
-      toast.error(isAr ? 'فشل التحقق من رمز المرور' : 'Passcode verification failed');
-    } finally {
-      setAdminVerifying(false);
-    }
-  };
 
   const handleAdminCancel = () => {
     SessionService.logout();
