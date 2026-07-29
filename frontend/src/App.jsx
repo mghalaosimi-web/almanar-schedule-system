@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ProgressLoader from './components/ProgressLoader';
 import { PERMISSIONS, hasPermission } from './utils/permissionRegistry';
 import { SessionService } from './utils/sessionService';
+import { restoreUserTheme, applyOtaTheme } from './utils/themeEngine';
 
 // Shared layout controls & modal
 import Logo from './Logo';
@@ -18,7 +19,6 @@ import CommandPalette from './CommandPalette';
 import ErrorBoundary from './ErrorBoundary';
 
 // Dynamic lazy loaded route page components
-// NOTE: LandingPage removed — root "/" route uses PublicLandingWizard (orphan import fix)
 const PublicLandingWizard = React.lazy(() => import('./components/PublicLandingWizard'));
 const Login = React.lazy(() => import('./Login'));
 const TeacherLogin = React.lazy(() => import('./TeacherLogin'));
@@ -43,26 +43,7 @@ const LicenseSuspended = React.lazy(() => import('./components/LicenseSuspended'
 // Sleek loading fallback spinner
 const PageLoader = () => {
   React.useEffect(() => {
-    const userJson = localStorage.getItem('manar_user');
-    let user = null;
-    try { user = JSON.parse(userJson); } catch {}
-    
-    let otaColor = null;
-    try {
-      const cachedSettings = JSON.parse(localStorage.getItem('cached_system_settings') || '{}');
-      otaColor = cachedSettings.otaThemeColor;
-    } catch {}
-
-    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-    const color = otaColor || (isSuperAdmin 
-      ? localStorage.getItem('superadmin_selectedThemeColor')
-      : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor')));
-      
-    if (color) {
-      document.documentElement.style.setProperty('--accent', color);
-      document.documentElement.style.setProperty('--accent-glow', `${color}33`);
-      document.documentElement.style.setProperty('--accent-dim', `${color}1a`);
-    }
+    restoreUserTheme();
   }, []);
 
   return (
@@ -118,17 +99,6 @@ axios.interceptors.response.use(
       // Admin users & Developers are NEVER blocked or redirected to /license-suspended by license revocation
       if (!isAdmin) {
         SessionService.logout();
-        window.location.href = '/license-suspended';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
     .replace(/_/g, '/');
 
   const rawData = window.atob(base64);
@@ -290,6 +260,35 @@ function AppLayout() {
     }
   };
 
+
+  // Admin secure gateway passcode lock
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(sessionStorage.getItem('manar_admin_unlocked') === 'true');
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminVerifying, setAdminVerifying] = useState(false);
+  const [adminPasscodeError, setAdminPasscodeError] = useState('');
+
+  const handleVerifyAdminPasscode = async (e) => {
+    e.preventDefault();
+    setAdminVerifying(true);
+    setAdminPasscodeError('');
+    try {
+      const res = await axios.post(`${API_URL}/api/admin/dev/verify-key`, 
+        { passcode: adminPasscode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.success) {
+        sessionStorage.setItem('manar_admin_unlocked', 'true');
+        setIsAdminUnlocked(true);
+        toast.success(isAr ? 'تم فتح لوحة التحكم بنجاح' : 'Admin Panel unlocked successfully');
+      }
+    } catch (err) {
+      setAdminPasscodeError(err.response?.data?.error || (isAr ? 'رمز المرور غير صحيح' : 'Incorrect passcode'));
+      toast.error(isAr ? 'فشل التحقق من رمز المرور' : 'Passcode verification failed');
+    } finally {
+      setAdminVerifying(false);
+    }
+  };
+
   const handleAdminCancel = () => {
     SessionService.logout();
     navigate('/login');
@@ -315,173 +314,17 @@ function AppLayout() {
 
   // ── Persistent Theme Color application ───────────────────────────────────
   useEffect(() => {
-    const applyTheme = () => {
-      const userJson = localStorage.getItem('manar_user');
-      let user = null;
-      try { user = JSON.parse(userJson); } catch {}
-      
-      let otaColor = null;
-      try {
-        const cachedSettings = JSON.parse(localStorage.getItem('cached_system_settings') || '{}');
-        otaColor = cachedSettings.otaThemeColor;
-      } catch {}
-
-      const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-      const color = otaColor || (isSuperAdmin 
-        ? localStorage.getItem('superadmin_selectedThemeColor')
-        : (user?.themeColor || localStorage.getItem('selectedUniversityThemeColor')));
-        
-      if (color) {
-        document.documentElement.style.setProperty('--accent', color);
-        document.documentElement.style.setProperty('--accent-glow', `${color}33`);
-        document.documentElement.style.setProperty('--accent-dim', `${color}1a`);
-      }
-    };
-    applyTheme();
-    window.addEventListener('MANAR_COLLEGE_SWITCH', applyTheme);
-    return () => window.removeEventListener('MANAR_COLLEGE_SWITCH', applyTheme);
+    restoreUserTheme();
+    window.addEventListener('MANAR_COLLEGE_SWITCH', restoreUserTheme);
+    return () => window.removeEventListener('MANAR_COLLEGE_SWITCH', restoreUserTheme);
   }, []);
-
-  // ── PWA Soft Update Listener ─────────────────────────────────────────────
-  useEffect(() => {
-    const handleUpdate = (e) => {
-      const { updateHandler } = e.detail;
-      
-      toast((t) => (
-        <div className="flex flex-col gap-3 p-2 min-w-[280px]" dir={isAr ? 'rtl' : 'ltr'}>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🚀</span>
-            <div className="flex flex-col text-start">
-              <span className="text-xs font-black text-white">
-                {isAr ? 'تم إطلاق تحديث جديد للنظام!' : 'New Update Available!'}
-              </span>
-              <span className="text-[10px] text-white/50">
-                {isAr ? 'يرجى التحديث للحصول على آخر الميزات والتحسينات.' : 'Please update to get the latest features.'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              onClick={() => {
-                toast.dismiss(t.id);
-                updateHandler();
-              }}
-              className="flex-1 py-1.5 px-3 rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] text-[10px] font-black hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-            >
-              {isAr ? 'تحديث الآن' : 'Update Now'}
-            </button>
-            <button
-              onClick={() => toast.dismiss(t.id)}
-              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 text-[10px] font-bold hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-            >
-              {isAr ? 'لاحقاً' : 'Later'}
-            </button>
-          </div>
-        </div>
-      ), {
-        position: 'bottom-center',
-        duration: Infinity,
-        style: {
-          background: 'rgba(15, 15, 15, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
-        }
-      });
-    };
-
-    window.addEventListener('MANAR_SW_UPDATE_AVAILABLE', handleUpdate);
-    return () => {
-      window.removeEventListener('MANAR_SW_UPDATE_AVAILABLE', handleUpdate);
-    };
-  }, [i18n.language]);
-
-  // ── Fetch Tenants for Super Admin Dropdown ───────────────────────────────
-  useEffect(() => {
-    const token = localStorage.getItem('manar_token');
-    const userJson = localStorage.getItem('manar_user');
-    if (!token || !userJson) return;
-    
-    let userObj = null;
-    try { userObj = JSON.parse(userJson); } catch {}
-    if (userObj?.role === 'SUPER_ADMIN') {
-      axios.get(`${API_URL}/api/tenants`)
-        .then(res => {
-          if (res.data?.success) {
-            setTenants(res.data.data);
-            // Auto-select first college if none is selected yet
-            const savedCollegeId = localStorage.getItem('superadmin_selectedCollegeId');
-            if (!savedCollegeId && res.data.data.length > 0) {
-              const firstUni = res.data.data[0];
-              if (firstUni.colleges && firstUni.colleges.length > 0) {
-                const firstCol = firstUni.colleges[0];
-                localStorage.setItem('superadmin_selectedCollegeId', firstCol.id);
-                localStorage.setItem('superadmin_selectedCollegeName', firstCol.name);
-                localStorage.setItem('superadmin_selectedUniversityName', firstUni.name);
-                localStorage.setItem('superadmin_selectedUniversityLogo', firstUni.logoUrl || '');
-                localStorage.setItem('superadmin_selectedThemeColor', firstUni.themeColor || '');
-                window.dispatchEvent(new CustomEvent('MANAR_COLLEGE_SWITCH'));
-              }
-            }
-          }
-        })
-        .catch(err => console.error('[App] Failed to load tenants for switcher:', err));
-    }
-  }, [path]);
-
-  // ── Session Restoration: Auto-redirect on cold load ──────────────────────
-  useEffect(() => {
-    const token = localStorage.getItem('manar_token');
-    const userJson = localStorage.getItem('manar_user');
-    if (!token || !userJson) return;
-
-    let user = null;
-    try { user = JSON.parse(userJson); } catch { return; }
-    if (!user) return;
-
-    // Only auto-redirect from public / root paths
-    const isPublicPath = ['/', '/login', '/register', '/verify'].includes(path);
-    if (!isPublicPath) return; // Already on a protected route, let route guards handle it
-
-    if (hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
-      navigate('/admin/overview', { replace: true });
-    } else if (user.role === 'LECTURER') {
-      navigate('/lecturer/home', { replace: true });
-    } else if (user.role === 'STUDENT') {
-      navigate('/student/home', { replace: true });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Navigation Lock: Block back button to public pages when logged in ─────
-  useEffect(() => {
-    const token = localStorage.getItem('manar_token');
-    const userJson = localStorage.getItem('manar_user');
-    if (!token || !userJson) return;
-    let user = null;
-    try { user = JSON.parse(userJson); } catch { return; }
-    if (!user) return;
-
-    const publicPaths = ['/', '/login', '/register', '/verify'];
-    const isOnPublicPath = publicPaths.includes(path);
-    if (!isOnPublicPath) return;
-
-    // User is logged in but on a public path — push them forward
-    if (hasPermission(user, PERMISSIONS.ACCESS_ADMIN_PORTAL)) {
-      navigate('/admin/overview', { replace: true });
-    } else if (user.role === 'LECTURER') {
-      navigate('/lecturer/home', { replace: true });
-    } else if (user.role === 'STUDENT') {
-      navigate('/student/home', { replace: true });
-    }
-  }, [path]); // Runs every time path changes
 
   // ── Web Push Notification Subscription ───────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('manar_token');
     const userJson = localStorage.getItem('manar_user');
     if (!token || !userJson) return;
+
 
     // Ask for permission and register push subscription
     if ('serviceWorker' in navigator && 'PushManager' in window) {

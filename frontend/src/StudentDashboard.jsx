@@ -1194,44 +1194,58 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleDeletePost = async (postId) => {
-    if (!window.confirm(t('exchange.deletePostConfirm'))) return;
-    try {
-      const token = localStorage.getItem('manar_token');
-      const res = await axios.delete(`${API_URL}/api/exchange/posts/${postId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.data?.success) {
-        toast.success(isAr ? 'تم حذف الموضوع بنجاح' : 'Discussion deleted successfully');
-        if (selectedPost && selectedPost.id === postId) {
-          setSelectedPost(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'post' | 'comment', id: string } | null
+  const [isImpersonating, setIsImpersonating] = useState(() => !!localStorage.getItem('manar_super_admin_token'));
+
+  const handleDeletePost = (postId) => {
+    setDeleteTarget({ type: 'post', id: postId });
+  };
+
+  const handleDeleteComment = (commentId) => {
+    setDeleteTarget({ type: 'comment', id: commentId });
+  };
+
+  const confirmDeleteTarget = async () => {
+    if (!deleteTarget) return;
+    const { type, id } = deleteTarget;
+    setDeleteTarget(null);
+
+    if (type === 'post') {
+      try {
+        const token = localStorage.getItem('manar_token');
+        const res = await axios.delete(`${API_URL}/api/exchange/posts/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.data?.success) {
+          toast.success(isAr ? 'تم حذف الموضوع بنجاح' : 'Discussion deleted successfully');
+          if (selectedPost && selectedPost.id === id) {
+            setSelectedPost(null);
+          }
+          fetchPosts();
         }
-        fetchPosts();
+      } catch (err) {
+        console.error('Error deleting post:', err);
+        toast.error(isAr ? 'فشل حذف الموضوع' : 'Failed to delete discussion');
       }
-    } catch (err) {
-      console.error('Error deleting post:', err);
-      toast.error(isAr ? 'فشل حذف الموضوع' : 'Failed to delete discussion');
+    } else if (type === 'comment') {
+      try {
+        const token = localStorage.getItem('manar_token');
+        const res = await axios.delete(`${API_URL}/api/exchange/comments/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.data?.success) {
+          toast.success(isAr ? 'تم حذف التعليق' : 'Comment deleted');
+          if (selectedPost) {
+            fetchPostDetails(selectedPost.id);
+          }
+        }
+      } catch (err) {
+        console.error('Error deleting comment:', err);
+        toast.error(isAr ? 'فشل حذف التعليق' : 'Failed to delete comment');
+      }
     }
   };
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm(t('exchange.deleteCommentConfirm'))) return;
-    try {
-      const token = localStorage.getItem('manar_token');
-      const res = await axios.delete(`${API_URL}/api/exchange/comments/${commentId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.data?.success) {
-        toast.success(isAr ? 'تم حذف التعليق' : 'Comment deleted');
-        if (selectedPost) {
-          fetchPostDetails(selectedPost.id);
-        }
-      }
-    } catch (err) {
-      console.error('Error deleting comment:', err);
-      toast.error(isAr ? 'فشل حذف التعليق' : 'Failed to delete comment');
-    }
-  };
 
   useEffect(() => {
     if (activeTab === 'exchange') {
@@ -1466,8 +1480,9 @@ export default function StudentDashboard() {
         {/* ══ رأس الصفحة الثابت — HCI: Visual Clarity + Touch Targets ══ */}
         <header
           className="app-header-bar h-16 flex items-center justify-between px-4 fixed w-full max-w-[430px] z-40 transition-all"
-          style={{ top: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}
+          style={{ top: isImpersonating ? '40px' : '0px' }}
         >
+
           {/* الجانب الأيسر: زر القائمة + الأفاتار + عنوان الصفحة */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* Hamburger / Drawer Button — HCI 44px target */}
@@ -1823,7 +1838,7 @@ export default function StudentDashboard() {
             { id: 'schedule',       label: isAr ? 'الجدول'   : 'Schedule', iconActive: 'ph-fill ph-calendar',    iconInactive: 'ph ph-calendar' },
             { id: 'goals',          label: isAr ? 'المهام'   : 'Tasks',    iconActive: 'ph-fill ph-checks',      iconInactive: 'ph ph-checks' },
             { id: 'exchange',       label: isAr ? 'الملتقى'  : 'Forum',    iconActive: 'ph-fill ph-chats',       iconInactive: 'ph ph-chats' },
-            { id: 'representative', label: isAr ? 'المندوب'  : 'Delegate', iconActive: 'ph-fill ph-users-three', iconInactive: 'ph ph-users-three' },
+            ...(profile?.isRepresentative ? [{ id: 'representative', label: isAr ? 'المندوب'  : 'Delegate', iconActive: 'ph-fill ph-users-three', iconInactive: 'ph ph-users-three' }] : []),
             { id: 'profile',        label: isAr ? 'الملف'    : 'Profile',  iconActive: 'ph-fill ph-user-circle', iconInactive: 'ph ph-user-circle' },
           ].map(tab => {
             const active = activeTab === tab.id;
@@ -1866,25 +1881,10 @@ export default function StudentDashboard() {
                 >
                   {tab.label}
                 </span>
-
-                {/* Notification dot on profile (unread count) */}
-                {tab.id === 'profile' && unreadNotificationsCount > 0 && !active && (
-                  <span
-                    className="absolute"
-                    style={{
-                      top: '8px', right: 'calc(50% - 14px)',
-                      width: '8px', height: '8px',
-                      borderRadius: '50%',
-                      background: '#ef4444',
-                      border: '1.5px solid var(--bg-primary)',
-                      boxShadow: '0 0 6px rgba(239,68,68,0.6)'
-                    }}
-                    aria-hidden="true"
-                  />
-                )}
               </button>
             );
           })}
+
         </nav>
 
       </div>
@@ -1987,6 +1987,17 @@ export default function StudentDashboard() {
         cancelText={isAr ? 'إلغاء' : 'Cancel'}
       />
 
+      {/* نافذة تأكيد حذف المنشور أو التعليق */}
+      <ConfirmationModal
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.type === 'post' ? (isAr ? 'تأكيد حذف الموضوع' : 'Delete Discussion') : (isAr ? 'تأكيد حذف التعليق' : 'Delete Comment')}
+        message={deleteTarget?.type === 'post' ? (isAr ? 'هل أنت متأكد من رغبتك في حذف هذا الموضوع بشكل نهائي؟' : 'Are you sure you want to permanently delete this discussion?') : (isAr ? 'هل أنت متأكد من حذف هذا التعليق؟' : 'Are you sure you want to delete this comment?')}
+        onConfirm={confirmDeleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        confirmText={isAr ? 'حذف' : 'Delete'}
+        cancelText={isAr ? 'إلغاء' : 'Cancel'}
+      />
+
       {/* PWA / APK Install Modal */}
       <PWAInstallModal
         isOpen={showPwaInstallModal}
@@ -1995,33 +2006,7 @@ export default function StudentDashboard() {
         onInstallPwa={installApp}
         initialTab={pwaModalInitialTab || 'pwa'}
       />
-
-      {/* حقن حركات الرسوم البصرية الفاخرة للـ Marquee والنبض */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          animation: marquee 16s linear infinite;
-        }
-        @keyframes pulse-ring {
-          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
-          70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-        .pulse-ring-emerald {
-          animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse-ring-accent {
-          0% { box-shadow: 0 0 0 0 var(--accent-glow); }
-          70% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
-          100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
-        }
-        .pulse-ring-active {
-          animation: pulse-ring-accent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      ` }} />
     </div>
+
   );
 }

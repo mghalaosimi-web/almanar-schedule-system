@@ -46,9 +46,13 @@ export default function HomeTab({
     return startA.localeCompare(startB);
   });
 
-  const announcementsText = isAr
-    ? '🚨 عاجل: تم تحديث قاعة محاضرة هندسة البرمجيات • 📢 تنويه: تأكد من تفعيل الإشعارات الفورية للجدول الجامعي'
-    : '🚨 Rescheduling Notice: Web Lab relocated to Lab 5 • 📢 Tip: Keep push notifications enabled for live updates';
+  const latestAlert = allAlerts && allAlerts.length > 0 ? allAlerts[0]?.message : null;
+  const announcementsText = latestAlert
+    ? `📢 ${latestAlert}`
+    : (isAr
+        ? '📢 تنويه: تأكد من تفعيل الإشعارات الفورية لتلقي أحدث التنبيهات والتحديثات الدراسية المباشرة'
+        : '📢 Tip: Keep push notifications enabled to receive real-time lecture updates');
+
 
   // معالجة وحساب بيانات المحاضرات للعرض
   const lecturesToRender = sortedToday.length > 0 ? sortedToday.map((lec) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { applyAccentColor, clearAccentColor } from './utils/themeEngine';
 
 const THEMES = [
   {
@@ -93,26 +94,16 @@ export default function ThemeSwitcher() {
     // Apply exact Hex custom color properties if 'custom' is active
     if (activeTheme === 'custom') {
       const customHex = localStorage.getItem('manar_custom_accent') || '#10b981';
-      const rgb = hexToRgb(customHex);
-      htmlEl.style.setProperty('--accent', customHex);
-      htmlEl.style.setProperty('--accent-dim', `rgba(${rgb}, 0.12)`);
-      htmlEl.style.setProperty('--accent-glow', `rgba(${rgb}, 0.25)`);
-      htmlEl.style.setProperty('--primary-color-rgb', rgb);
-      htmlEl.style.setProperty('--primary-hover-rgb', rgb);
-      htmlEl.style.setProperty('--glow-lime', `rgba(${rgb}, 0.10)`);
+      applyAccentColor(customHex, 'USER');
     } else {
-      // Clear custom properties to let static theme classes rule
-      htmlEl.style.removeProperty('--accent');
-      htmlEl.style.removeProperty('--accent-dim');
-      htmlEl.style.removeProperty('--accent-glow');
-      htmlEl.style.removeProperty('--primary-color-rgb');
-      htmlEl.style.removeProperty('--primary-hover-rgb');
-      htmlEl.style.removeProperty('--glow-lime');
+      // Clear custom inline properties to let static theme classes rule
+      clearAccentColor('USER');
     }
 
     // Trigger sync events
     window.dispatchEvent(new Event('themeColorChanged'));
   }, [activeTheme]);
+
 
   // Apply dark/light/system theme mode
   useEffect(() => {
@@ -229,11 +220,11 @@ export default function ThemeSwitcher() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className={`absolute mt-2 w-56 bg-gray-950 border border-white/10 rounded-2xl p-2.5 shadow-2xl z-50 ${
+              className={`absolute mt-2 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-2.5 shadow-2xl z-50 ${
                 isRtl ? 'left-0' : 'right-0'
               }`}
             >
-              <div className="px-3 py-1.5 border-b border-white/5 mb-1.5 text-[9px] font-black tracking-widest text-gray-500 uppercase text-right">
+              <div className="px-3 py-1.5 border-b border-[var(--border-color)] mb-1.5 text-[9px] font-black tracking-widest text-[var(--text-muted)] uppercase text-right">
                 {isRtl ? 'مظهر الألوان' : 'Color Theme'}
               </div>
               
@@ -259,7 +250,7 @@ export default function ThemeSwitcher() {
                         className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 border ${
                           isSelected 
                             ? '' 
-                            : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'
+                            : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)] border-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
@@ -279,15 +270,7 @@ export default function ThemeSwitcher() {
                               localStorage.setItem('manar_custom_accent', hex);
                               localStorage.setItem('manar_theme_color', 'custom');
                               setActiveTheme('custom');
-                              
-                              const htmlEl = document.documentElement;
-                              const rgb = hexToRgb(hex);
-                              htmlEl.style.setProperty('--accent', hex);
-                              htmlEl.style.setProperty('--accent-dim', `rgba(${rgb}, 0.12)`);
-                              htmlEl.style.setProperty('--accent-glow', `rgba(${rgb}, 0.25)`);
-                              htmlEl.style.setProperty('--primary-color-rgb', rgb);
-                              htmlEl.style.setProperty('--primary-hover-rgb', rgb);
-                              htmlEl.style.setProperty('--glow-lime', `rgba(${rgb}, 0.10)`);
+                              applyAccentColor(hex, 'USER');
                               window.dispatchEvent(new Event('themeColorChanged'));
                             }}
                             className="w-5 h-5 p-0 border-0 bg-transparent rounded cursor-pointer shrink-0"
@@ -295,6 +278,7 @@ export default function ThemeSwitcher() {
                           />
                         </div>
                       )}
+
                     </div>
                   );
                 })}

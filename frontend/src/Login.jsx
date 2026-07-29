@@ -40,12 +40,13 @@ const item = {
 
 const Field = ({ label, children }) => (
   <div className="space-y-2">
-    <label className="block text-[10px] font-black tracking-wider uppercase text-white/50">
+    <label className="block text-[10px] font-black tracking-wider uppercase text-slate-300">
       {label}
     </label>
     {children}
   </div>
 );
+
 
 export default function Login() {
   const { i18n } = useTranslation();
@@ -358,7 +359,8 @@ export default function Login() {
     }
   };
 
-  const inputClass = 'w-full px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all duration-200 text-sm backdrop-blur-md h-[56px] min-h-[56px]';
+  const inputClass = 'w-full px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-400 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all duration-200 text-sm backdrop-blur-md h-[56px] min-h-[56px]';
+
 
   return (
     <div
@@ -619,7 +621,7 @@ export default function Login() {
                     {/* Divider */}
                     <div className="relative flex py-2 items-center">
                       <div className="flex-grow border-t border-white/10"></div>
-                      <span className="flex-shrink mx-4 text-[10px] font-black text-white/45 uppercase tracking-widest text-center leading-relaxed">
+                      <span className="flex-shrink mx-4 text-[10px] font-black text-slate-300 uppercase tracking-widest text-center leading-relaxed">
                         {isAr ? 'أو للدخول السريع للطلاب المربوطين' : 'Or quick login for linked students'}
                       </span>
                       <div className="flex-grow border-t border-white/10"></div>
@@ -641,7 +643,7 @@ export default function Login() {
                       </SafeGoogleLogin>
                     </div>
 
-                    <p className="text-[11px] text-white/55 text-center leading-relaxed mt-4 p-4 rounded-2xl bg-white/2 border border-white/5 backdrop-blur-sm">
+                    <p className="text-[11px] text-slate-300 text-center leading-relaxed mt-4 p-4 rounded-2xl bg-white/2 border border-white/5 backdrop-blur-sm">
                       {isAr 
                         ? '⚠️ يتطلب نظام منار للطلاب تسجيل الدخول الحصري والمباشر عبر حساب جوجل الجامعي الموثق.' 
                         : '⚠️ The Manar Student Portal requires exclusive and direct login via your verified university Google account.'}
@@ -661,7 +663,7 @@ export default function Login() {
 
               {/* Bottom links inside card */}
               <div className="mt-8 pt-6 border-t border-white/10 text-center">
-                <p className="text-xs text-white/50">
+                <p className="text-xs text-slate-300">
                   {isAr ? 'لا تملك حساباً؟ ' : "Don't have an account? "}
                   <button
                     type="button"
@@ -673,6 +675,7 @@ export default function Login() {
                   </button>
                 </p>
               </div>
+
 
             </motion.div>
 

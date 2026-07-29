@@ -41,6 +41,15 @@
 
   /* Fonts */
   --font-family: 'Cairo', 'Urbanist', 'Inter', sans-serif;
+
+  /* Unified Layer Z-Index Scale */
+  --z-base:            1;
+  --z-dropdown:        100;
+  --z-sticky:          200;
+  --z-modal:           300;
+  --z-notification:    400;
+  --z-overlay:         500;
+  --z-system-banner:   600;
 }
 
 /* Light mode keeps same structure but softens blacks */
@@ -60,35 +69,30 @@
   --glow-emerald: rgba(218, 165, 32, 0.10);
 }
 
-/* ── Light Mode Component Adaptation Overrides ────────────────── */
-:root.light .bg-slate-900,
-:root.light .bg-slate-950,
-:root.light .bg-slate-955,
-:root.light .bg-slate-850,
-:root.light .bg-slate-800,
-:root.light .bg-\[\#0f172a\],
-:root.light .bg-\[\#070b13\],
-:root.light .bg-\[\#121824\] {
-  background-color: var(--bg-card) !important;
-  color: var(--text-primary) !important;
+/* ── Light Mode Colored Theme Specificity Overrides ─────────── */
+:root.light.theme-purple {
+  --accent:             #9333ea;
+  --accent-dim:         rgba(147, 51, 234, 0.12);
+  --accent-glow:        rgba(147, 51, 234, 0.25);
+  --primary-color-rgb:  147, 51, 234;
+  --primary-hover-rgb:  168, 85, 247;
+  --glow-lime:          rgba(147, 51, 234, 0.10);
 }
-
-:root.light .text-slate-200,
-:root.light .text-slate-300,
-:root.light .text-white {
-  color: var(--text-primary) !important;
+:root.light.theme-blue {
+  --accent:             #2563eb;
+  --accent-dim:         rgba(37, 99, 235, 0.12);
+  --accent-glow:        rgba(37, 99, 235, 0.25);
+  --primary-color-rgb:  37, 99, 235;
+  --primary-hover-rgb:  59, 130, 246;
+  --glow-lime:          rgba(37, 99, 235, 0.10);
 }
-
-:root.light .text-slate-400,
-:root.light .text-slate-500 {
-  color: var(--text-secondary) !important;
-}
-
-:root.light .border-white\/5,
-:root.light .border-white\/10,
-:root.light .border-slate-800,
-:root.light .border-slate-700 {
-  border-color: var(--border-color) !important;
+:root.light.theme-amber {
+  --accent:             #d97706;
+  --accent-dim:         rgba(217, 119, 6, 0.12);
+  --accent-glow:        rgba(217, 119, 6, 0.25);
+  --primary-color-rgb:  217, 119, 6;
+  --primary-hover-rgb:  245, 158, 11;
+  --glow-lime:          rgba(217, 119, 6, 0.10);
 }
 
 /* ── Theme variants (for ThemeSwitcher) ──────────────────────── */
@@ -997,5 +1001,54 @@ input, button, select, textarea {
   70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HCI — COMPLETE LIGHT MODE ADAPTATION OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+:root.light .glass-header,
+:root.light .app-header,
+:root.light .app-header-bar {
+  background: rgba(252, 251, 247, 0.94) !important;
+  border-bottom-color: rgba(184, 134, 11, 0.15) !important;
+}
+
+:root.light .hci-glass-card {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(184, 134, 11, 0.15) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+:root.light .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.05) 25%,
+    rgba(0,0,0,0.09) 50%,
+    rgba(0,0,0,0.05) 75%
+  ) !important;
+}
+
+:root.light .btn-neon {
+  color: #ffffff !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACCESSIBILITY — PREFERS REDUCED MOTION
+   ══════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ambient-orb,
+  .animate-pulse,
+  .animate-marquee,
+  .live-dot,
+  .active-pulse-ring::after {
+    animation: none !important;
+  }
+}
+
 
 
