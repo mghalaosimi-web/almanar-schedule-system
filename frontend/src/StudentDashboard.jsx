@@ -32,6 +32,7 @@ import DelegateTab from './components/student/DelegateTab';
 import ProfileTab from './components/student/ProfileTab';
 import ExchangeHubTab from './components/student/ExchangeHubTab';
 import GoalsTab from './components/student/GoalsTab';
+import GlobalAiCoPilotModal from './components/student/GlobalAiCoPilotModal';
 
 const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const SCHED_DAYS = ['SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'];
@@ -2006,6 +2007,9 @@ export default function StudentDashboard() {
         onInstallPwa={installApp}
         initialTab={pwaModalInitialTab || 'pwa'}
       />
+
+      {/* مساعد الذكاء الاصطناعي الشامل المتاح في جميع التبويبات */}
+      <GlobalAiCoPilotModal isAr={isAr} profile={profile} />
     </div>
 
   );
