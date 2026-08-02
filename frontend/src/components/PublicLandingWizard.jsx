@@ -954,14 +954,14 @@ export default function PublicLandingWizard() {
                           </motion.div>
 
                           {/* Governorates Grid */}
-                          {governorates.length === 0 ? (
+                          {(governorates || []).length === 0 ? (
                             <motion.div variants={cardVariants} className="text-center py-16 text-white/30 font-bold text-sm">
                               <div className="text-4xl mb-3">🏛️</div>
                               <p>{isAr ? 'لا توجد محافظات مسجلة. سيضيفها المطور قريباً.' : 'No governorates registered yet. Developer will add them soon.'}</p>
                             </motion.div>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                              {governorates.map((gov) => (
+                              {(governorates || []).map((gov) => (
                                 <motion.button
                                   key={gov.id}
                                   variants={cardVariants}
@@ -1010,7 +1010,7 @@ export default function PublicLandingWizard() {
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                            {universities.map((uni) => {
+                            {(universities || []).map((uni) => {
                               const logoSrc = getLogoSrc(uni);
                               return (
                                 <motion.button
@@ -1046,7 +1046,7 @@ export default function PublicLandingWizard() {
                       {/* STEP 3: COLLEGES */}
                       {step === 3 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                          {colleges.map((col) => (
+                          {(colleges || []).map((col) => (
                             <motion.button
                               key={col.id}
                               variants={cardVariants}
@@ -1076,7 +1076,7 @@ export default function PublicLandingWizard() {
                             </motion.div>
                           )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {majors.map((major) => (
+                            {(majors || []).map((major) => (
                               <motion.button
                                 key={major.id}
                                 variants={cardVariants}
@@ -1117,7 +1117,7 @@ export default function PublicLandingWizard() {
                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="" disabled>{isAr ? 'اختر محافظة' : 'Select Gov'}</option>
-                                {governorates.map(g => (
+                                {(governorates || []).map(g => (
                                   <option key={g.id} value={g.id}>{g.name}</option>
                                 ))}
                               </select>
@@ -1135,7 +1135,7 @@ export default function PublicLandingWizard() {
                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
                               >
                                 <option value="" disabled>{isAr ? 'اختر جامعة' : 'Select Uni'}</option>
-                                {universities.map(u => (
+                                {(universities || []).map(u => (
                                   <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                               </select>
@@ -1153,7 +1153,7 @@ export default function PublicLandingWizard() {
                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
                               >
                                 <option value="" disabled>{isAr ? 'اختر كلية' : 'Select College'}</option>
-                                {colleges.map(c => (
+                                {(colleges || []).map(c => (
                                   <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                               </select>
@@ -1171,7 +1171,7 @@ export default function PublicLandingWizard() {
                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
                               >
                                 <option value="" disabled>{isAr ? 'اختر تخصص' : 'Select Major'}</option>
-                                {majors.map(m => (
+                                {(majors || []).map(m => (
                                   <option key={m.id} value={m.id}>{m.name}</option>
                                 ))}
                               </select>
