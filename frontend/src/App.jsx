@@ -570,7 +570,7 @@ function AppLayout() {
 
   const renderImpersonationBanner = () => {
     const isImpersonating = !!localStorage.getItem('manar_super_admin_token');
-    if (!isImpersonating) return null;
+    if (!isImpersonating || !user || !user.name || !user.role) return null;
 
     return (
       <div 
@@ -581,8 +581,8 @@ function AppLayout() {
           <span className="animate-pulse">🔴</span>
           <span>
             {isAr 
-              ? `أنت في وضع المحاكاة والمعاينة: ${user?.name} (${user?.role})` 
-              : `Active User Impersonation Preview: ${user?.name} (${user?.role})`}
+              ? `أنت في وضع المحاكاة والمعاينة: ${user.name} (${user.role})` 
+              : `Active User Impersonation Preview: ${user.name} (${user.role})`}
           </span>
         </div>
         <button
@@ -596,10 +596,13 @@ function AppLayout() {
             if (superToken && superUser) {
               localStorage.setItem('manar_token', superToken);
               localStorage.setItem('manar_user', superUser);
+            } else {
+              localStorage.removeItem('manar_token');
+              localStorage.removeItem('manar_user');
             }
             
             localStorage.removeItem('student_profile');
-            window.location.href = '/admin/dev-portal';
+            window.location.href = '/login';
           }}
           className="bg-black/40 hover:bg-black/60 px-3 py-1 rounded-md text-[10px] uppercase font-black tracking-wider transition-all border border-white/10 cursor-pointer"
         >

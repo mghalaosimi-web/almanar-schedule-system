@@ -939,7 +939,23 @@ async function main() {
       role: 'ADMIN'
     }
   });
-  console.log(`Master Admin created successfully: ${masterAdmin.name} (${masterAdmin.email})`);
+
+  const superAdminPasswordHash = await bcrypt.hash('12345678', 10);
+  await prisma.admin.upsert({
+    where: { email: 'm.gh.alosimi@gmail.com' },
+    update: {
+      name: 'م. محمد العليمي (SUPER_ADMIN)',
+      password: superAdminPasswordHash,
+      role: 'ADMIN'
+    },
+    create: {
+      name: 'م. محمد العليمي (SUPER_ADMIN)',
+      email: 'm.gh.alosimi@gmail.com',
+      password: superAdminPasswordHash,
+      role: 'ADMIN'
+    }
+  });
+  console.log(`Master Admin created successfully: ${masterAdmin.name} (${masterAdmin.email}) & SUPER_ADMIN m.gh.alosimi@gmail.com`);
 
   // Generate 1,000 realistic dummy students for Al-Manar
   console.log('Generating 1,000 realistic dummy students for Al-Manar University College...');
