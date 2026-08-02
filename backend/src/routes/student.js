@@ -29,33 +29,22 @@ function getCoordinateDistance(lat1, lon1, lat2, lon2) {
   return R * c; // Distance in meters
 }
 
-// 1. Tenants Endpoint (Get Universities and Colleges)
+// 1. Tenants Endpoint (Get Al-Manar University College)
 router.get('/tenants', async (req, res) => {
-  try {
-    const universities = await prisma.university.findMany({
-      orderBy: [
-        { sortIndex: 'asc' },
-        { name: 'asc' }
-      ],
-      include: {
-        colleges: {
-          orderBy: [
-            { sortIndex: 'asc' },
-            { name: 'asc' }
-          ]
-        }
-      }
-    });
-    const mapped = universities.map(uni => ({
-      ...uni,
-      logoUrl: uni.logoUrl ? uni.logoUrl : (uni.slug === 'hajjah-university' ? '/hajjah-logo-new.png' :
-               uni.slug === 'almanar-college' ? '/almanar-logo.png' : uni.logoUrl)
-    }));
-    res.status(200).json({ success: true, data: mapped });
-  } catch (error) {
-    console.error('[API] Fetch tenants error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch tenants' });
-  }
+  res.status(200).json({
+    success: true,
+    data: [{
+      id: 1,
+      name: 'جامعة المنار',
+      slug: 'almanar-college',
+      logoUrl: '/almanar-logo.png',
+      colleges: [{
+        id: 1,
+        name: 'كلية المنار الجامعية',
+        slug: 'almanar-college'
+      }]
+    }]
+  });
 });
 
 // 2b. Dynamic Morning & Daily Greeting API
@@ -216,10 +205,7 @@ router.post('/notifications/subscribe', verifyToken, async (req, res) => {
 // 5. GET all departments
 router.get('/departments', async (req, res) => {
   try {
-    const { collegeId } = req.query;
-    const filter = collegeId ? { collegeId: parseInt(collegeId) } : {};
     const departments = await prisma.department.findMany({
-      where: filter,
       orderBy: { name: 'asc' }
     });
     res.status(200).json({ success: true, data: departments });
@@ -232,14 +218,8 @@ router.get('/departments', async (req, res) => {
 // 6. GET all majors
 router.get('/majors', async (req, res) => {
   try {
-    const { departmentId, collegeId } = req.query;
-    const filter = {};
-    if (departmentId) {
-      filter.departmentId = parseInt(departmentId);
-    }
-    if (collegeId) {
-      filter.department = { collegeId: parseInt(collegeId) };
-    }
+    const { departmentId } = req.query;
+    const filter = departmentId ? { departmentId: parseInt(departmentId) } : {};
     const majors = await prisma.major.findMany({
       where: filter,
       orderBy: { name: 'asc' }
@@ -267,9 +247,8 @@ router.get('/levels', async (req, res) => {
 // 8. GET all groups
 router.get('/groups', async (req, res) => {
   try {
-    const { collegeId, majorId, levelId } = req.query;
+    const { majorId, levelId } = req.query;
     const filter = {};
-    if (collegeId) filter.collegeId = parseInt(collegeId);
     if (majorId) filter.majorId = parseInt(majorId);
     if (levelId) filter.levelId = parseInt(levelId);
 
@@ -291,16 +270,7 @@ router.get('/groups', async (req, res) => {
 // 9. GET all rooms
 router.get('/rooms', verifyToken, async (req, res) => {
   try {
-    const { collegeId } = req.query;
-    const whereClause = {};
-    if (req.user.role !== 'SUPER_ADMIN') {
-      whereClause.collegeId = req.user.collegeId;
-    } else if (collegeId) {
-      whereClause.collegeId = parseInt(collegeId);
-    }
-
     const rooms = await prisma.room.findMany({
-      where: whereClause,
       orderBy: { name: 'asc' }
     });
     res.status(200).json({ success: true, data: rooms });
@@ -313,16 +283,7 @@ router.get('/rooms', verifyToken, async (req, res) => {
 // 10. GET all lecturers
 router.get('/lecturers', verifyToken, async (req, res) => {
   try {
-    const { collegeId } = req.query;
-    const whereClause = {};
-    if (req.user.role !== 'SUPER_ADMIN') {
-      whereClause.collegeId = req.user.collegeId;
-    } else if (collegeId) {
-      whereClause.collegeId = parseInt(collegeId);
-    }
-
     const lecturers = await prisma.lecturer.findMany({
-      where: whereClause,
       orderBy: { name: 'asc' }
     });
     res.status(200).json({ success: true, data: lecturers });
@@ -335,7 +296,7 @@ router.get('/lecturers', verifyToken, async (req, res) => {
 // 11. GET all schedules
 router.get('/schedules', verifyToken, async (req, res) => {
   try {
-    const { groupId, collegeId, majorId, levelId, page, limit } = req.query;
+    const { groupId, majorId, levelId, page, limit } = req.query;
 
     const whereClause = {};
     if (groupId) {
@@ -346,12 +307,6 @@ router.get('/schedules', verifyToken, async (req, res) => {
         majorId: parseInt(majorId),
         levelId: parseInt(levelId)
       };
-    }
-    
-    if (req.user.role !== 'SUPER_ADMIN') {
-      whereClause.collegeId = req.user.collegeId;
-    } else if (collegeId) {
-      whereClause.collegeId = parseInt(collegeId);
     }
 
     let schedules;
@@ -463,7 +418,6 @@ router.get('/representative/students', verifyToken, async (req, res) => {
 
     const students = await prisma.student.findMany({
       where: {
-        collegeId: studentInfo.collegeId,
         majorId: studentInfo.majorId,
         levelId: studentInfo.levelId,
       },
@@ -498,7 +452,7 @@ router.post('/representative/assign', verifyToken, async (req, res) => {
 
     if (groupId !== null) {
       const group = await prisma.group.findUnique({ where: { id: parseInt(groupId) } });
-      if (!group || group.collegeId !== studentInfo.collegeId) {
+      if (!group) {
         return res.status(400).json({ success: false, error: 'Invalid group selection' });
       }
     }
@@ -506,7 +460,6 @@ router.post('/representative/assign', verifyToken, async (req, res) => {
     const updateResult = await prisma.student.updateMany({
       where: {
         id: { in: studentIds.map(id => parseInt(id)) },
-        collegeId: studentInfo.collegeId,
         majorId: studentInfo.majorId,
         levelId: studentInfo.levelId
       },

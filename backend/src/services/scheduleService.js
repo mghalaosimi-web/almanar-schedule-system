@@ -25,11 +25,10 @@ const { broadcastSSE, sendPushNotification } = require('./notifications');
  * @param {number} [excludeScheduleId] - معرف الحصة المراد استثناؤها من الفحص (في حالة التعديل).
  * @returns {Promise<Object|null>} يعيد كائن الحصة المتعارضة إن وُجدت، أو null في حال خلو الموعد من التعارضات.
  */
-async function checkScheduleClash(dayOfWeek, startTime, roomId, lecturerName, collegeId, subjectId, excludeScheduleId) {
+async function checkScheduleClash(dayOfWeek, startTime, roomId, lecturerName, subjectId, excludeScheduleId) {
   const whereClause = {
     dayOfWeek,
     startTime,
-    collegeId,
     subjectId: { not: subjectId }, // السماح بالمحاضرات المشتركة لنفس المادة
     OR: [
       { roomId },
@@ -91,7 +90,6 @@ async function createOverride(scheduleId, newStartTime, newEndTime, newRoomId, d
     targetStartTime,
     targetRoomId,
     schedule.lecturerName,
-    schedule.collegeId,
     schedule.subjectId,
     parseInt(scheduleId)
   );

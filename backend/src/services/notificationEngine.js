@@ -109,7 +109,7 @@ async function whatsappProvider(recipients, payload) {
 }
 
 // ── 3. AUDIENCE RESOLVER ────────────────────────────────────────────────────
-async function resolveAudience({ groupId, collegeId, studentId, role }) {
+async function resolveAudience({ groupId, studentId, role }) {
   if (studentId) {
     const student = await prisma.student.findUnique({ where: { id: parseInt(studentId) } });
     return student ? [student] : [];
@@ -122,18 +122,13 @@ async function resolveAudience({ groupId, collegeId, studentId, role }) {
     });
   }
 
-  if (collegeId) {
-    return await prisma.student.findMany({
-      where: { collegeId: parseInt(collegeId) },
-      select: { id: true, email: true, name: true, groupId: true }
-    });
-  }
-
-  return [];
+  return await prisma.student.findMany({
+    select: { id: true, email: true, name: true, groupId: true }
+  });
 }
 
 // ── 4. NOTIFICATION ENGINE CORE ─────────────────────────────────────────────
-async function sendNotification({ templateKey, templateData, title, body, groupId, collegeId, studentId, channels = ['PUSH', 'INTERNAL'] }) {
+async function sendNotification({ templateKey, templateData, title, body, groupId, studentId, channels = ['PUSH', 'INTERNAL'] }) {
   let finalTitle = title;
   let finalBody = body;
 
@@ -152,7 +147,7 @@ async function sendNotification({ templateKey, templateData, title, body, groupI
   };
 
   // 1. Resolve Target Audience
-  const recipients = await resolveAudience({ groupId, collegeId, studentId });
+  const recipients = await resolveAudience({ groupId, studentId });
 
   // 2. Dispatch to Selected Channels in Parallel
   const dispatchPromises = [];

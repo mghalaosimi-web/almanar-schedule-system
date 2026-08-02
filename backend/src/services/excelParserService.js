@@ -8,12 +8,6 @@ const { prisma } = require('../db');
 const xlsx = require('xlsx');
 const bcrypt = require('bcryptjs');
 
-/**
- * فك تشفير سلسلة الـ Base64 وقراءة ملف الـ Excel لاستخراج بيانات الورقة الأولى كصفوف JSON.
- * 
- * @param {string} fileBase64 - السلسلة المشفرة بصيغة Base64 للملف المرفوع.
- * @returns {Array<Object>} مصفوفة من كائنات الأسطر المستخرجة من جدول البيانات.
- */
 function parseXlsxBase64(fileBase64) {
   const buffer = Buffer.from(fileBase64, 'base64');
   const workbook = xlsx.read(buffer, { type: 'buffer' });
@@ -22,37 +16,18 @@ function parseXlsxBase64(fileBase64) {
   return xlsx.utils.sheet_to_json(sheet, { defval: '' });
 }
 
-/**
- * معالجة واستيراد الطلاب جماعياً من ملف Excel.
- * 
- * التدفق البرمجي والتحسين الفني:
- * 1. فك تشفير ملف Excel وقراءة الصفوف.
- * 2. التحقق من وجود بيانات فعلية في الملف.
- * 3. المرحلة الأولى (Phase 1): التحقق المتتابع الفردي من صحة الصفوف وحل الموارد المشتركة:
- *    - التأكد من عدم نقص الحقول الأساسية (الاسم، البريد، رقم الهوية، الهاتف).
- *    - التحقق من تكرار البريد، الهاتف، أو رقم الهوية في قاعدة البيانات لتفادي التعارض.
- *    - حل التخصص (Major): فحص وجود التخصص وفي حال غيابه، يتم إنشاء قسم عام وتخصص جديد بشكل تلقائي لمنع أخطاء العلاقات.
- *    - حل المستوى (Level) والشعبة (Group): البحث عنهم في الكلية المعنية وإنشاؤهم عند الحاجة.
- * 4. المرحلة الثانية (Phase 2): تشفير كلمات المرور بشكل متوازٍ (Concurrently) باستخدام الـ Promises لرفع أداء المعالجة البرمجية (حيث أن عملية التشفير مستهلكة لوقت المعالج CPU).
- * 5. إدخال البيانات دفعة واحدة (Bulk Insert) باستخدام `createMany` لتقليل استهلاك موارد خادم قاعدة البيانات وسرعة الإنجاز.
- * 
- * @param {string} fileBase64 - كائن الملف مرمزاً بـ Base64.
- * @param {number} targetCollegeId - معرف الكلية المستهدفة.
- * @returns {Promise<Object>} يحتوي على إحصائيات الطلاب المنشئين والصفوف المتخطاة والأخطاء التفصيلية.
- */
-async function uploadStudents(fileBase64, targetCollegeId) {
+async function uploadStudents(fileBase64) {
   const rows = parseXlsxBase64(fileBase64);
   if (!rows.length) {
     throw new Error('Excel file is empty or has no data rows');
   }
 
   const results = { created: 0, skipped: 0, errors: [] };
-  const candidateRows = []; // الصفوف التي اجتازت التحقق ومستعدة للإدخال الجماعي
+  const candidateRows = [];
 
-  // ── المرحلة الأولى: التحقق وحل الهياكل التعليمية بشكل متسلسل لتجنب التنافس (Race Conditions) ──
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const rowNum = i + 2; // رقم الصف في ملف الإكسل (مع احتساب سطر العناوين)
+    const rowNum = i + 2;
     try {
       const name = String(row['name'] || row['الاسم'] || '').trim();
       const email = String(row['email'] || row['البريد الإلكتروني'] || '').trim().toLowerCase();
@@ -69,7 +44,6 @@ async function uploadStudents(fileBase64, targetCollegeId) {
         continue;
       }
 
-      // فحص تكرار البيانات الفردية
       const existing = await prisma.student.findFirst({
         where: { OR: [{ email }, { idNumber }, { phone }] }
       });
@@ -79,23 +53,17 @@ async function uploadStudents(fileBase64, targetCollegeId) {
         continue;
       }
 
-      // حل التخصص (Major) والقسم (Department)
       let major = null;
       if (majorName) {
         major = await prisma.major.findFirst({
-          where: {
-            name: { contains: majorName, mode: 'insensitive' },
-            department: { collegeId: targetCollegeId }
-          }
+          where: { name: { contains: majorName, mode: 'insensitive' } }
         });
 
         if (!major) {
-          let department = await prisma.department.findFirst({
-            where: { collegeId: targetCollegeId }
-          });
+          let department = await prisma.department.findFirst();
           if (!department) {
             department = await prisma.department.create({
-              data: { name: 'القسم العام', collegeId: targetCollegeId }
+              data: { name: 'القسم العام' }
             });
           }
           major = await prisma.major.create({
@@ -103,26 +71,13 @@ async function uploadStudents(fileBase64, targetCollegeId) {
           });
         }
       } else {
-        major = await prisma.major.findFirst({
-          where: { department: { collegeId: targetCollegeId } }
-        });
-
+        major = await prisma.major.findFirst();
         if (!major) {
-          let department = await prisma.department.findFirst({
-            where: { collegeId: targetCollegeId }
-          });
-          if (!department) {
-            department = await prisma.department.create({
-              data: { name: 'القسم العام', collegeId: targetCollegeId }
-            });
-          }
-          major = await prisma.major.create({
-            data: { name: 'التخصص العام', departmentId: department.id }
-          });
+          let department = await prisma.department.findFirst() || await prisma.department.create({ data: { name: 'القسم العام' } });
+          major = await prisma.major.create({ data: { name: 'التخصص العام', departmentId: department.id } });
         }
       }
 
-      // حل المستوى الدراسي (Level)
       let level = levelName
         ? await prisma.level.findFirst({ where: { name: { contains: levelName, mode: 'insensitive' } } })
         : null;
@@ -133,13 +88,9 @@ async function uploadStudents(fileBase64, targetCollegeId) {
         level = await prisma.level.findFirst() || await prisma.level.create({ data: { name: 'المستوى الأول' } });
       }
 
-      // حل شعبة الدراسة (Group)
       let group = groupName
         ? await prisma.group.findFirst({
-            where: {
-              name: { contains: groupName, mode: 'insensitive' },
-              collegeId: targetCollegeId
-            }
+            where: { name: { contains: groupName, mode: 'insensitive' } }
           })
         : null;
       if (groupName && !group && major) {
@@ -147,13 +98,11 @@ async function uploadStudents(fileBase64, targetCollegeId) {
           data: {
             name: groupName,
             majorId: major.id,
-            levelId: level.id,
-            collegeId: targetCollegeId
+            levelId: level.id
           }
         });
       }
 
-      // حفظ الصف الجاهز للإدخال الجماعي
       candidateRows.push({
         name,
         email,
@@ -161,7 +110,6 @@ async function uploadStudents(fileBase64, targetCollegeId) {
         phone,
         plainPassword,
         isEmailVerified: true,
-        collegeId: targetCollegeId,
         majorId: major.id,
         levelId: level.id,
         groupId: group?.id || null
@@ -172,7 +120,6 @@ async function uploadStudents(fileBase64, targetCollegeId) {
     }
   }
 
-  // ── المرحلة الثانية: تشفير كلمات المرور بالتوازي ثم الإدخال كدفعة واحدة ──
   if (candidateRows.length > 0) {
     const salt = await bcrypt.genSalt(10);
     const hashedPasswords = await Promise.all(
@@ -186,13 +133,11 @@ async function uploadStudents(fileBase64, targetCollegeId) {
       phone: r.phone,
       password: hashedPasswords[idx],
       isEmailVerified: r.isEmailVerified,
-      collegeId: r.collegeId,
       majorId: r.majorId,
       levelId: r.levelId,
       groupId: r.groupId
     }));
 
-    // إدخال جماعي سريع بقاعدة البيانات وتخطي الصفوف المكررة الصامتة
     const batchResult = await prisma.student.createMany({
       data: insertData,
       skipDuplicates: true
@@ -204,20 +149,7 @@ async function uploadStudents(fileBase64, targetCollegeId) {
   return results;
 }
 
-/**
- * معالجة واستيراد الجدول الدراسي (Schedules) جماعياً من ملف Excel.
- * 
- * التدفق البرمجي:
- * 1. فك تشفير ملف Excel والتحقق من صحته.
- * 2. التحقق من تطابق أسماء الأيام المدرجة مع الأيام الرسمية المدعومة.
- * 3. البحث عن المواد (Subjects) والقاعات (Rooms) والشعب (Groups) والمحاضرين وتسكينهم تلقائياً.
- * 4. إنشاء السجل الخاص بالجدول في قاعدة البيانات.
- * 
- * @param {string} fileBase64 - كائن ملف الـ Excel مرمزاً بـ Base64.
- * @param {number} targetCollegeId - معرف الكلية المستهدفة.
- * @returns {Promise<Object>} يحتوي على إحصائيات الجداول المضافة والمخطاة.
- */
-async function uploadSchedules(fileBase64, targetCollegeId) {
+async function uploadSchedules(fileBase64) {
   const rows = parseXlsxBase64(fileBase64);
   if (!rows.length) {
     throw new Error('Excel file is empty or has no data rows');
@@ -255,51 +187,34 @@ async function uploadSchedules(fileBase64, targetCollegeId) {
         continue;
       }
 
-      // إيجاد أو إنشاء المادة
       const code = subjectCode || subjectName.slice(0, 8).replace(/\s/g, '_').toUpperCase() + '_' + Date.now();
-      const existingSubject = await prisma.subject.findUnique({ where: { code } });
-      if (existingSubject && existingSubject.collegeId !== targetCollegeId) {
-        results.errors.push({ row: rowNum, reason: `رمز المادة "${code}" مستخدم بالفعل في كلية أخرى` });
-        results.skipped++;
-        continue;
-      }
-      let subject = existingSubject;
+      let subject = await prisma.subject.findUnique({ where: { code } });
       if (!subject) {
         subject = await prisma.subject.create({
-          data: { name: subjectName, code, type: subjectType, collegeId: targetCollegeId }
+          data: { name: subjectName, code, type: subjectType }
         });
       }
 
-      // إيجاد أو إنشاء القاعة
-      const existingRoom = await prisma.room.findUnique({ where: { name: roomName } });
-      if (existingRoom && existingRoom.collegeId !== targetCollegeId) {
-        results.errors.push({ row: rowNum, reason: `اسم القاعة "${roomName}" مستخدم بالفعل في كلية أخرى` });
-        results.skipped++;
-        continue;
-      }
-      let room = existingRoom;
+      let room = await prisma.room.findUnique({ where: { name: roomName } });
       if (!room) {
         room = await prisma.room.create({
-          data: { name: roomName, capacity: roomCapacity, collegeId: targetCollegeId }
+          data: { name: roomName, capacity: roomCapacity }
         });
       }
 
-      // إيجاد الشعبة الدراسية
       const group = await prisma.group.findFirst({
-        where: { name: { contains: groupName, mode: 'insensitive' }, collegeId: targetCollegeId }
+        where: { name: { contains: groupName, mode: 'insensitive' } }
       });
       if (!group) {
-        results.errors.push({ row: rowNum, reason: `Group "${groupName}" not found in this college` });
+        results.errors.push({ row: rowNum, reason: `Group "${groupName}" not found` });
         results.skipped++;
         continue;
       }
 
-      // إيجاد المحاضر الاختياري
       const lecturer = lecturerName
-        ? await prisma.lecturer.findFirst({ where: { name: { contains: lecturerName, mode: 'insensitive' }, collegeId: targetCollegeId } })
+        ? await prisma.lecturer.findFirst({ where: { name: { contains: lecturerName, mode: 'insensitive' } } })
         : null;
 
-      // إدراج الحصة الدراسية
       await prisma.schedule.create({
         data: {
           subjectId: subject.id,
@@ -309,8 +224,7 @@ async function uploadSchedules(fileBase64, targetCollegeId) {
           groupId: group.id,
           dayOfWeek,
           startTime,
-          endTime,
-          collegeId: targetCollegeId
+          endTime
         }
       });
       results.created++;
@@ -323,14 +237,7 @@ async function uploadSchedules(fileBase64, targetCollegeId) {
   return results;
 }
 
-/**
- * معالجة واستيراد جدول الاختبارات (Exams) جماعياً من ملف Excel.
- * 
- * @param {string} fileBase64 - كائن ملف الـ Excel مرمزاً بـ Base64.
- * @param {number} targetCollegeId - معرف الكلية المستهدفة.
- * @returns {Promise<Object>} يحتوي على تفاصيل ونتائج إدخال جداول الاختبارات.
- */
-async function uploadExams(fileBase64, targetCollegeId) {
+async function uploadExams(fileBase64) {
   const rows = parseXlsxBase64(fileBase64);
   if (!rows.length) {
     throw new Error('Excel file is empty or has no data rows');
@@ -363,38 +270,23 @@ async function uploadExams(fileBase64, targetCollegeId) {
         continue;
       }
 
-      // إيجاد أو إنشاء المادة
       const code = subjectCode || subjectName.slice(0, 8).replace(/\s/g, '_').toUpperCase();
-      const existingSubject = await prisma.subject.findUnique({ where: { code } });
-      if (existingSubject && existingSubject.collegeId !== targetCollegeId) {
-        results.errors.push({ row: rowNum, reason: `رمز المادة "${code}" مستخدم بالفعل في كلية أخرى` });
-        results.skipped++;
-        continue;
-      }
-      let subject = existingSubject;
+      let subject = await prisma.subject.findUnique({ where: { code } });
       if (!subject) {
         subject = await prisma.subject.create({
-          data: { name: subjectName, code, type: 'THEORY', collegeId: targetCollegeId }
+          data: { name: subjectName, code, type: 'THEORY' }
         });
       }
 
-      // إيجاد أو إنشاء القاعة
-      const existingRoom = await prisma.room.findUnique({ where: { name: roomName } });
-      if (existingRoom && existingRoom.collegeId !== targetCollegeId) {
-        results.errors.push({ row: rowNum, reason: `اسم القاعة "${roomName}" مستخدم بالفعل في كلية أخرى` });
-        results.skipped++;
-        continue;
-      }
-      let room = existingRoom;
+      let room = await prisma.room.findUnique({ where: { name: roomName } });
       if (!room) {
         room = await prisma.room.create({
-          data: { name: roomName, capacity: 50, collegeId: targetCollegeId }
+          data: { name: roomName, capacity: 50 }
         });
       }
 
-      // إيجاد الشعبة الدراسية
       const group = await prisma.group.findFirst({
-        where: { name: { contains: groupName, mode: 'insensitive' }, collegeId: targetCollegeId }
+        where: { name: { contains: groupName, mode: 'insensitive' } }
       });
       if (!group) {
         results.errors.push({ row: rowNum, reason: `Group "${groupName}" not found` });
@@ -402,7 +294,6 @@ async function uploadExams(fileBase64, targetCollegeId) {
         continue;
       }
 
-      // إدراج جدول الاختبار
       await prisma.examSchedule.create({
         data: {
           subjectId: subject.id,
@@ -410,8 +301,7 @@ async function uploadExams(fileBase64, targetCollegeId) {
           groupId: group.id,
           date: examDate,
           startTime,
-          endTime,
-          collegeId: targetCollegeId
+          endTime
         }
       });
       results.created++;

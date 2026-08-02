@@ -1,21 +1,16 @@
 const express = require('express');
 const { searchEnterprise } = require('../services/searchEngine');
 const { verifyToken, requirePermission } = require('../middleware/auth');
-const adminService = require('../services/adminService');
 
 const router = express.Router();
 
 /**
  * GET /api/search
  * Enterprise Full-Text & Relational Search
- * Query Params:
- * - q: Search text (required)
- * - type: ALL | STUDENT | SCHEDULE | LECTURER | ROOM
- * Guarded by requirePermission('SEARCH_VIEW')
  */
 router.get('/search', verifyToken, requirePermission('SEARCH_VIEW'), async (req, res) => {
   try {
-    const { q, type = 'ALL', collegeId } = req.query;
+    const { q, type = 'ALL' } = req.query;
 
     if (!q || String(q).trim().length < 2) {
       return res.status(200).json({
@@ -25,19 +20,9 @@ router.get('/search', verifyToken, requirePermission('SEARCH_VIEW'), async (req,
       });
     }
 
-    const userScope = {
-      student: adminService.getModelScope(req.user, 'Student'),
-      schedule: adminService.getModelScope(req.user, 'Schedule'),
-      lecturer: adminService.getModelScope(req.user, 'Lecturer')
-    };
-
-    const targetCollegeId = collegeId ? parseInt(collegeId) : req.user.collegeId;
-
     const results = await searchEnterprise({
       query: String(q),
-      type: String(type).toUpperCase(),
-      collegeId: targetCollegeId,
-      userScope
+      type: String(type).toUpperCase()
     });
 
     res.status(200).json({

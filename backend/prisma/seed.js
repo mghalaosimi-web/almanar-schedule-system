@@ -14,8 +14,6 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-
-
 // Al-Manar University College configuration (strictly 6 majors)
 const almanarDeptsData = [
   {
@@ -52,13 +50,11 @@ const almanarLecturerNames = [
   'د. شفيق القرشي', 'د. بكر القشوي', 'د. أسماء شمسان', 'د. بسمه القباطي'
 ];
 
-// Clean lecturer name to ignore titles 'د.' or 'أ.' or 'أ.د.' or 'م.'
 function cleanName(name) {
   if (!name) return '';
   return name.replace(/^(د\.|أ\.|أ\.د\.|م\.)\s*/, '').trim();
 }
 
-// Convert Arabic name to safe English email prefix
 function getLecturerEmailPrefix(name) {
   const mapping = {
     'د. محمد السويدي': 'm.suwaidi',
@@ -93,7 +89,6 @@ function getLecturerEmailPrefix(name) {
   return mapping[name] || 'lecturer.' + Math.random().toString(36).substring(2, 7);
 }
 
-// Al-Manar schedule entries from Level 2, Level 3, and Level 4 images
 const almanarSchedulesData = [
   // ── LEVEL 2 ─────────────────────────────────────────────────────────────
   {
@@ -773,13 +768,6 @@ const almanarSchedulesData = [
 ];
 
 async function main() {
-  // Check if database already has data (majors) to prevent wiping existing data
-  const majorCount = await prisma.major.count().catch(() => 0);
-  if (majorCount > 0) {
-    console.log('Database is already seeded and contains data. Skipping seeding to preserve existing records.');
-    return;
-  }
-
   console.log('Clearing existing database tables...');
   await prisma.seatAllocation.deleteMany();
   await prisma.attendanceRecord.deleteMany();
@@ -788,6 +776,16 @@ async function main() {
   await prisma.scheduleOverride.deleteMany();
   await prisma.notificationLog.deleteMany();
   await prisma.rescheduleRequest.deleteMany();
+  await prisma.studentGoalCompletion.deleteMany();
+  await prisma.academicGoal.deleteMany();
+  await prisma.attendance.deleteMany();
+  await prisma.groupResource.deleteMany();
+  await prisma.pollVote.deleteMany();
+  await prisma.poll.deleteMany();
+  await prisma.exchangeComment.deleteMany();
+  await prisma.exchangePost.deleteMany();
+  await prisma.feedback.deleteMany();
+  await prisma.studentTask.deleteMany();
   await prisma.student.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.examSchedule.deleteMany();
@@ -799,22 +797,9 @@ async function main() {
   await prisma.major.deleteMany();
   await prisma.department.deleteMany();
   await prisma.admin.deleteMany();
-  await prisma.college.deleteMany();
-  await prisma.university.deleteMany();
-  await prisma.governorate.deleteMany();
   console.log('All tables cleared.');
 
-  console.log('Creating Governorates...');
-  const targetGovs = ["حجة"];
-  const govMap = {};
-  for (const name of targetGovs) {
-    const gov = await prisma.governorate.create({
-      data: { name }
-    });
-    govMap[name] = gov;
-  }
-
-  // Create Levels early so we can associate them with major/level groups
+  // Create Levels
   console.log('Creating Levels...');
   const levels = [];
   const levelsMap = {};
@@ -824,34 +809,13 @@ async function main() {
     levelsMap[`Level ${i}`] = lvl;
   }
 
-  console.log('Creating Al-Manar University & College...');
-  const almanarUniversity = await prisma.university.create({
-    data: {
-      name: "كلية المنار الجامعية",
-      slug: "almanar-college",
-      logoUrl: null,
-      themeColor: "#059669",
-      governorateId: govMap["حجة"].id
-    }
-  });
-
-  const almanarCollege = await prisma.college.create({
-    data: {
-      name: "كلية المنار الجامعية",
-      slug: "almanar-main",
-      location: "Sanaa",
-      universityId: almanarUniversity.id
-    }
-  });
-
-  console.log('Creating Al-Manar Departments & Majors...');
+  console.log('Creating Departments & Majors...');
   const almanarMajorsMap = {};
   const almanarMajorsList = [];
   for (const deptConfig of almanarDeptsData) {
     const dept = await prisma.department.create({
       data: {
-        name: deptConfig.name,
-        collegeId: almanarCollege.id
+        name: deptConfig.name
       }
     });
 
@@ -867,8 +831,8 @@ async function main() {
     }
   }
 
-  console.log('Creating Al-Manar Groups for each combination of Major and Level...');
-  const almanarGroupsMap = {}; // Key: "majorId_levelId_groupSuffix" -> Group object
+  console.log('Creating Groups for each combination of Major and Level...');
+  const almanarGroupsMap = {};
   const groupSuffixes = ['مجموعة أ (نظري)', 'مجموعة ب (عملي 1)', 'مجموعة ج (عملي 2)'];
   for (const majorName of Object.keys(almanarMajorsMap)) {
     const major = almanarMajorsMap[majorName];
@@ -879,8 +843,7 @@ async function main() {
           data: {
             name: groupName,
             majorId: major.id,
-            levelId: lvl.id,
-            collegeId: almanarCollege.id
+            levelId: lvl.id
           }
         });
         almanarGroupsMap[`${major.id}_${lvl.id}_${suffix}`] = grp;
@@ -888,75 +851,60 @@ async function main() {
     }
   }
 
-  console.log('Creating Al-Manar Rooms...');
+  console.log('Creating Rooms...');
   const almanarRoomsMap = {};
   for (const rm of almanarRoomsData) {
     const createdRoom = await prisma.room.create({
       data: {
         name: rm.name,
-        capacity: rm.capacity,
-        collegeId: almanarCollege.id
+        capacity: rm.capacity
       }
     });
     almanarRoomsMap[rm.name] = createdRoom;
   }
 
-  console.log('Creating Al-Manar Lecturers...');
+  console.log('Creating Lecturers...');
   const lecturerPasswordHash = await bcrypt.hash('12345678', 10);
   const almanarLecturersMap = {};
   for (const name of almanarLecturerNames) {
     const emailPrefix = getLecturerEmailPrefix(name);
-    const email = `${emailPrefix}@manar.edu`;
+    const email = `${emailPrefix}@almanar.edu.ye`;
     const lecturer = await prisma.lecturer.create({
       data: {
         name,
         email,
         password: lecturerPasswordHash,
-        phone: `+96773` + String(Math.floor(1000000 + Math.random() * 9000000)),
-        collegeId: almanarCollege.id
+        phone: `+96773` + String(Math.floor(1000000 + Math.random() * 9000000))
       }
     });
     almanarLecturersMap[cleanName(name)] = lecturer;
   }
 
-  console.log('Creating Al-Manar Subjects & Schedules...');
+  console.log('Creating Subjects & Schedules...');
   const almanarSubjectsMap = {};
   let subjectIdx = 1;
   const schedulesToCreate = [];
 
   for (const item of almanarSchedulesData) {
-    // 1. Get or create subject
     let subject = almanarSubjectsMap[item.subjectName];
     if (!subject) {
       subject = await prisma.subject.create({
         data: {
           name: item.subjectName,
           code: `M-SUB-${subjectIdx++}`,
-          type: 'THEORY',
-          collegeId: almanarCollege.id
+          type: 'THEORY'
         }
       });
       almanarSubjectsMap[item.subjectName] = subject;
     }
 
-    // 2. Resolve room
     const room = almanarRoomsMap[item.roomName];
-    if (!room) {
-      console.warn(`Room ${item.roomName} not found!`);
-      continue;
-    }
+    if (!room) continue;
 
-    // 3. Resolve lecturer using cleaned name to prevent أ. vs د. title conflicts
     const lecturer = almanarLecturersMap[cleanName(item.lecturerName)];
-    if (!lecturer) {
-      console.warn(`Lecturer ${item.lecturerName} (cleaned: ${cleanName(item.lecturerName)}) not found!`);
-    }
-
-    // 4. Resolve level
     const level = levelsMap[item.levelName];
     if (!level) continue;
 
-    // 5. Link schedule to each major's group for this level
     for (const majorName of item.majors) {
       const major = almanarMajorsMap[majorName];
       if (!major) continue;
@@ -972,46 +920,29 @@ async function main() {
         groupId: group.id,
         dayOfWeek: item.day,
         startTime: item.startTime,
-        endTime: item.endTime,
-        collegeId: almanarCollege.id
+        endTime: item.endTime
       });
     }
   }
 
   await prisma.schedule.createMany({ data: schedulesToCreate });
-  console.log(`Seeded ${schedulesToCreate.length} schedules for Al-Manar.`);
+  console.log(`Seeded ${schedulesToCreate.length} schedules for Al-Manar University College.`);
 
-
-  // Create SUPER_ADMIN Account
-  console.log('Creating SUPER_ADMIN user...');
-  const superAdminPasswordHash = await bcrypt.hash('708090', 10);
-  const superAdmin = await prisma.admin.create({
-    data: {
-      name: 'Chief Architect',
-      email: 'm.gh.alosimi@gmail.com',
-      password: superAdminPasswordHash,
-      role: 'SUPER_ADMIN'
-    }
-  });
-  console.log(`SUPER_ADMIN created: ${superAdmin.email}`);
-
-  // Create standard ADMIN users
-  console.log('Creating college admins...');
+  // Create Master Admin User: عبد الملك الحداد
+  console.log('Creating Master System Admin: عبد الملك الحداد...');
   const adminPasswordHash = await bcrypt.hash('12345678', 10);
-  
-  await prisma.admin.create({
+  const masterAdmin = await prisma.admin.create({
     data: {
-      name: 'Al-Manar Admin',
-      email: 'admin.manar@manar.edu',
+      name: 'عبد الملك الحداد',
+      email: 'admin@almanar.edu.ye',
       password: adminPasswordHash,
-      role: 'COLLEGE_ADMIN',
-      collegeId: almanarCollege.id
+      role: 'ADMIN'
     }
   });
-
+  console.log(`Master Admin created successfully: ${masterAdmin.name} (${masterAdmin.email})`);
 
   // Generate 1,000 realistic dummy students for Al-Manar
-  console.log('Generating 1,000 realistic dummy students for Al-Manar College...');
+  console.log('Generating 1,000 realistic dummy students for Al-Manar University College...');
   const firstNames = [
     'احمد', 'خالد', 'فاطمة', 'سارة', 'محمد', 'علي', 'عمر', 'عثمان',
     'صالح', 'عبدالله', 'زينب', 'منى', 'ياسمين', 'رنا', 'حمزة', 'بلال',
@@ -1037,19 +968,17 @@ async function main() {
     const major = almanarMajorsList[(i - 1) % almanarMajorsList.length];
     const level = levels[(i - 1) % levels.length];
 
-    // Find the correct Major-Level group for this student
     const group = almanarGroupsMap[`${major.id}_${level.id}_مجموعة أ (نظري)`];
     if (!group) continue;
 
     studentsToCreate.push({
       name: fullName,
-      email: `student.${i}@manar.edu`,
+      email: `student.${i}@almanar.edu.ye`,
       idNumber: `2026-${String(i).padStart(4, '0')}`,
       phone: `+96777${String(i).padStart(7, '0')}`,
       isEmailVerified: true,
       isPhoneVerified: true,
       password: studentPasswordHash,
-      collegeId: almanarCollege.id,
       majorId: major.id,
       levelId: level.id,
       groupId: group.id
@@ -1060,47 +989,17 @@ async function main() {
   await prisma.student.createMany({ data: studentsToCreate });
   console.log('1,000 dummy students seeded successfully.');
 
-  // Call the function to inject the 5 test students
   await injectTestStudents();
-
-  console.log('Seeding completed.');
+  console.log('Seeding completed successfully.');
 }
 
 async function injectTestStudents() {
-  console.log('Injecting 5 specific test students for Al-Manar University College...');
+  console.log('Injecting 5 test students for Al-Manar University College...');
   
-  const college = await prisma.college.findFirst({
-    where: { name: "كلية المنار الجامعية" }
-  });
-  
-  if (!college) {
-    console.error("Al-Manar University College not found in database!");
-    return;
-  }
-  
-  // Find departments in this college
-  const departments = await prisma.department.findMany({
-    where: { collegeId: college.id }
-  });
-  
-  const deptIds = departments.map(d => d.id);
-  
-  // Find majors in these departments
-  const majors = await prisma.major.findMany({
-    where: { departmentId: { in: deptIds } }
-  });
-  
-  if (majors.length === 0) {
-    console.error("No majors found for Al-Manar University College!");
-    return;
-  }
-  
-  // Find levels
+  const majors = await prisma.major.findMany();
   const levels = await prisma.level.findMany();
-  if (levels.length === 0) {
-    console.error("No levels found in database!");
-    return;
-  }
+
+  if (majors.length === 0 || levels.length === 0) return;
   
   const studentPasswordHash = await bcrypt.hash('12345678', 10);
   
@@ -1109,31 +1008,17 @@ async function injectTestStudents() {
     const email = `test${i}@almanar.edu.ye`;
     const idNumber = `2026-TEST0${i}`;
     
-    // Check if student already exists
     const existing = await prisma.student.findFirst({
-      where: {
-        OR: [
-          { email },
-          { idNumber }
-        ]
-      }
+      where: { OR: [{ email }, { idNumber }] }
     });
     
-    if (existing) {
-      console.log(`Test student ${email} or ID ${idNumber} already exists. Skipping.`);
-      continue;
-    }
+    if (existing) continue;
     
     const major = majors[(i - 1) % majors.length];
     const level = levels[(i - 1) % levels.length];
     
-    // Find a group for this major and level in Al-Manar
     const group = await prisma.group.findFirst({
-      where: {
-        majorId: major.id,
-        levelId: level.id,
-        collegeId: college.id
-      }
+      where: { majorId: major.id, levelId: level.id }
     });
     
     testStudents.push({
@@ -1144,7 +1029,6 @@ async function injectTestStudents() {
       isEmailVerified: true,
       isPhoneVerified: true,
       password: studentPasswordHash,
-      collegeId: college.id,
       majorId: major.id,
       levelId: level.id,
       groupId: group ? group.id : null,
@@ -1154,7 +1038,7 @@ async function injectTestStudents() {
   
   if (testStudents.length > 0) {
     await prisma.student.createMany({ data: testStudents });
-    console.log(`Seeded ${testStudents.length} new test students.`);
+    console.log(`Seeded ${testStudents.length} test students.`);
   }
 }
 

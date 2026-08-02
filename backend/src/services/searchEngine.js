@@ -5,7 +5,7 @@ const { prisma } = require('../db');
  * Performs fast full-text and relational searches across system entities.
  * Assembles deep nested entity trees for students (Profile, Courses, Attendance, Goals).
  */
-async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {} }) {
+async function searchEnterprise({ query, type = 'ALL', userScope = {} }) {
   if (!query || String(query).trim().length < 2) {
     return [];
   }
@@ -17,7 +17,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
   const searchStudents = type === 'ALL' || type === 'STUDENT';
   const searchSchedules = type === 'ALL' || type === 'SCHEDULE';
   const searchLecturers = type === 'ALL' || type === 'LECTURER';
-  const searchRooms = type === 'ALL' || type === 'ROOM';
 
   // 1. Search Students with nested tree assembly
   if (searchStudents) {
@@ -31,7 +30,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
           { phone: searchPattern }
         ]
       };
-      if (collegeId) studentWhere.collegeId = parseInt(collegeId);
 
       const students = await prisma.student.findMany({
         where: studentWhere,
@@ -39,7 +37,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
           major: true,
           level: true,
           group: true,
-          college: true,
           attendances: {
             take: 20,
             orderBy: { date: 'desc' },
@@ -53,12 +50,10 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
       });
 
       for (const student of students) {
-        // Compute attendance statistics
         const totalClasses = student.attendances.length;
         const presentClasses = student.attendances.filter(a => a.status === 'PRESENT').length;
         const attendanceRate = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 100;
 
-        // Fetch student's assigned group schedules (courses)
         let courses = [];
         if (student.groupId) {
           courses = await prisma.schedule.findMany({
@@ -89,7 +84,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
             major: student.major,
             level: student.level,
             group: student.group,
-            college: student.college,
             courses: courses.map(c => ({
               id: c.id,
               subjectName: c.subject?.name,
@@ -130,7 +124,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
           { lecturerName: searchPattern }
         ]
       };
-      if (collegeId) scheduleWhere.collegeId = parseInt(collegeId);
 
       const schedules = await prisma.schedule.findMany({
         where: scheduleWhere,
@@ -180,13 +173,11 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
           { phone: searchPattern }
         ]
       };
-      if (collegeId) lecturerWhere.collegeId = parseInt(collegeId);
 
       const lecturers = await prisma.lecturer.findMany({
         where: lecturerWhere,
         include: {
-          schedules: { include: { subject: true, group: true } },
-          college: true
+          schedules: { include: { subject: true, group: true } }
         },
         take: 10
       });
@@ -201,7 +192,6 @@ async function searchEnterprise({ query, type = 'ALL', collegeId, userScope = {}
           badgeColor: 'info',
           tree: {
             profile: { id: lec.id, name: lec.name, email: lec.email, phone: lec.phone },
-            college: lec.college,
             assignedSchedules: lec.schedules
           }
         });

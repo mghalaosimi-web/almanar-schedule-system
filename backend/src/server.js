@@ -269,11 +269,11 @@ async function boot() {
 
     // Check if seeding is needed (e.g. if university table is empty)
     try {
-      const uniCount = await prisma.university.count();
-      if (uniCount === 0) {
-        console.log('[DATABASE] Warning: University table is empty. If this is a fresh setup, please run the seed script manually: node backend/prisma/seed.js');
+      const studentCount = await prisma.student.count();
+      if (studentCount === 0) {
+        console.log('[DATABASE] Warning: Student table is empty. If this is a fresh setup, please run the seed script manually: node backend/prisma/seed.js');
       } else {
-        console.log(`[DATABASE] Database populated with ${uniCount} universities.`);
+        console.log(`[DATABASE] System populated with ${studentCount} students for Al-Manar University College.`);
       }
     } catch (dbErr) {
       console.warn('[DATABASE] Connection check warning:', dbErr.message);

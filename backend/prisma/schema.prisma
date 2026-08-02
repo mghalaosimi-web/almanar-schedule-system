@@ -33,14 +33,9 @@ enum NotificationStatus {
 }
 
 model Department {
-  id        Int     @id @default(autoincrement())
-  name      String
-  collegeId Int
-  // onDelete: Cascade — departments are purged when their parent college is deleted
-  college   College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
-  majors    Major[]
-
-  @@index([collegeId])
+  id     Int     @id @default(autoincrement())
+  name   String
+  majors Major[]
 }
 
 model Major {
@@ -75,12 +70,9 @@ model Group {
   resources        GroupResource[]
   exchangePosts    ExchangePost[]
   academicGoals    AcademicGoal[]
-  collegeId        Int
-  college          College           @relation(fields: [collegeId], references: [id])
 
   @@index([majorId])
   @@index([levelId])
-  @@index([collegeId])
 }
 
 model Student {
@@ -95,8 +87,6 @@ model Student {
   isRepresentative  Boolean                 @default(false)
   password          String?
   googleId          String?                 @unique
-  collegeId         Int
-  college           College                 @relation(fields: [collegeId], references: [id])
   majorId           Int
   major             Major                   @relation(fields: [majorId], references: [id])
   levelId           Int
@@ -121,7 +111,6 @@ model Student {
   goalCompletions   StudentGoalCompletion[]
   createdAt         DateTime                @default(now())
 
-  @@index([collegeId])
   @@index([majorId])
   @@index([levelId])
   @@index([groupId])
@@ -135,10 +124,6 @@ model Subject {
   schedules     Schedule[]
   examSchedules ExamSchedule[]
   academicGoals AcademicGoal[]
-  collegeId     Int
-  college       College        @relation(fields: [collegeId], references: [id])
-
-  @@index([collegeId])
 }
 
 model Room {
@@ -149,10 +134,6 @@ model Room {
   overrides          ScheduleOverride[]
   rescheduleRequests RescheduleRequest[]
   examSchedules      ExamSchedule[]
-  collegeId          Int
-  college            College             @relation(fields: [collegeId], references: [id])
-
-  @@index([collegeId])
 }
 
 model Lecturer {
@@ -165,10 +146,6 @@ model Lecturer {
   rescheduleRequests RescheduleRequest[]
   pushSubscriptions  PushSubscription[]
   createdAt          DateTime            @default(now())
-  collegeId          Int
-  college            College             @relation(fields: [collegeId], references: [id])
-
-  @@index([collegeId])
 }
 
 enum RequestStatus {
@@ -180,7 +157,6 @@ enum RequestStatus {
 model RescheduleRequest {
   id           Int           @id @default(autoincrement())
   scheduleId   Int
-  // onDelete: Cascade — reschedule requests are cleaned up when the parent schedule is deleted
   schedule     Schedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   lecturerId   Int
   lecturer     Lecturer      @relation(fields: [lecturerId], references: [id])
@@ -218,11 +194,8 @@ model Schedule {
   attendanceRecords  AttendanceRecord[]
   attendances        Attendance[]
   academicGoals      AcademicGoal[]
-  collegeId          Int
-  college            College             @relation(fields: [collegeId], references: [id])
 
   @@index([groupId])
-  @@index([collegeId])
   @@index([lecturerId])
   @@index([dayOfWeek])
 }
@@ -230,7 +203,6 @@ model Schedule {
 model ScheduleOverride {
   id           Int          @id @default(autoincrement())
   scheduleId   Int
-  // onDelete: Cascade — overrides are purged when their parent schedule is deleted
   schedule     Schedule     @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   newStartTime String?
   newEndTime   String?
@@ -249,15 +221,15 @@ model NotificationLog {
   student     Student?           @relation(fields: [studentId], references: [id])
   groupId     Int?
   group       Group?             @relation(fields: [groupId], references: [id])
-  title       String? // عنوان الإشعار
+  title       String?
   message     String
   sentTime    DateTime           @default(now())
-  deliveredAt DateTime? // وقت استلام الجهاز للإشعار
-  readAt      DateTime? // وقت فتح الطالب للإشعار
-  deviceToken String? // رمز الجهاز المستقبِل
-  platform    String? // Android / iOS / Web
+  deliveredAt DateTime?
+  readAt      DateTime?
+  deviceToken String?
+  platform    String?
   status      NotificationStatus
-  broadcastId String? // معرف البث الموحد للمجموعة
+  broadcastId String?
 
   @@index([studentId])
   @@index([groupId])
@@ -267,9 +239,7 @@ model NotificationLog {
 }
 
 enum AdminRole {
-  SUPER_ADMIN
-  UNI_ADMIN
-  COLLEGE_ADMIN
+  ADMIN
 }
 
 model Admin {
@@ -277,15 +247,8 @@ model Admin {
   name              String
   email             String             @unique
   password          String
-  role              AdminRole          @default(SUPER_ADMIN)
+  role              AdminRole          @default(ADMIN)
   pushSubscriptions PushSubscription[]
-  collegeId         Int?
-  college           College?           @relation(fields: [collegeId], references: [id])
-  universityId      Int?
-  university        University?        @relation(fields: [universityId], references: [id])
-
-  @@index([collegeId])
-  @@index([universityId])
 }
 
 enum VerificationType {
@@ -339,7 +302,6 @@ model AttendanceRecord {
   scannedAt  DateTime         @default(now())
 
   @@unique([studentId, scheduleId, date])
-  // Performance: index for lecturer attendance report queries (filter by schedule + date range)
   @@index([scheduleId, date])
 }
 
@@ -352,14 +314,11 @@ model ExamSchedule {
   groupId         Int
   group           Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
   date            DateTime
-  startTime       String // e.g. "09:00"
-  endTime         String // e.g. "11:00"
+  startTime       String
+  endTime         String
   seatAllocations SeatAllocation[]
-  collegeId       Int
-  college         College          @relation(fields: [collegeId], references: [id])
 
   @@index([groupId])
-  @@index([collegeId])
   @@index([date])
 }
 
@@ -369,65 +328,22 @@ model SeatAllocation {
   student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   examScheduleId Int
   examSchedule   ExamSchedule @relation(fields: [examScheduleId], references: [id], onDelete: Cascade)
-  seatNumber     String // e.g. "Seat 1", "Seat 2"
+  seatNumber     String
 
   @@unique([studentId, examScheduleId])
   @@unique([examScheduleId, seatNumber])
 }
 
-model Governorate {
-  id           String       @id @default(uuid())
-  name         String       @unique
-  universities University[]
-}
-
-model University {
-  id            Int           @id @default(autoincrement())
-  name          String
-  slug          String        @unique
-  logoUrl       String?
-  themeColor    String?
-  sortIndex     Int           @default(0)
-  colleges      College[]
-  governorateId String?
-  governorate   Governorate?  @relation(fields: [governorateId], references: [id])
-  admins        Admin[]
-  tenantConfig  TenantConfig?
-}
-
-model College {
-  id            Int            @id @default(autoincrement())
-  name          String
-  slug          String         @unique
-  location      String?
-  sortIndex     Int            @default(0)
-  universityId  Int
-  university    University     @relation(fields: [universityId], references: [id])
-  departments   Department[]
-  students      Student[]
-  admins        Admin[]
-  lecturers     Lecturer[]
-  rooms         Room[]
-  subjects      Subject[]
-  groups        Group[]
-  schedules     Schedule[]
-  examSchedules ExamSchedule[]
-  tenantConfig  TenantConfig?
-
-  @@index([universityId])
-}
-
 model Attendance {
   id           String   @id @default(uuid())
   date         DateTime @default(now())
-  status       String // "PRESENT", "ABSENT", "EXCUSED"
+  status       String
   studentId    Int
   student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   scheduleId   Int
   schedule     Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  recordedById Int // ID of the representative who took attendance
+  recordedById Int
 
-  // Performance indexes: speed up per-student and per-schedule attendance queries
   @@index([studentId])
   @@index([scheduleId, date])
 }
@@ -442,31 +358,6 @@ model GroupResource {
   createdAt  DateTime @default(now())
 
   @@index([groupId, createdAt])
-}
-
-model TenantConfig {
-  id           String      @id @default(uuid())
-  universityId Int?        @unique
-  university   University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  collegeId    Int?        @unique
-  college      College?    @relation(fields: [collegeId], references: [id], onDelete: Cascade)
-
-  // Customization & Branding
-  themeColor   String? // Hex color
-  logoUrl      String? // Custom logo url
-  customDomain String? // Custom subdomain/domain
-  databaseUrl  String? // Encrypted connection string (PostgreSQL URI)
-
-  // Licensing & Dynamic DB Integration
-  whitelabelKey       String? @unique // Secure generated hash for licensing
-  databaseUrlOverride String? // Direct connection string override for tenant
-  isLicenseActive     Boolean @default(true) // Global kill-switch for this tenant
-
-  // Feature Flags
-  enabledFeatures Json @default("{}") // JSON config: {"qrAttendance": true, etc.}
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 enum PostCategory {
@@ -552,7 +443,7 @@ model StudentTask {
   title     String
   dueDate   DateTime?
   completed Boolean   @default(false)
-  category  String    @default("PERSONAL") // "ASSIGNMENT", "PROJECT", "PERSONAL"
+  category  String    @default("PERSONAL")
   createdAt DateTime  @default(now())
 
   @@index([studentId])
@@ -626,7 +517,7 @@ model AcademicGoal {
   description String?
   type        GoalType  @default(ASSIGNMENT)
   dueDate     DateTime?
-  weekNumber  Int? // e.g. 1 for week 1
+  weekNumber  Int?
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -654,7 +545,7 @@ model StudentGoalCompletion {
   academicGoalId Int
   academicGoal   AcademicGoal @relation(fields: [academicGoalId], references: [id], onDelete: Cascade)
   completedAt    DateTime     @default(now())
-  status         String       @default("COMPLETED") // "COMPLETED" or other custom status
+  status         String       @default("COMPLETED")
 
   @@unique([studentId, academicGoalId])
   @@index([studentId])
