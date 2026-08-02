@@ -166,7 +166,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
         }
       });
       if (adminUser) {
-        if (adminUser.role !== 'SUPER_ADMIN' && collegeId && adminUser.collegeId !== parseInt(collegeId)) {
+        if (adminUser.role !== 'SUPER_ADMIN' && collegeId && adminUser.collegeId && adminUser.collegeId !== parseInt(collegeId)) {
           return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
         }
         if (adminUser.password) {
@@ -189,7 +189,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
           }
         });
         if (lecturerUser) {
-          if (collegeId && lecturerUser.collegeId !== parseInt(collegeId)) {
+          if (collegeId && lecturerUser.collegeId && lecturerUser.collegeId !== parseInt(collegeId)) {
             return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
           }
           if (lecturerUser.password) {
@@ -213,7 +213,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
           }
         });
         if (studentUser && studentUser.password) {
-          if (collegeId && studentUser.collegeId !== parseInt(collegeId)) {
+          if (collegeId && studentUser.collegeId && studentUser.collegeId !== parseInt(collegeId)) {
             return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
           }
           const isMatch = await bcrypt.compare(password, studentUser.password);
