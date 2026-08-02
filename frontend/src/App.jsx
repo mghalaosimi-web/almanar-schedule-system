@@ -498,6 +498,24 @@ function AppLayout() {
       console.error(e);
     }
   }
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const universityLogoUrlRaw = isSuperAdmin
+    ? (localStorage.getItem('superadmin_selectedUniversityLogo') || '')
+    : (user?.universityLogo || localStorage.getItem('selectedUniversityLogo'));
+
+  const selectedSlug = localStorage.getItem('selectedUniversitySlug');
+  const activeName = user?.universityName || localStorage.getItem('selectedUniversityName') || '';
+  const activeSlug = selectedSlug || (isSuperAdmin ? localStorage.getItem('superadmin_selectedUniversitySlug') : '');
+
+  const universityLogoUrl = activeSlug === 'hajjah-university' || activeName.includes('حجة') || activeName.includes('Hajjah') ? '/hajjah-logo-new.png' :
+                            activeSlug === 'almanar-college' || activeName.includes('المنار') || activeName.includes('Manar') ? '/almanar-logo.png' : universityLogoUrlRaw;
+
+  const getBrandedTitle = (isAr) => {
+    const uniName = isSuperAdmin
+      ? localStorage.getItem('superadmin_selectedUniversityName')
+      : (user?.universityName || localStorage.getItem('selectedUniversityName'));
+    const colName = isSuperAdmin
+      ? localStorage.getItem('superadmin_selectedCollegeName')
       : (user?.collegeName || localStorage.getItem('selectedCollegeName'));
     
     if (uniName && colName) {
