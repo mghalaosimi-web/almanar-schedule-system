@@ -108,6 +108,26 @@ export function applyOtaTheme(otaColor, fallbackColor = null) {
  */
 export function restoreUserTheme() {
   try {
+    // ── 0. Restore dark/light mode class first (prevents FOUC) ──
+    const themeMode = localStorage.getItem('manar_theme_mode') || 'dark';
+    const htmlEl = document.documentElement;
+    if (themeMode === 'light') {
+      htmlEl.classList.add('light');
+      htmlEl.classList.remove('dark');
+    } else if (themeMode === 'dark') {
+      htmlEl.classList.remove('light');
+      htmlEl.classList.add('dark');
+    } else if (themeMode === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        htmlEl.classList.remove('light');
+        htmlEl.classList.add('dark');
+      } else {
+        htmlEl.classList.add('light');
+        htmlEl.classList.remove('dark');
+      }
+    }
+
     const userJson = localStorage.getItem('manar_user');
     let user = null;
     try { user = JSON.parse(userJson); } catch {}

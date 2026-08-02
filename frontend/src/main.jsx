@@ -5,8 +5,13 @@ import App from './App.jsx'
 import { EntityProvider } from './context/EntityProvider.jsx'
 import './i18n'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { restoreUserTheme } from './utils/themeEngine.js'
 
 import { registerSW } from 'virtual:pwa-register'
+
+// ── Immediately restore theme mode to prevent FOUC (Flash of Unstyled Content) ──
+// Must run synchronously BEFORE React renders any component.
+restoreUserTheme();
 
 // Register Service Worker for PWA with prompt update logic
 try {

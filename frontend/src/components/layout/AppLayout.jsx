@@ -24,7 +24,7 @@ export default function AppLayout({
   const [activeTab, setActiveTab] = useState('home');
 
   return (
-    <div className="h-screen w-full bg-[#070b13] text-white flex flex-col overflow-hidden relative selection:bg-amber-500/30">
+    <div className="h-screen w-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden relative selection:bg-amber-500/30">
       
       {/* 1. Header (Sticky Top Glassmorphic Navigation) */}
       <MobileHeader

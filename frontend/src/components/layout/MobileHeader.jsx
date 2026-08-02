@@ -51,7 +51,7 @@ export default function MobileHeader({
             <span className="text-[11px] font-bold text-slate-400 leading-tight">
               {greeting}
             </span>
-            <h1 className="text-sm font-black text-white tracking-wide truncate max-w-[160px] sm:max-w-[240px]">
+            <h1 className="text-sm font-black text-[var(--text-primary)] tracking-wide truncate max-w-[160px] sm:max-w-[240px]">
               {studentName}
             </h1>
           </div>
@@ -86,7 +86,7 @@ export default function MobileHeader({
             {unreadNotifications > 0 && (
               <>
                 <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-[#070b13]" />
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-[var(--bg-primary)]" />
               </>
             )}
           </motion.button>

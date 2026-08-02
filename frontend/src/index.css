@@ -992,7 +992,7 @@ input, button, select, textarea {
   width: 10px; height: 10px;
   border-radius: 50%;
   background: #10b981;
-  border: 2px solid #0f172a;
+  border: 2px solid var(--bg-primary);
   box-shadow: 0 0 8px #10b981;
   animation: pulse-ring 2s infinite;
 }
@@ -1050,5 +1050,126 @@ input, button, select, textarea {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   GLOBAL LIGHT MODE — COMPREHENSIVE TEXT & GLASS OVERRIDES
+   Prevents text disappearance and color clashing in light mode.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Text Color Overrides ─────────────────────────────────── */
+/* Any element that uses bg-white/5..20 with text-white becomes invisible in light.
+   These overrides make text legible everywhere without touching JSX. */
+:root.light .text-white:not(.text-white-force),
+:root.light .text-gray-100,
+:root.light .text-gray-200,
+:root.light .text-zinc-100 {
+  color: var(--text-primary) !important;
+}
+
+:root.light .text-gray-300,
+:root.light .text-gray-400,
+:root.light .text-zinc-300,
+:root.light .text-zinc-400 {
+  color: var(--text-secondary) !important;
+}
+
+:root.light .text-gray-500,
+:root.light .text-gray-600,
+:root.light .text-zinc-500 {
+  color: var(--text-muted) !important;
+}
+
+/* ── 2. Background Overrides — Dark Alpha Panels ─────────────── */
+/* Semi-transparent dark backgrounds that look correct in dark mode
+   become invisible or clashing rectangles in light mode. */
+:root.light .bg-white\/3,
+:root.light .bg-white\/5,
+:root.light .bg-white\/8,
+:root.light .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+:root.light .bg-black\/20,
+:root.light .bg-black\/30,
+:root.light .bg-black\/40,
+:root.light .bg-black\/45,
+:root.light .bg-black\/60,
+:root.light .bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ── 3. Border Overrides — Dark Alpha Borders ─────────────────── */
+:root.light .border-white\/5,
+:root.light .border-white\/8,
+:root.light .border-white\/10,
+:root.light .border-white\/20 {
+  border-color: var(--border-color) !important;
+}
+
+/* ── 4. Glassmorphism Components ─────────────────────────────── */
+/* frosted-panel: provide white-tinted glass in light mode */
+:root.light .frosted-panel {
+  background-color: rgba(255, 255, 255, 0.90) !important;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.04) inset, 0 8px 24px -8px rgba(0,0,0,0.10) !important;
+}
+
+/* card-subtle: brightened for light mode */
+:root.light .card-subtle {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── 5. Admin Dropdown Selects ───────────────────────────────── */
+:root.light select.bg-white\/5,
+:root.light .bg-white\/5 select {
+  background-color: #ffffff !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── 6. Input Fields Light Mode ─────────────────────────────── */
+:root.light input.bg-white\/5,
+:root.light input.bg-white\/3,
+:root.light textarea.bg-white\/5 {
+  background-color: #ffffff !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ── 7. Bottom Nav Dock Light Mode ───────────────────────────── */
+:root.light .bottom-nav-dock {
+  background: rgba(252, 251, 247, 0.96) !important;
+  border-top-color: var(--border-color) !important;
+}
+
+/* ── 8. Skeleton Light Mode ─────────────────────────────────── */
+:root.light .skeleton-wave {
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.05) 25%,
+    rgba(0,0,0,0.10) 50%,
+    rgba(0,0,0,0.05) 75%
+  ) !important;
+}
+
+/* ── 9. Accent-colored buttons always readable ───────────────── */
+/* btn-neon: dark accent has sufficient contrast with black text (dark mode).
+   Light accent (#b8860b) needs white text for WCAG AA compliance. */
+:root.light .btn-neon {
+  color: #ffffff !important;
+}
+
+/* Custom hex accent buttons that use accent as background */
+[style*="background: var(--accent)"],
+[style*="background-color: var(--accent)"] {
+  color: #fff;
+}
+
+/* ── 10. Opt-out class — preserve forced colors ──────────────── */
+/* Use .theme-preserve on elements that should NOT be overridden.
+   e.g. status chips and colored badges that intentionally use bright colors. */
+:root.light .theme-preserve * {
+  color: inherit !important;
+  background-color: inherit !important;
+}
 
 

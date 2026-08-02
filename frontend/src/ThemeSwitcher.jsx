@@ -197,7 +197,7 @@ export default function ThemeSwitcher() {
     <div className="relative z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-gray-300 transition-all duration-200"
+        className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-[var(--border-color)] rounded-xl text-xs font-bold text-[var(--text-secondary)] transition-all duration-200"
         title="Change Theme & Appearance"
       >
         <span className="w-3.5 h-3.5 rounded-full ring-2 ring-white/20" style={{ backgroundColor: displayThemeColor }} />
@@ -286,13 +286,13 @@ export default function ThemeSwitcher() {
 
               {/* Day/Night Mode Switcher section */}
               <div className="border-t border-white/5 mt-2.5 pt-2.5 flex items-center justify-between px-3 text-xs">
-                <span className="text-[10px] font-bold text-gray-500 uppercase">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">
                   {isRtl ? 'وضع المظهر' : 'Appearance'}
                 </span>
                 <button
                   type="button"
                   onClick={cycleMode}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 font-bold text-[10px] text-gray-300 transition-all duration-200"
+                  className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-dim)] hover:bg-[var(--accent-glow)] rounded-lg border border-[var(--border-hover)] font-bold text-[10px] text-[var(--text-primary)] transition-all duration-200"
                 >
                   {getModeLabel()}
                 </button>
@@ -300,7 +300,7 @@ export default function ThemeSwitcher() {
 
               {/* Font Customization Selector section */}
               <div className="border-t border-white/5 mt-2.5 pt-2.5 flex items-center justify-between px-3 text-xs">
-                <span className="text-[10px] font-bold text-gray-500 uppercase">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">
                   {isRtl ? 'خط الواجهة' : 'Interface Font'}
                 </span>
                 <select
