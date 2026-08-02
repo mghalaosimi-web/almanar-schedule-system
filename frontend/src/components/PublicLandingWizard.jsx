@@ -609,8 +609,7 @@ export default function PublicLandingWizard() {
           }
         }
       } catch (err) {
-        console.error('Error resolving tenant slug:', err);
-        toast.error(isAr ? 'فشل تحميل إعدادات الرابط المخصص' : 'Failed to load tenant configuration');
+        console.warn('Tenant slug resolution fallback:', err.message);
       } finally {
         setLoading(false);
       }

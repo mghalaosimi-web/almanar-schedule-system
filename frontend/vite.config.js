@@ -37,7 +37,7 @@ export default defineConfig({
         // Only cache static assets — navigation always goes to network first
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         // Let user trigger activation via prompt
-        skipWaiting: false,
+        skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
           {
