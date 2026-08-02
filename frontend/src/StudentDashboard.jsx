@@ -1657,7 +1657,7 @@ export default function StudentDashboard() {
         </header>
 
         {/* لوحة عرض المحتوى */}
-        <main className="flex-1 overflow-y-auto pb-24 pt-20 px-4 space-y-6">
+        <main className={activeTab === 'exchange' ? 'flex-1 flex flex-col overflow-hidden pt-16' : 'flex-1 overflow-y-auto pb-24 pt-20 px-4 space-y-6'}>
           
           {/* تنبيه وجود محاضرة نشطة الآن وإمكانية التحضير السريع */}
           {activeTab === 'home' && activeLectureNow && (
@@ -1693,7 +1693,8 @@ export default function StudentDashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
-                className="space-y-4"
+                className={activeTab === 'exchange' ? 'flex flex-col h-full' : 'space-y-4'}
+                style={activeTab === 'exchange' ? { flex: 1, minHeight: 0 } : {}}
               >
                 {/* 1. تبويب الصفحة الرئيسية */}
                 {activeTab === 'home' && (
