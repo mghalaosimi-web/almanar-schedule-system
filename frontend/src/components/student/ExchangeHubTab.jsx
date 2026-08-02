@@ -1,17 +1,114 @@
 /**
  * @file ExchangeHubTab.jsx
- * @description الواجهة البديلة التفاعلية المبتكرة لـ "ملتقى الشعبة" (Class Hub & Live Discussion).
- * مصممة بهيكل مرن وطبيعي لمنع أي تجمّد أو ارتفاع أو خروج عن إطار الصفحة (Zero Viewport Jump / Zero Lag).
- * تضمن المزامنة الحية المباشرة مع سيرفر الكلية وإبراز مؤشرات القراءة بأسلوب واتساب.
- * @author أنتيجرافيتي (Antigravity) — Fix & Overhaul Release 2026
+ * @description "Simple but Smart" — Redesigned Class Hub (ملتقى الشعبة).
+ * WhatsApp-lite group chat + Hacker News–style academic forum.
+ * Split-pane layout · Slide-in thread detail · FAB · AI bottom sheet.
+ * @author أنتيجرافيتي (Antigravity) — Redesign v2 2026
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import { API_URL } from '../../config';
 
+// ─── Framer Motion Variants ───────────────────────────────────────────────────
+const slideFromRight = {
+  initial:   { x: '100%', opacity: 0 },
+  animate:   { x: 0,      opacity: 1 },
+  exit:      { x: '100%', opacity: 0 },
+  transition:{ type: 'spring', stiffness: 380, damping: 38, mass: 0.8 }
+};
+
+const slideFromBottom = {
+  initial:   { y: '100%', opacity: 0 },
+  animate:   { y: 0,      opacity: 1 },
+  exit:      { y: '100%', opacity: 0 },
+  transition:{ type: 'spring', stiffness: 380, damping: 38 }
+};
+
+const fadeScale = {
+  initial:   { opacity: 0, scale: 0.93 },
+  animate:   { opacity: 1, scale: 1 },
+  exit:      { opacity: 0, scale: 0.93 },
+  transition:{ duration: 0.18, ease: 'easeOut' }
+};
+
+// ─── Category helpers ─────────────────────────────────────────────────────────
+const CATEGORY_META = {
+  QUESTION: { ar: 'سؤال',        en: 'Question',  cls: 'bg-blue-500/12 text-blue-300 border-blue-500/25' },
+  RESOURCE: { ar: 'مرجع',        en: 'Resource',  cls: 'bg-emerald-500/12 text-emerald-300 border-emerald-500/25' },
+  HELP:     { ar: 'مساعدة',      en: 'Help',      cls: 'bg-red-500/12 text-red-300 border-red-500/25' },
+  GENERAL:  { ar: 'نقاش',        en: 'General',   cls: 'bg-slate-500/12 text-slate-400 border-slate-500/20' },
+};
+
+const getCatMeta = (cat) => CATEGORY_META[cat] ?? CATEGORY_META.GENERAL;
+
+// ─── Avatar Helper ────────────────────────────────────────────────────────────
+function Avatar({ student, size = 'sm' }) {
+  const dim = size === 'sm' ? 'w-[22px] h-[22px] text-[9px]' : 'w-8 h-8 text-[10px]';
+  if (!student || student.isAnonymous) {
+    return (
+      <div className={`${dim} rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-slate-400`}>
+        🕵️
+      </div>
+    );
+  }
+  if (student.idPhotoUrl) {
+    return (
+      <img src={student.idPhotoUrl} alt={student.name}
+        className={`${dim} rounded-full object-cover border border-white/10 shrink-0`} />
+    );
+  }
+  const initials = student.name
+    ? student.name.split(' ').slice(0, 2).map(n => n[0]).join('')
+    : 'ST';
+  return (
+    <div className={`${dim} rounded-full bg-gradient-to-br from-[var(--accent)]/25 to-slate-800 border border-[var(--accent)]/30 flex items-center justify-center font-black text-white shrink-0`}>
+      {initials}
+    </div>
+  );
+}
+
+// ─── Name + Rep Badge ─────────────────────────────────────────────────────────
+function AuthorName({ student, isAr, className = '' }) {
+  const name = !student || student.isAnonymous
+    ? (isAr ? 'طالب مجهول' : 'Anonymous')
+    : student.name;
+  return (
+    <span className={`font-bold text-white ${className}`}>
+      {name}
+      {!student?.isAnonymous && student?.isRepresentative && (
+        <span className="ml-1 text-[8px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full align-middle">
+          👑
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Relative time ────────────────────────────────────────────────────────────
+function relativeTime(dateStr, isAr) {
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60)   return isAr ? 'الآن' : 'now';
+  if (diff < 3600) return isAr ? `${Math.floor(diff/60)}د` : `${Math.floor(diff/60)}m`;
+  if (diff < 86400)return isAr ? `${Math.floor(diff/3600)}س` : `${Math.floor(diff/3600)}h`;
+  return isAr ? `${Math.floor(diff/86400)}ي` : `${Math.floor(diff/86400)}d`;
+}
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+function Spinner({ size = 5, color = 'var(--accent)' }) {
+  return (
+    <div
+      className={`h-${size} w-${size} rounded-full border-2 border-t-transparent animate-spin`}
+      style={{ borderColor: `${color} transparent transparent transparent` }}
+    />
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function ExchangeHubTab({
   isAr,
   profile,
@@ -28,1138 +125,846 @@ export default function ExchangeHubTab({
   fetchPostDetails,
   t
 }) {
-  // ── Tab State: 'chat' (Live Group Chat) vs 'forum' (Academic Forum) ──
-  const [exchangeTab, setExchangeTab] = useState('chat');
+  // ── Tab & Search State ──────────────────────────────────────────────────────
+  const [activeTab, setActiveTab]         = useState('chat'); // 'chat' | 'forum'
+  const [rawSearch, setRawSearch]         = useState('');
   const [exchangeSearch, setExchangeSearch] = useState('');
-  const [exchangeCategoryFilter, setExchangeCategoryFilter] = useState('ALL');
-  const [isNewPostModalOpen, setIsNewPostModalOpen] = useState(false);
+  const [catFilter, setCatFilter]         = useState('ALL');
 
-  // New Post Form States
-  const [newPostTitle, setNewPostTitle] = useState('');
-  const [newPostContent, setNewPostContent] = useState('');
-  const [newPostCategory, setNewPostCategory] = useState('GENERAL');
-  const [newPostIsAnonymous, setNewPostIsAnonymous] = useState(false);
+  // ── New Post Modal ──────────────────────────────────────────────────────────
+  const [showNewPost, setShowNewPost]     = useState(false);
+  const [newTitle, setNewTitle]           = useState('');
+  const [newContent, setNewContent]       = useState('');
+  const [newCategory, setNewCategory]     = useState('QUESTION');
+  const [newIsAnon, setNewIsAnon]         = useState(false);
 
-  // Comment Form States
-  const [newCommentText, setNewCommentText] = useState('');
-  const [newCommentIsAnonymous, setNewCommentIsAnonymous] = useState(false);
+  // ── Comment Form ────────────────────────────────────────────────────────────
+  const [commentText, setCommentText]     = useState('');
+  const [commentIsAnon, setCommentIsAnon] = useState(false);
 
-  // Group Chat Input States
-  const [chatInput, setChatInput] = useState('');
-  const [isSendingChat, setIsSendingChat] = useState(false);
-  const [chatIsAnonymous, setChatIsAnonymous] = useState(false);
+  // ── Chat State ──────────────────────────────────────────────────────────────
+  const [chatInput, setChatInput]         = useState('');
+  const [isSending, setIsSending]         = useState(false);
+  const [chatIsAnon, setChatIsAnon]       = useState(false);
 
-  // AI Summary States
-  const [summary, setSummary] = useState('');
+  // ── Long-press context menu ─────────────────────────────────────────────────
+  const [menuMsgId, setMenuMsgId]         = useState(null);
+  const longPressTimer                    = useRef(null);
+
+  // ── Message Info Modal ──────────────────────────────────────────────────────
+  const [msgInfoTarget, setMsgInfoTarget] = useState(null);
+
+  // ── AI Bottom Sheet ─────────────────────────────────────────────────────────
+  const [showAiSheet, setShowAiSheet]     = useState(false);
+  const [aiTab, setAiTab]                 = useState('summary'); // 'summary' | 'quiz' | 'explain'
+  const [summary, setSummary]             = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
-
-  // AI Quiz Co-Pilot States
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiSubjectName, setAiSubjectName] = useState('');
-  const [aiTopic, setAiTopic] = useState('');
+  const [aiSubject, setAiSubject]         = useState('');
+  const [aiTopic, setAiTopic]             = useState('');
   const [quizQuestions, setQuizQuestions] = useState([]);
-  const [quizLoading, setQuizLoading] = useState(false);
-  const [aiSummaryResult, setAiSummaryResult] = useState('');
-  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [quizLoading, setQuizLoading]     = useState(false);
+  const [aiExplain, setAiExplain]         = useState('');
+  const [explainLoading, setExplainLoading] = useState(false);
 
-  // ── WhatsApp-Style "Message Info" Modal State ──
-  const [selectedMsgForInfo, setSelectedMsgForInfo] = useState(null);
-  const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
+  // ── Refs ────────────────────────────────────────────────────────────────────
+  const chatEndRef   = useRef(null);
+  const chatInputRef = useRef(null);
 
-  const chatEndRef = useRef(null);
-  const chatContainerRef = useRef(null);
-
-  // Auto-scroll chat to bottom smoothly without triggering parent page shifts
+  // ── Debounced search ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (exchangeTab === 'chat' && chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [posts, exchangeTab]);
+    const timer = setTimeout(() => setExchangeSearch(rawSearch), 300);
+    return () => clearTimeout(timer);
+  }, [rawSearch]);
 
-  // AI Chat Summarizer
-  const handleSummarizeChat = async () => {
-    setSummaryLoading(true);
-    setSummary('');
-    setIsSummaryOpen(true);
-    try {
-      const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/exchange/posts/summarize`, {}, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+  // ── Auto-scroll chat to bottom ──────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [posts, activeTab]);
+
+  // ── Derived data ────────────────────────────────────────────────────────────
+  const chatMessages = useMemo(() =>
+    posts
+      .filter(p => p.category === 'GENERAL')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    [posts]
+  );
+
+  const filteredForumPosts = useMemo(() => {
+    return posts
+      .filter(p => p.category !== 'GENERAL')
+      .filter(p => catFilter === 'ALL' || p.category === catFilter)
+      .filter(p => {
+        if (!exchangeSearch.trim()) return true;
+        const q = exchangeSearch.toLowerCase();
+        return (p.title || '').toLowerCase().includes(q) ||
+               (p.content || '').toLowerCase().includes(q);
       });
-      if (res.data?.success) {
-        setSummary(res.data.summary);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(isAr ? 'فشل تلخيص المحادثة' : 'Failed to summarize chat');
-      setIsSummaryOpen(false);
-    } finally {
-      setSummaryLoading(false);
-    }
-  };
+  }, [posts, catFilter, exchangeSearch]);
 
-  // AI Quiz Generator
-  const handleGenerateAiQuiz = async () => {
-    if (!aiSubjectName.trim()) {
-      toast.error(isAr ? 'يرجى كتابة اسم المادة أولاً' : 'Please enter subject name');
-      return;
-    }
-    setQuizLoading(true);
-    setQuizQuestions([]);
-    try {
-      const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/student/quiz/generate`, {
-        subjectName: aiSubjectName.trim()
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data?.success) {
-        setQuizQuestions(res.data.questions || []);
-        toast.success(isAr ? 'تم توليد الاختبار التجريبي بنجاح!' : 'Quiz generated successfully!');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(isAr ? 'فشل توليد الاختبار' : 'Failed to generate quiz');
-    } finally {
-      setQuizLoading(false);
-    }
-  };
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERS
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // AI Topic Explainer
-  const handleGenerateAiExplain = async () => {
-    if (!aiTopic.trim()) {
-      toast.error(isAr ? 'يرجى كتابة موضوع الشرح' : 'Please enter topic');
-      return;
-    }
-    setAiSummaryLoading(true);
-    setAiSummaryResult('');
+  const handleSendChat = async (e) => {
+    e?.preventDefault();
+    if (!chatInput.trim() || isSending) return;
+    setIsSending(true);
     try {
-      const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/student/copilot/explain`, {
-        topic: aiTopic.trim(),
-        subjectName: aiSubjectName.trim()
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data?.success) {
-        setAiSummaryResult(res.data.summary);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(isAr ? 'فشل إعداد التلخيص' : 'Failed to generate summary');
-    } finally {
-      setAiSummaryLoading(false);
-    }
-  };
-
-  // Send group chat message via real API
-  const handleSendChatMessage = async (e) => {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (!chatInput.trim() || isSendingChat) return;
-    try {
-      setIsSendingChat(true);
-      const success = await handleCreatePost(
-        chatInput.trim(),
-        chatInput.trim(),
-        'GENERAL',
-        chatIsAnonymous
-      );
-      if (success) {
+      const ok = await handleCreatePost(chatInput.trim(), chatInput.trim(), 'GENERAL', chatIsAnon);
+      if (ok) {
         setChatInput('');
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }, 80);
-        });
+        requestAnimationFrame(() => setTimeout(() => {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 80));
       }
-    } catch (err) {
-      console.error('Failed to send group chat message:', err);
     } finally {
-      setIsSendingChat(false);
+      setIsSending(false);
     }
   };
 
-  // Poll Vote Handler
+  const handleChatKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendChat();
+    }
+  };
+
+  const handleSubmitPost = async (e) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+    const ok = await handleCreatePost(newTitle, newContent, newCategory, newIsAnon);
+    if (ok) {
+      setShowNewPost(false);
+      setNewTitle(''); setNewContent(''); setNewCategory('QUESTION'); setNewIsAnon(false);
+    }
+  };
+
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    const ok = await handleCreateComment(commentText, commentIsAnon);
+    if (ok) { setCommentText(''); setCommentIsAnon(false); }
+  };
+
   const handleVotePoll = async (postId, optionIdx) => {
     try {
       const token = localStorage.getItem('manar_token');
-      const res = await axios.post(`${API_URL}/api/exchange/posts/${postId}/poll/vote`, {
-        optionIdx
-      }, { headers: { Authorization: `Bearer ${token}` } });
-
+      const res = await axios.post(`${API_URL}/api/exchange/posts/${postId}/poll/vote`,
+        { optionIdx }, { headers: { Authorization: `Bearer ${token}` } });
       if (res.data?.success) {
-        toast.success(isAr ? 'تم تسجيل تصويتك بنجاح!' : 'Vote recorded successfully!');
+        toast.success(isAr ? 'تم التصويت!' : 'Vote recorded!');
         const { pollId, votes, votedOptionIdx } = res.data.data;
-        if (setSelectedPost) {
-          setSelectedPost(prev => {
-            if (!prev || !prev.poll || prev.poll.id !== pollId) return prev;
-            return {
-              ...prev,
-              poll: {
-                ...prev.poll,
-                votes,
-                votedOptionIdx
-              }
-            };
-          });
-        }
+        setSelectedPost(prev => {
+          if (!prev || !prev.poll || prev.poll.id !== pollId) return prev;
+          return { ...prev, poll: { ...prev.poll, votes, votedOptionIdx } };
+        });
       }
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.error || (isAr ? 'فشل تسجيل التصويت' : 'Failed to record vote'));
+      toast.error(err.response?.data?.error || (isAr ? 'فشل التصويت' : 'Vote failed'));
     }
   };
 
-  // Verified Comment Toggle
-  const handleToggleVerifyComment = async (commentId, currentIsVerified) => {
+  const handleToggleVerify = async (commentId, currentIsVerified) => {
     try {
       const token = localStorage.getItem('manar_token');
-      const res = await axios.put(`${API_URL}/api/exchange/comments/${commentId}/verify`, {
-        isVerified: !currentIsVerified
-      }, { headers: { Authorization: `Bearer ${token}` } });
-
+      const res = await axios.put(`${API_URL}/api/exchange/comments/${commentId}/verify`,
+        { isVerified: !currentIsVerified }, { headers: { Authorization: `Bearer ${token}` } });
       if (res.data?.success) {
-        toast.success(isAr ? 'تم تحديث حالة الإجابة المعتمدة!' : 'Verified status updated!');
-        if (setSelectedPost) {
-          setSelectedPost(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              comments: (prev.comments || []).map(c => c.id === commentId ? { ...c, isVerified: !currentIsVerified } : c)
-            };
-          });
-        }
+        toast.success(isAr ? 'تم التحديث!' : 'Updated!');
+        setSelectedPost(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            comments: prev.comments.map(c =>
+              c.id === commentId ? { ...c, isVerified: !currentIsVerified } : c
+            )
+          };
+        });
       }
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.error || (isAr ? 'فشل التوثيق' : 'Failed to update verified answer'));
+      toast.error(isAr ? 'فشل التوثيق' : 'Verify failed');
     }
   };
 
-  // Category labels & badge styles
-  const getCategoryBadgeClass = (category) => {
-    switch (category) {
-      case 'QUESTION': return 'bg-blue-500/15 border-blue-500/30 text-blue-300';
-      case 'RESOURCE': return 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300';
-      case 'HELP':     return 'bg-red-500/15 border-red-500/30 text-red-300';
-      case 'GENERAL':
-      default:        return 'bg-slate-500/15 border-slate-500/30 text-slate-300';
-    }
+  // Long-press handlers
+  const startLongPress = useCallback((msgId) => {
+    longPressTimer.current = setTimeout(() => setMenuMsgId(msgId), 500);
+  }, []);
+  const cancelLongPress = useCallback(() => {
+    clearTimeout(longPressTimer.current);
+  }, []);
+
+  // AI handlers
+  const handleSummarize = async () => {
+    setSummaryLoading(true); setSummary('');
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/exchange/posts/summarize`, {},
+        { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.success) setSummary(res.data.summary);
+    } catch { toast.error(isAr ? 'فشل التلخيص' : 'Summary failed'); }
+    finally { setSummaryLoading(false); }
   };
 
-  const getCategoryLabel = (category) => {
-    switch (category) {
-      case 'QUESTION': return isAr ? 'سؤال' : 'Question';
-      case 'RESOURCE': return isAr ? 'مرجع دراسي' : 'Resource';
-      case 'HELP':     return isAr ? 'طلب مساعدة' : 'Help Request';
-      case 'GENERAL':
-      default:        return isAr ? 'نقاش عام' : 'General';
-    }
+  const handleGenQuiz = async () => {
+    if (!aiSubject.trim()) { toast.error(isAr ? 'أدخل اسم المادة' : 'Enter subject name'); return; }
+    setQuizLoading(true); setQuizQuestions([]);
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/quiz/generate`,
+        { subjectName: aiSubject.trim() }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.success) {
+        setQuizQuestions(res.data.questions || []);
+        toast.success(isAr ? 'تم توليد الكويز!' : 'Quiz generated!');
+      }
+    } catch { toast.error(isAr ? 'فشل توليد الكويز' : 'Quiz failed'); }
+    finally { setQuizLoading(false); }
   };
 
-  // Filter posts
-  const forumPosts = posts.filter(post => post.category !== 'GENERAL');
-  const filteredPosts = forumPosts.filter(post => {
-    const matchesCategory = exchangeCategoryFilter === 'ALL' || post.category === exchangeCategoryFilter;
-    const matchesSearch = !exchangeSearch.trim() || 
-      (post.title || '').toLowerCase().includes(exchangeSearch.toLowerCase()) || 
-      (post.content || '').toLowerCase().includes(exchangeSearch.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
-
-  const chatMessages = posts
-    .filter(post => post.category === 'GENERAL')
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-  const onCreatePostSubmit = async (e) => {
-    e.preventDefault();
-    if (!newPostTitle.trim() || !newPostContent.trim()) return;
-    const success = await handleCreatePost(newPostTitle, newPostContent, newPostCategory, newPostIsAnonymous);
-    if (success) {
-      setIsNewPostModalOpen(false);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setNewPostCategory('GENERAL');
-      setNewPostIsAnonymous(false);
-    }
+  const handleGenExplain = async () => {
+    if (!aiTopic.trim()) { toast.error(isAr ? 'أدخل الموضوع' : 'Enter topic'); return; }
+    setExplainLoading(true); setAiExplain('');
+    try {
+      const token = localStorage.getItem('manar_token');
+      const res = await axios.post(`${API_URL}/api/student/copilot/explain`,
+        { topic: aiTopic.trim(), subjectName: aiSubject.trim() },
+        { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.success) setAiExplain(res.data.summary);
+    } catch { toast.error(isAr ? 'فشل الشرح' : 'Explain failed'); }
+    finally { setExplainLoading(false); }
   };
 
-  const onCreateCommentSubmit = async (e) => {
-    e.preventDefault();
-    if (!newCommentText.trim()) return;
-    const success = await handleCreateComment(newCommentText, newCommentIsAnonymous);
-    if (success) {
-      setNewCommentText('');
-      setNewCommentIsAnonymous(false);
-    }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER: MESSAGE INFO DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+  const getMsgInfo = (msg) => {
+    const t = new Date(msg.createdAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US',
+      { hour: '2-digit', minute: '2-digit', hour12: true });
+    return {
+      timeStr: t,
+      readList: [
+        { name: isAr ? 'محمد غالب' : 'Mohammed G.', avatar: '👨‍🎓' },
+        { name: isAr ? 'أحمد علي' : 'Ahmed Ali',    avatar: '👨‍💻' },
+        { name: isAr ? 'سارة خالد' : 'Sarah K.',    avatar: '👩‍🎓' },
+      ]
+    };
   };
 
-  // Real database WhatsApp-style read/delivery metadata generator
-  const getMessageReadInfo = (msg) => {
-    const createdTime = new Date(msg.createdAt);
-    const timeStr = createdTime.toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
+  return (
+    <div
+      className="relative w-full flex flex-col font-sans overflow-hidden"
+      style={{ height: 'calc(100dvh - 64px - 76px)' }}
+      dir={isAr ? 'rtl' : 'ltr'}
+    >
 
-    const readList = [
-      { name: isAr ? 'محمد غالب العبسي' : 'Mohammed Al-Absi', time: timeStr, avatar: '👨‍🎓' },
-      { name: isAr ? 'أحمد علي حسن' : 'Ahmed Ali', time: timeStr, avatar: '👨‍💻' },
-      { name: isAr ? 'سارة خالد المصعبي' : 'Sarah Khalid', time: timeStr, avatar: '👩‍🎓' },
-      { name: isAr ? 'عمر فاروق الشامي' : 'Omar Farooq', time: timeStr, avatar: '👨‍🔬' }
-    ];
-
-    const deliveredList = [
-      ...readList,
-      { name: isAr ? 'فاطمة الزهراء عبده' : 'Fatima Al-Zahra', time: timeStr, avatar: '👩‍🏫' }
-    ];
-
-    return { readList, deliveredList, timeStr };
-  };
-
-  // ── Single Thread Detail View ──
-  if (selectedPost) {
-    return (
-      <div className="space-y-4 font-sans" dir={isAr ? 'rtl' : 'ltr'}>
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setSelectedPost(null)}
-            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white flex items-center gap-2 text-xs font-bold transition-all active:scale-95 shadow-md"
-          >
-            <span>{isAr ? '← العودة للملتقى' : '← Back to Hub'}</span>
-          </button>
-          <span className="text-xs font-black text-[var(--accent)] uppercase tracking-wider">
-            {isAr ? 'تفاصيل الموضوع الأكاديمي' : 'Academic Thread Details'}
+      {/* ── STICKY MINIMAL HEADER ─────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-white/6 bg-[#0b1120]/80 backdrop-blur-lg z-10">
+        {/* Left: Group name + live indicator */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+          </div>
+          <span className="text-[12px] font-bold text-white truncate max-w-[140px]">
+            {profile?.groupName || (isAr ? 'الشعبة' : 'Class Group')}
           </span>
         </div>
 
-        <div className="p-5 rounded-[22px] bg-slate-900/90 border border-white/10 space-y-4 shadow-2xl backdrop-blur-xl">
-          <div className="flex justify-between items-start gap-3">
-            <div className="flex items-center gap-3">
-              {selectedPost.student?.isAnonymous ? (
-                <div className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                  🕵️
-                </div>
-              ) : selectedPost.student?.idPhotoUrl ? (
-                <img
-                  src={selectedPost.student.idPhotoUrl}
-                  alt={selectedPost.student.name}
-                  className="w-10 h-10 rounded-2xl object-cover border border-white/10 shrink-0 shadow-md"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[var(--accent)]/30 to-slate-800 border border-[var(--accent)]/40 flex items-center justify-center font-black text-xs text-white shrink-0 shadow-md">
-                  {selectedPost.student?.name ? selectedPost.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black text-white">
-                    {selectedPost.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : selectedPost.student?.name}
-                  </span>
-                  {!selectedPost.student?.isAnonymous && selectedPost.student?.isRepresentative && (
-                    <span className="text-[9px] font-black uppercase bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 px-2 py-0.5 rounded-full">
-                      👑 {isAr ? 'مندوب' : 'Rep'}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[9.5px] text-slate-400 font-semibold block mt-0.5" dir="ltr">
-                  {new Date(selectedPost.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
-                </span>
-              </div>
-            </div>
+        {/* Right: AI pill + Chat/Forum segmented control */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* AI pill button */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            type="button"
+            onClick={() => { setShowAiSheet(true); if (aiTab === 'summary') handleSummarize(); }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] text-[10px] font-bold hover:bg-[var(--accent)]/18 transition-colors"
+          >
+            <span>✨</span>
+            <span>AI</span>
+          </motion.button>
 
-            <div className="flex items-center gap-2">
-              <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl border ${getCategoryBadgeClass(selectedPost.category)}`}>
-                {getCategoryLabel(selectedPost.category)}
-              </span>
-              {selectedPost.isMine && (
-                <button
-                  onClick={() => handleDeletePost(selectedPost.id)}
-                  className="p-2 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 text-xs transition-all active:scale-95"
-                  title={isAr ? 'حذف المنشور' : 'Delete Post'}
-                >
-                  🗑️
-                </button>
-              )}
-            </div>
+          {/* Segmented control */}
+          <div className="flex items-center p-0.5 rounded-full bg-slate-950/80 border border-white/8">
+            {[
+              { id: 'chat',  labelAr: 'دردشة', labelEn: 'Chat',  icon: '💬' },
+              { id: 'forum', labelAr: 'منتدى', labelEn: 'Forum', icon: '📚' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 ${
+                  activeTab === tab.id
+                    ? 'bg-[var(--accent)] text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{isAr ? tab.labelAr : tab.labelEn}</span>
+              </button>
+            ))}
           </div>
+        </div>
+      </div>
 
-          <div className="space-y-2">
-            <h3 className="text-sm font-black text-white leading-snug">{selectedPost.title}</h3>
-            <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed font-medium bg-black/30 p-3.5 rounded-2xl border border-white/5">
-              {selectedPost.content}
-            </p>
+      {/* ── MAIN CONTENT AREA (flex-1, scrollable) ────────────────────────── */}
+      <div className="flex-1 relative overflow-hidden">
 
-            {/* Poll Widget */}
-            {selectedPost.poll && (
-              <div className="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/25 space-y-3 shadow-inner my-3">
-                <p className="font-black text-xs text-amber-300 flex items-center gap-2">
-                  <span>📊</span> {selectedPost.poll.question}
-                </p>
-                <div className="space-y-2">
-                  {selectedPost.poll.options.map((optText, idx) => {
-                    const totalVotes = selectedPost.poll.votes?.length || 0;
-                    const optVotes = selectedPost.poll.votes?.filter(v => v.optionIdx === idx).length || 0;
-                    const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-                    const isSelected = selectedPost.poll.votedOptionIdx === idx;
-                    const hasVoted = selectedPost.poll.votedOptionIdx !== undefined && selectedPost.poll.votedOptionIdx !== null;
+        {/* ═══════════════════════════════════════════════════════════════════
+            CHAT VIEW
+        ═══════════════════════════════════════════════════════════════════ */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'chat' && (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex flex-col"
+            >
+              {/* Scrollable messages */}
+              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 no-scrollbar">
+                {postsLoading ? (
+                  <div className="flex items-center justify-center h-full gap-2 text-slate-500 text-xs">
+                    <Spinner /><span>{isAr ? 'جاري التحميل...' : 'Loading...'}</span>
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center text-slate-600 gap-2">
+                    <span className="text-4xl">💬</span>
+                    <p className="text-xs font-bold">
+                      {isAr ? 'ابدأ المحادثة مع شعبتك!' : 'Start the class conversation!'}
+                    </p>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, idx) => {
+                    const isMine = msg.isMine;
+                    const prevMsg = chatMessages[idx - 1];
+                    const showAvatar = !isMine && (!prevMsg || prevMsg.student?.id !== msg.student?.id || prevMsg.isMine);
+                    const showName = showAvatar;
+                    const isMenuOpen = menuMsgId === msg.id;
+                    const { timeStr } = getMsgInfo(msg);
 
                     return (
-                      <button
-                        key={idx}
-                        type="button"
-                        disabled={hasVoted}
-                        onClick={() => handleVotePoll(selectedPost.id, idx)}
-                        className={`w-full bg-slate-900 border rounded-xl p-3 text-right relative overflow-hidden transition-all active:scale-[0.98] ${
-                          isSelected 
-                            ? 'border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.25)]' 
-                            : hasVoted
-                              ? 'border-slate-800 opacity-90'
-                              : 'border-slate-700 hover:border-amber-400'
+                      <div key={msg.id} className={`flex items-end gap-1.5 ${isMine ? 'justify-end' : 'justify-start'} ${idx > 0 ? 'mt-0.5' : ''}`}>
+                        {/* Avatar — only for first in a group */}
+                        {!isMine && (
+                          <div className="w-[22px] shrink-0 self-end mb-0.5">
+                            {showAvatar && <Avatar student={msg.student} size="sm" />}
+                          </div>
+                        )}
+
+                        <div className={`flex flex-col max-w-[78%] ${isMine ? 'items-end' : 'items-start'}`}>
+                          {showName && !isMine && (
+                            <div className="px-1 mb-0.5">
+                              <AuthorName student={msg.student} isAr={isAr} className="text-[10px] text-[var(--accent)]" />
+                            </div>
+                          )}
+
+                          {/* Bubble */}
+                          <div className="relative">
+                            <motion.div
+                              onPointerDown={() => startLongPress(msg.id)}
+                              onPointerUp={cancelLongPress}
+                              onPointerLeave={cancelLongPress}
+                              className={`px-3 py-2 text-[12px] leading-relaxed font-medium cursor-pointer select-none ${
+                                isMine
+                                  ? 'bg-[var(--accent)] text-slate-950 rounded-[16px] rounded-br-[4px] shadow-[0_2px_12px_var(--accent-glow)]'
+                                  : 'bg-slate-900 border border-white/7 text-slate-100 rounded-[16px] rounded-bl-[4px]'
+                              }`}
+                              dir="rtl"
+                            >
+                              <p className="whitespace-pre-line break-words">{msg.content}</p>
+                              <div className={`flex items-center gap-1.5 mt-1 text-[9px] font-mono ${
+                                isMine ? 'justify-end text-slate-900/60' : 'justify-start text-slate-500'
+                              }`}>
+                                <span>{timeStr}</span>
+                                {isMine && <span className="text-sky-400 font-black">✓✓</span>}
+                              </div>
+                            </motion.div>
+
+                            {/* Long-press context menu */}
+                            <AnimatePresence>
+                              {isMenuOpen && (
+                                <motion.div
+                                  {...fadeScale}
+                                  className={`absolute bottom-full mb-2 z-30 flex items-center gap-1 bg-slate-900/95 border border-white/12 p-1.5 rounded-2xl shadow-2xl backdrop-blur-xl ${
+                                    isMine ? 'right-0' : 'left-0'
+                                  }`}
+                                  onClick={() => setMenuMsgId(null)}
+                                >
+                                  {['👍','❤️','💡','🔥','🚀'].map((em, i) => (
+                                    <button key={i} type="button" onClick={() => toast.success(isAr ? `تفاعلت بـ ${em}` : `Reacted ${em}`)}
+                                      className="text-sm p-1 hover:scale-125 transition-transform">
+                                      {em}
+                                    </button>
+                                  ))}
+                                  {isMine && (
+                                    <>
+                                      <div className="w-px h-4 bg-white/10 mx-0.5" />
+                                      <button type="button"
+                                        onClick={() => { setMsgInfoTarget(msg); setMenuMsgId(null); }}
+                                        className="text-[10px] font-bold px-2 py-1 bg-slate-800 text-slate-300 rounded-xl">
+                                        ℹ️
+                                      </button>
+                                      <button type="button"
+                                        onClick={() => { handleDeletePost(msg.id); setMenuMsgId(null); }}
+                                        className="text-[10px] font-bold px-2 py-1 bg-red-500/15 text-red-400 rounded-xl">
+                                        🗑️
+                                      </button>
+                                    </>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* ── Pinned chat input bar ──────────────────────────────────── */}
+              <form
+                onSubmit={handleSendChat}
+                className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-white/6 bg-[#0b1120]/90 backdrop-blur-lg"
+                style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}
+              >
+                {/* Anonymous toggle */}
+                <motion.button
+                  whileTap={{ scale: 0.93 }}
+                  type="button"
+                  onClick={() => setChatIsAnon(!chatIsAnon)}
+                  className={`shrink-0 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${
+                    chatIsAnon
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/35'
+                      : 'bg-white/4 text-slate-600 border-transparent hover:text-slate-400'
+                  }`}
+                  title={isAr ? 'مجهول' : 'Anon'}
+                >
+                  🕵️
+                </motion.button>
+
+                {/* Text input */}
+                <input
+                  ref={chatInputRef}
+                  type="text"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder={isAr ? 'اكتب رسالة...' : 'Write a message...'}
+                  dir="rtl"
+                  className="flex-1 bg-slate-900/60 border border-white/8 rounded-full px-4 py-2 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/50 font-medium transition-colors"
+                />
+
+                {/* Send button */}
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  type="submit"
+                  disabled={isSending || !chatInput.trim()}
+                  className="shrink-0 w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center shadow-[0_0_12px_var(--accent-glow)] disabled:opacity-40 disabled:shadow-none transition-all"
+                >
+                  {isSending
+                    ? <Spinner size={4} color="#000" />
+                    : <span className="text-slate-950 text-sm font-black" style={{ transform: isAr ? 'scaleX(-1)' : undefined }}>➤</span>
+                  }
+                </motion.button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            FORUM VIEW
+        ═══════════════════════════════════════════════════════════════════ */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'forum' && (
+            <motion.div
+              key="forum"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex flex-col overflow-hidden"
+            >
+              {/* Search + Filter strip */}
+              <div className="shrink-0 px-3 pt-2.5 pb-2 space-y-2">
+                <div className="relative">
+                  <span className="absolute inset-y-0 flex items-center text-slate-500 text-sm"
+                    style={{ [isAr ? 'right' : 'left']: '12px' }}>🔍</span>
+                  <input
+                    type="text"
+                    value={rawSearch}
+                    onChange={e => setRawSearch(e.target.value)}
+                    placeholder={isAr ? 'بحث في المواضيع...' : 'Search threads...'}
+                    dir={isAr ? 'rtl' : 'ltr'}
+                    className="w-full bg-slate-900/60 border border-white/8 rounded-full py-2 text-[11px] text-white placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/45 font-medium transition-colors"
+                    style={{ [isAr ? 'paddingRight' : 'paddingLeft']: '34px', [isAr ? 'paddingLeft' : 'paddingRight']: '12px' }}
+                  />
+                </div>
+
+                {/* Category chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'ALL',      labelAr: 'الكل',      labelEn: 'All' },
+                    { id: 'QUESTION', labelAr: 'أسئلة',     labelEn: 'Questions' },
+                    { id: 'RESOURCE', labelAr: 'مراجع',     labelEn: 'Resources' },
+                    { id: 'HELP',     labelAr: 'مساعدة',    labelEn: 'Help' },
+                  ].map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setCatFilter(c.id)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-all border ${
+                        catFilter === c.id
+                          ? 'bg-[var(--accent)] text-slate-950 border-transparent shadow-sm'
+                          : 'bg-white/4 text-slate-500 border-white/6 hover:text-slate-300'
+                      }`}
+                    >
+                      {isAr ? c.labelAr : c.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Thread list */}
+              <div className="flex-1 overflow-y-auto no-scrollbar">
+                {postsLoading ? (
+                  <div className="flex items-center justify-center h-32 gap-2 text-slate-500 text-xs">
+                    <Spinner /><span>{isAr ? 'جاري التحميل...' : 'Loading...'}</span>
+                  </div>
+                ) : filteredForumPosts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-slate-600 gap-2 text-xs">
+                    <span className="text-3xl">📚</span>
+                    <p className="font-bold">{isAr ? 'لا توجد مواضيع بعد' : 'No threads yet'}</p>
+                  </div>
+                ) : filteredForumPosts.map((post, idx) => {
+                  const cat = getCatMeta(post.category);
+                  return (
+                    <motion.button
+                      key={post.id}
+                      type="button"
+                      whileTap={{ scale: 0.985 }}
+                      onClick={() => { if (fetchPostDetails) fetchPostDetails(post.id); setSelectedPost(post); }}
+                      className={`w-full text-${isAr ? 'right' : 'left'} px-4 py-3 flex items-start gap-3 border-b border-white/5 hover:bg-white/[0.025] transition-colors group`}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                    >
+                      <Avatar student={post.student} size="sm" />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${cat.cls}`}>
+                            {isAr ? cat.ar : cat.en}
+                          </span>
+                        </div>
+                        <p className="text-[12px] font-bold text-white leading-snug line-clamp-2 group-hover:text-[var(--accent)] transition-colors">
+                          {post.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-[9.5px] text-slate-500 font-medium">
+                          <AuthorName student={post.student} isAr={isAr} className="text-slate-500 font-semibold text-[9.5px]" />
+                          <span>·</span>
+                          <span>{relativeTime(post.createdAt, isAr)}</span>
+                          <span>·</span>
+                          <span>💬 {post._count?.comments || 0}</span>
+                        </div>
+                      </div>
+
+                      <span className="text-slate-700 text-xs shrink-0 mt-1 group-hover:text-[var(--accent)] transition-colors">
+                        {isAr ? '←' : '→'}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* FAB — New Thread */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setShowNewPost(true)}
+                className="absolute bottom-4 shadow-[0_0_22px_var(--accent-glow)] bg-[var(--accent)] rounded-full w-12 h-12 flex items-center justify-center z-10"
+                style={{ [isAr ? 'left' : 'right']: '16px' }}
+              >
+                <span className="text-xl font-black text-slate-950 leading-none">+</span>
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            THREAD DETAIL — Slide-in sheet from right
+        ═══════════════════════════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {selectedPost && (
+            <motion.div
+              {...slideFromRight}
+              className="absolute inset-0 z-20 flex flex-col bg-[#0b1120] overflow-hidden"
+              dir={isAr ? 'rtl' : 'ltr'}
+            >
+              {/* Detail header */}
+              <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-white/6 bg-[#0b1120]/90 backdrop-blur-lg">
+                <motion.button
+                  whileTap={{ scale: 0.93 }}
+                  type="button"
+                  onClick={() => setSelectedPost(null)}
+                  className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs font-bold transition-colors"
+                >
+                  <span style={{ transform: isAr ? 'scaleX(-1)' : undefined }}>←</span>
+                  <span>{isAr ? 'العودة' : 'Back'}</span>
+                </motion.button>
+                <span className="text-[10px] font-black text-[var(--accent)] uppercase tracking-wider">
+                  {isAr ? 'الموضوع' : 'Thread'}
+                </span>
+                {selectedPost.isMine && (
+                  <button type="button"
+                    onClick={() => handleDeletePost(selectedPost.id)}
+                    className="text-red-400 text-xs px-2 py-1 rounded-xl bg-red-500/10 border border-red-500/20 font-bold hover:bg-red-500/20 transition-colors">
+                    {isAr ? 'حذف' : 'Delete'}
+                  </button>
+                )}
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-4">
+                {/* Post body */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar student={selectedPost.student} size="md" />
+                    <div>
+                      <AuthorName student={selectedPost.student} isAr={isAr} className="text-[12px]" />
+                      <p className="text-[9.5px] text-slate-500 mt-0.5">
+                        {new Date(selectedPost.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US',
+                          { dateStyle: 'short', timeStyle: 'short' })}
+                      </p>
+                    </div>
+                    <div className="flex-1" />
+                    {(() => { const cat = getCatMeta(selectedPost.category); return (
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${cat.cls}`}>
+                        {isAr ? cat.ar : cat.en}
+                      </span>
+                    ); })()}
+                  </div>
+
+                  <h2 className="text-[14px] font-black text-white leading-snug">{selectedPost.title}</h2>
+                  <p className="text-[12px] text-slate-200 leading-relaxed whitespace-pre-line font-medium bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3">
+                    {selectedPost.content}
+                  </p>
+
+                  {/* Poll widget */}
+                  {selectedPost.poll && (
+                    <div className="bg-slate-950/80 border border-amber-500/20 rounded-2xl p-4 space-y-3">
+                      <p className="text-[11px] font-black text-amber-300 flex items-center gap-2">
+                        <span>📊</span>{selectedPost.poll.question}
+                      </p>
+                      <div className="space-y-2">
+                        {selectedPost.poll.options.map((optText, idx) => {
+                          const total = selectedPost.poll.votes?.length || 0;
+                          const optVotes = selectedPost.poll.votes?.filter(v => v.optionIdx === idx).length || 0;
+                          const pct = total > 0 ? Math.round((optVotes / total) * 100) : 0;
+                          const isSelected = selectedPost.poll.votedOptionIdx === idx;
+                          const hasVoted = selectedPost.poll.votedOptionIdx != null;
+                          return (
+                            <button key={idx} type="button"
+                              disabled={hasVoted}
+                              onClick={() => handleVotePoll(selectedPost.id, idx)}
+                              className={`w-full relative overflow-hidden rounded-xl border text-left px-3 py-2.5 text-[11px] font-bold transition-all active:scale-[0.98] ${
+                                isSelected ? 'border-amber-400' : hasVoted ? 'border-slate-800 opacity-80' : 'border-slate-700 hover:border-amber-400'
+                              }`}
+                            >
+                              <div className="absolute inset-y-0 left-0 bg-amber-500/15 transition-all duration-700 z-0" style={{ width: `${pct}%` }} />
+                              <div className="relative z-10 flex justify-between text-white">
+                                <span>{optText}{isSelected && <span className="text-amber-400 ml-1">✓</span>}</span>
+                                <span className="font-mono">{pct}%</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[9.5px] text-slate-500 text-center font-bold">
+                        {isAr ? `${selectedPost.poll.votes?.length || 0} صوت` : `${selectedPost.poll.votes?.length || 0} votes`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Comments */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-1">
+                    💬 {isAr ? 'التعليقات' : 'Comments'} ({selectedPost.comments?.length || 0})
+                  </p>
+
+                  {selectedPost.comments?.length > 0 ? selectedPost.comments.map(comment => (
+                    <div key={comment.id}
+                      className={`p-3 rounded-2xl border space-y-2 ${
+                        comment.isVerified
+                          ? 'border-emerald-500/35 bg-emerald-950/15'
+                          : 'border-white/5 bg-white/[0.025]'
+                      }`}
+                    >
+                      {comment.isVerified && (
+                        <div className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400">
+                          <span>✓</span>
+                          <span>{isAr ? 'إجابة معتمدة' : 'Verified Answer'}</span>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2 justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar student={comment.student} size="sm" />
+                          <div>
+                            <AuthorName student={comment.student} isAr={isAr} className="text-[11px]" />
+                            <p className="text-[8.5px] text-slate-600 mt-0.5">
+                              {relativeTime(comment.createdAt, isAr)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {(profile?.isRepresentative || profile?.role === 'ADMIN') && (
+                            <button type="button"
+                              onClick={() => handleToggleVerify(comment.id, comment.isVerified)}
+                              className={`text-[9px] font-black px-2 py-1 rounded-full border transition-colors ${
+                                comment.isVerified
+                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-white/4 text-slate-500 border-white/8 hover:text-white'
+                              }`}
+                            >
+                              {comment.isVerified ? '✓' : '+'}
+                            </button>
+                          )}
+                          {comment.isMine && (
+                            <button type="button"
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="text-[9px] p-1 text-red-400 hover:text-red-300">
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-200 leading-relaxed font-medium px-1">
+                        {comment.content}
+                      </p>
+                    </div>
+                  )) : (
+                    <div className="text-center py-6 text-slate-600 text-xs font-bold">
+                      {isAr ? 'لا توجد تعليقات بعد' : 'No comments yet'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Comment input bar */}
+              <form
+                onSubmit={handleSubmitComment}
+                className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-white/6 bg-[#0b1120]/90 backdrop-blur-lg"
+                style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}
+              >
+                <motion.button whileTap={{ scale: 0.93 }} type="button"
+                  onClick={() => setCommentIsAnon(!commentIsAnon)}
+                  className={`shrink-0 px-2.5 py-1.5 rounded-full text-[10px] font-bold transition-all border ${
+                    commentIsAnon ? 'bg-amber-500/15 text-amber-300 border-amber-500/35' : 'bg-white/4 text-slate-600 border-transparent'
+                  }`}
+                >
+                  🕵️
+                </motion.button>
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  placeholder={isAr ? 'اكتب تعليقاً...' : 'Write a comment...'}
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  className="flex-1 bg-slate-900/60 border border-white/8 rounded-full px-4 py-2 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/45 font-medium transition-colors"
+                />
+                <motion.button whileTap={{ scale: 0.9 }} type="submit"
+                  disabled={commentSubmitting || !commentText.trim()}
+                  className="shrink-0 w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center shadow-[0_0_12px_var(--accent-glow)] disabled:opacity-40 transition-all"
+                >
+                  {commentSubmitting
+                    ? <Spinner size={4} color="#000" />
+                    : <span className="text-slate-950 text-sm font-black" style={{ transform: isAr ? 'scaleX(-1)' : undefined }}>➤</span>
+                  }
+                </motion.button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ═════════════════════════════════════════════════════════════════════
+          NEW THREAD MODAL
+      ═════════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {showNewPost && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-md p-4"
+            dir={isAr ? 'rtl' : 'ltr'} onClick={e => e.target === e.currentTarget && setShowNewPost(false)}>
+            <motion.div {...slideFromBottom}
+              className="w-full max-w-[420px] bg-slate-900 border border-white/12 rounded-t-[28px] rounded-b-[20px] shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+                <h3 className="text-[12px] font-black text-white">
+                  {isAr ? '+ موضوع جديد' : '+ New Thread'}
+                </h3>
+                <button onClick={() => setShowNewPost(false)} className="text-slate-500 hover:text-white text-sm transition-colors">✕</button>
+              </div>
+
+              <form onSubmit={handleSubmitPost} className="px-5 py-4 space-y-3">
+                {/* Category select */}
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {['QUESTION','RESOURCE','HELP'].map(c => {
+                    const cm = getCatMeta(c);
+                    return (
+                      <button key={c} type="button"
+                        onClick={() => setNewCategory(c)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black whitespace-nowrap border transition-all ${
+                          newCategory === c ? cm.cls + ' scale-105' : 'bg-white/4 text-slate-500 border-white/6'
                         }`}
                       >
-                        <div 
-                          className="absolute left-0 top-0 bottom-0 bg-amber-500/20 transition-all duration-700 z-0" 
-                          style={{ width: `${pct}%` }} 
-                        />
-                        <div className="relative z-10 flex justify-between text-xs font-bold text-white">
-                          <span className="flex items-center gap-1.5">
-                            {optText}
-                            {isSelected && <span className="text-amber-400 font-black"> ({isAr ? 'تصويتك ✓' : 'Your Vote ✓'})</span>}
-                          </span>
-                          <span className="font-mono font-black">{pct}%</span>
-                        </div>
+                        {isAr ? cm.ar : cm.en}
                       </button>
                     );
                   })}
                 </div>
-                <div className="text-[10px] text-slate-400 text-center font-bold">
-                  {isAr ? `إجمالي أصوات الطلاب: ${selectedPost.poll.votes?.length || 0}` : `Total student votes: ${selectedPost.poll.votes?.length || 0}`}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Comments Section */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider px-1">
-            💬 {isAr ? 'التعليقات والمناقشات الأكاديمية' : 'Comments & Discussion'} ({selectedPost.comments?.length || 0})
-          </h4>
+                <input required type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                  placeholder={isAr ? 'عنوان الموضوع...' : 'Thread title...'}
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-4 py-2.5 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/45 font-medium"
+                />
+                <textarea required rows={4} value={newContent} onChange={e => setNewContent(e.target.value)}
+                  placeholder={isAr ? 'اكتب تفاصيل الموضوع...' : 'Write thread details...'}
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-4 py-2.5 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/45 font-medium resize-none"
+                />
 
-          {selectedPost.comments && selectedPost.comments.length > 0 ? (
-            <div className="space-y-3">
-              {selectedPost.comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className={`rounded-2xl p-4 border space-y-2.5 transition-all ${
-                    comment.isVerified
-                      ? 'border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
-                      : 'border-white/5 bg-slate-900/60'
-                  }`}
-                >
-                  {comment.isVerified && (
-                    <div className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[9.5px] font-black flex items-center gap-1.5 w-fit">
-                      <span>✓</span>
-                      <span>{isAr ? 'إجابة معتمدة من المندوب / الدكتور' : 'Verified Answer'}</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2.5">
-                      {comment.student?.isAnonymous ? (
-                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0">
-                          🕵️
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[var(--accent)]/20 to-slate-800 border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0">
-                          {comment.student?.name ? comment.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">
-                            {comment.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : comment.student?.name}
-                          </span>
-                          {!comment.student?.isAnonymous && comment.student?.isRepresentative && (
-                            <span className="text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full">
-                              👑 {isAr ? 'مندوب' : 'Rep'}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[8.5px] text-slate-500 font-semibold block mt-0.5" dir="ltr">
-                          {new Date(comment.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {(profile?.isRepresentative || profile?.role === 'ADMIN') && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleVerifyComment(comment.id, comment.isVerified)}
-                          className={`text-[9.5px] px-2.5 py-1 rounded-xl font-black transition-all active:scale-95 ${
-                            comment.isVerified
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                              : 'bg-white/5 text-slate-400 border border-white/10 hover:text-white'
-                          }`}
-                        >
-                          {comment.isVerified ? (isAr ? '✓ معتمدة' : 'Verified') : (isAr ? '+ اعتماد الإجابة' : '+ Verify')}
-                        </button>
-                      )}
-                      {comment.isMine && (
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="p-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs transition-all active:scale-95"
-                          title={isAr ? 'حذف التعليق' : 'Delete Comment'}
-                        >
-                          🗑️
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-200 leading-relaxed font-medium pr-2">
-                    {comment.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500 font-bold text-xs bg-slate-900/40 border border-white/5 rounded-2xl space-y-1">
-              <span className="text-xl block">💬</span>
-              <p>{isAr ? 'لا توجد تعليقات بعد. كن أول من يضيف إجابة أو استفسار!' : 'No comments yet. Be the first to reply!'}</p>
-            </div>
-          )}
-
-          {/* Comment input form */}
-          <form onSubmit={onCreateCommentSubmit} className="space-y-3 pt-2">
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={newCommentText}
-                onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder={isAr ? 'اكتب تعليقك الأكاديمي هنا...' : 'Write an academic comment...'}
-                className="flex-1 bg-slate-950 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[var(--accent)] font-medium"
-              />
-              <button
-                type="submit"
-                disabled={commentSubmitting || !newCommentText.trim()}
-                className="px-5 py-3 bg-[var(--accent)] text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 shrink-0"
-              >
-                {commentSubmitting ? (isAr ? 'إرسال...' : 'Posting...') : (isAr ? 'تعليق 🚀' : 'Reply 🚀')}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 px-1 select-none">
-              <input
-                type="checkbox"
-                id="isAnonymousComment"
-                checked={newCommentIsAnonymous}
-                onChange={(e) => setNewCommentIsAnonymous(e.target.checked)}
-                className="accent-[var(--accent)] h-3.5 w-3.5 rounded border-white/10 bg-black cursor-pointer"
-              />
-              <label htmlFor="isAnonymousComment" className="text-[10px] text-slate-400 font-bold cursor-pointer">
-                🕵️ {isAr ? 'تعليق بهوية مجهولة' : 'Comment anonymously'}
-              </label>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Main UI view (Standard Page Flow) ──
-  return (
-    <div className="w-full space-y-4 font-sans" dir={isAr ? 'rtl' : 'ltr'}>
-
-      {/* ── 1. HEADER TOOLBAR & CONNECTION STATUS ── */}
-      <div className="p-4 rounded-3xl bg-slate-900/90 border border-white/10 flex items-center justify-between gap-3 shadow-xl backdrop-blur-xl">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
-            🏫
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-xs font-black text-white truncate">
-              {profile.groupName || (isAr ? 'شعبة تكنولوجيا المعلومات - A' : 'IT Cohort A')}
-            </h3>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <span className="text-[9.5px] text-emerald-400 font-bold truncate">
-                {isAr ? 'مباشر: متصل بسيرفر الكلية' : 'Live: Connected to Server'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Actions & Segmented Control */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleSummarizeChat}
-            disabled={summaryLoading}
-            className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all text-xs font-black flex items-center gap-1.5 active:scale-95"
-            title={isAr ? 'التلخيص الذكي للمحادثة' : 'AI Chat Summary'}
-          >
-            {summaryLoading ? (
-              <div className="h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <span>✨</span>
-                <span className="hidden sm:inline text-[10px]">{isAr ? 'الملخص' : 'Summary'}</span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsAiModalOpen(true)}
-            className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-all text-xs font-black flex items-center gap-1.5 active:scale-95"
-            title={isAr ? 'مساعد الكويزات والـ AI' : 'AI Quiz Co-Pilot'}
-          >
-            <span>🤖</span>
-            <span className="hidden sm:inline text-[10px]">{isAr ? 'كويز AI' : 'Quiz AI'}</span>
-          </button>
-
-          {/* Segmented Chat / Forum Selector */}
-          <div className="flex p-1 rounded-2xl bg-slate-950 border border-white/10 select-none shrink-0 shadow-inner">
-            <button
-              type="button"
-              onClick={() => setExchangeTab('chat')}
-              className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black transition-all flex items-center gap-1 ${
-                exchangeTab === 'chat'
-                  ? 'bg-[var(--accent)] text-slate-950 shadow-md scale-[1.02]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>💬</span>
-              <span>{isAr ? 'الدردشة' : 'Chat'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setExchangeTab('forum')}
-              className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black transition-all flex items-center gap-1 ${
-                exchangeTab === 'forum'
-                  ? 'bg-[var(--accent)] text-slate-950 shadow-md scale-[1.02]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>📚</span>
-              <span>{isAr ? 'المنتدى' : 'Forum'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Summary Banner Overlay */}
-      <AnimatePresence>
-        {isSummaryOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl space-y-2 shadow-2xl"
-          >
-            <div className="flex justify-between items-center border-b border-amber-500/20 pb-2">
-              <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                <span>✨</span> {isAr ? 'الملخص الذكي التلقائي لمحادثة الشعبة' : 'AI Chat Summary'}
-              </span>
-              <button type="button" onClick={() => setIsSummaryOpen(false)} className="text-amber-300 font-black text-xs hover:text-white transition-colors">✕</button>
-            </div>
-            {summaryLoading ? (
-              <p className="text-xs text-slate-400 text-center py-4 animate-pulse">{isAr ? 'جاري قراءة الرسائل وتوليد الملخص التلخيصي...' : 'Analyzing conversation history...'}</p>
-            ) : (
-              <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium">{summary}</p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── 2. VIEW 1: LIVE CLASS CHAT (NORMAL TAB FLOW) ── */}
-      {exchangeTab === 'chat' && (
-        <div className="space-y-4">
-          
-          {/* Chat Messages Card Container */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-4 space-y-4 shadow-xl">
-            <div
-              ref={chatContainerRef}
-              className="space-y-3.5 max-h-[420px] overflow-y-auto pr-1 pl-1 pb-2 font-sans"
-            >
-              {postsLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-xs text-slate-500 gap-2">
-                  <div className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                  <span>{isAr ? 'جاري تحميل رسائل المحادثة الحية...' : 'Loading chat messages...'}</span>
-                </div>
-              ) : chatMessages.length > 0 ? (
-                chatMessages.map((msg) => {
-                  const isMine = msg.isMine;
-                  const { timeStr } = getMessageReadInfo(msg);
-                  const isMenuOpen = activeMenuMsgId === msg.id;
-
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex items-start gap-2.5 relative group ${isMine ? 'justify-end' : 'justify-start'}`}
-                    >
-                      {/* Avatar */}
-                      {!isMine && (
-                        msg.student?.isAnonymous ? (
-                          <div className="w-8 h-8 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0 mt-1 shadow-inner">
-                            🕵️
-                          </div>
-                        ) : (
-                          <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-[var(--accent)]/20 to-slate-800 border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0 mt-1 shadow-md">
-                            {msg.student?.name ? msg.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-                          </div>
-                        )
-                      )}
-
-                      {/* Bubble */}
-                      <div className="flex flex-col space-y-1 max-w-[85%] sm:max-w-[75%]">
-                        {!isMine && (
-                          <div className="flex items-center gap-1.5 px-1">
-                            <span className="text-[10px] font-black text-[var(--accent)]">
-                              {msg.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : msg.student?.name}
-                            </span>
-                            {!msg.student?.isAnonymous && msg.student?.isRepresentative && (
-                              <span className="text-[7.5px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                                👑 {isAr ? 'مندوب' : 'Rep'}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        <div
-                          onClick={() => setActiveMenuMsgId(isMenuOpen ? null : msg.id)}
-                          className={`rounded-[20px] p-3.5 text-xs font-semibold leading-relaxed relative transition-all cursor-pointer shadow-lg ${
-                            isMine
-                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 rounded-tr-none shadow-amber-500/10'
-                              : 'bg-slate-950 border border-slate-800 text-slate-100 rounded-tl-none'
-                          }`}
-                        >
-                          <p className="whitespace-pre-line leading-relaxed font-medium" dir="rtl">{msg.content}</p>
-
-                          {/* Time & Read Status */}
-                          <div className={`flex items-center justify-between gap-3 mt-1.5 pt-1 border-t text-[8.5px] font-mono font-bold ${
-                            isMine ? 'border-slate-950/15 text-slate-900/80' : 'border-white/5 text-slate-400'
-                          }`}>
-                            <span>{timeStr}</span>
-                            {isMine && (
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedMsgForInfo(msg);
-                                }}
-                                className="flex items-center gap-1 cursor-pointer hover:opacity-100 transition-opacity"
-                              >
-                                <span className="text-[10px] font-black text-sky-400">✓✓</span>
-                                <span className="text-[8px] font-sans font-bold underline opacity-80">{isAr ? 'معلومات' : 'Info'}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Context Menu */}
-                          <AnimatePresence>
-                            {isMenuOpen && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="absolute -top-12 right-0 z-30 bg-slate-900 border border-white/15 p-1.5 rounded-2xl shadow-2xl flex items-center gap-1 backdrop-blur-xl"
-                              >
-                                {['👍', '❤️', '💡', '🔥', '🚀'].map((emoji, eIdx) => (
-                                  <button
-                                    key={eIdx}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toast.success(isAr ? `تفاعلت بـ ${emoji}` : `Reacted with ${emoji}`);
-                                      setActiveMenuMsgId(null);
-                                    }}
-                                    className="text-xs p-1 hover:scale-125 transition-transform"
-                                  >
-                                    {emoji}
-                                  </button>
-                                ))}
-                                {isMine && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedMsgForInfo(msg);
-                                      setActiveMenuMsgId(null);
-                                    }}
-                                    className="text-[10px] font-black px-2 py-1 bg-amber-500/20 text-amber-300 rounded-xl border border-amber-500/30 hover:bg-amber-500/30"
-                                  >
-                                    ℹ️ {isAr ? 'معلومات' : 'Info'}
-                                  </button>
-                                )}
-                                {isMine && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeletePost(msg.id);
-                                      setActiveMenuMsgId(null);
-                                    }}
-                                    className="text-xs p-1 text-red-400 hover:text-red-300"
-                                    title={isAr ? 'سحب الرسالة' : 'Delete'}
-                                  >
-                                    🗑️
-                                  </button>
-                                )}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-center space-y-2 text-slate-500">
-                  <span className="text-3xl block">💬</span>
-                  <p className="text-xs font-black">{isAr ? 'مرحباً بك في المحادثة الحية لشعبتك! ابدأ التحدث الآن.' : 'Start the conversation in your class group chat!'}</p>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Chat Send Input Form */}
-            <form onSubmit={handleSendChatMessage} className="flex gap-2 items-center bg-slate-955 border border-white/10 rounded-2xl p-2 shadow-inner">
-              <button
-                type="button"
-                onClick={() => toast(isAr ? '📎 إرفاق ملف أو صورة دراسية' : 'Attach study file', { icon: 'ℹ️' })}
-                className="p-2.5 rounded-xl bg-white/5 text-slate-400 hover:text-white transition-all text-sm shrink-0"
-                title={isAr ? 'إرفاق ملف' : 'Attach file'}
-              >
-                📎
-              </button>
-
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={isAr ? 'اكتب رسالتك للشعبة هنا...' : 'Write message to class...'}
-                className="flex-1 bg-transparent border-0 text-xs text-white placeholder-slate-500 focus:outline-none font-medium px-2"
-                dir="rtl"
-              />
-
-              <button
-                type="button"
-                onClick={() => setChatIsAnonymous(!chatIsAnonymous)}
-                className={`p-2 rounded-xl text-xs font-bold transition-all border shrink-0 ${
-                  chatIsAnonymous ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-white/5 text-slate-500 border-transparent'
-                }`}
-                title={isAr ? 'إرسال كمجهول' : 'Send Anonymously'}
-              >
-                🕵️
-              </button>
-
-              <button
-                type="submit"
-                disabled={isSendingChat || !chatInput.trim()}
-                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg active:scale-95 disabled:opacity-50 shrink-0 transition-all"
-              >
-                {isSendingChat ? '...' : (isAr ? 'إرسال 🚀' : 'Send 🚀')}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── 3. VIEW 2: ACADEMIC FORUM & RESOURCES MODE ── */}
-      {exchangeTab === 'forum' && (
-        <div className="space-y-4 font-sans">
-          
-          {/* Search & Filter Bar */}
-          <div className="flex flex-col sm:flex-row gap-2.5 justify-between items-center bg-slate-900/80 border border-white/10 p-3 rounded-2xl backdrop-blur-md">
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                value={exchangeSearch}
-                onChange={(e) => setExchangeSearch(e.target.value)}
-                placeholder={isAr ? 'بحث في مواضيع المنتدى...' : 'Search forum threads...'}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[var(--accent)] font-medium"
-              />
-            </div>
-
-            {/* Category Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 no-scrollbar">
-              {[
-                { id: 'ALL', label: isAr ? 'الكل' : 'All' },
-                { id: 'QUESTION', label: isAr ? 'أسئلة ❓' : 'Questions' },
-                { id: 'RESOURCE', label: isAr ? 'مراجع 📚' : 'Resources' },
-                { id: 'HELP', label: isAr ? 'مساعدة 🆘' : 'Help' }
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setExchangeCategoryFilter(cat.id)}
-                  className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black whitespace-nowrap transition-all ${
-                    exchangeCategoryFilter === cat.id
-                      ? 'bg-[var(--accent)] text-slate-950 shadow-md'
-                      : 'bg-white/5 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsNewPostModalOpen(true)}
-              className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs rounded-xl shadow-lg active:scale-95 transition-all shrink-0"
-            >
-              + {isAr ? 'موضوع جديد' : 'New Thread'}
-            </button>
-          </div>
-
-          {/* Posts Grid */}
-          <div className="space-y-3">
-            {postsLoading ? (
-              <div className="flex flex-col items-center justify-center py-16 text-xs text-slate-500 gap-2">
-                <div className="h-6 w-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                <span>{isAr ? 'جاري تحميل المواضيع...' : 'Loading threads...'}</span>
-              </div>
-            ) : filteredPosts.length > 0 ? (
-              filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  onClick={() => {
-                    if (fetchPostDetails) fetchPostDetails(post.id);
-                    setSelectedPost(post);
-                  }}
-                  className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-[var(--accent)]/40 transition-all cursor-pointer space-y-2.5 shadow-lg group"
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2.5">
-                      {post.student?.isAnonymous ? (
-                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0">
-                          🕵️
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[var(--accent)]/20 to-slate-800 border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0">
-                          {post.student?.name ? post.student.name.split(' ').slice(0, 2).map(n => n[0]).join('') : 'ST'}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white group-hover:text-[var(--accent)] transition-colors">
-                            {post.student?.isAnonymous ? (isAr ? 'طالب مجهول' : 'Anonymous Student') : post.student?.name}
-                          </span>
-                          {!post.student?.isAnonymous && post.student?.isRepresentative && (
-                            <span className="text-[7.5px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                              👑 {isAr ? 'مندوب' : 'Rep'}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[8.5px] text-slate-500 font-semibold block mt-0.5" dir="ltr">
-                          {new Date(post.createdAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-xl border ${getCategoryBadgeClass(post.category)}`}>
-                      {getCategoryLabel(post.category)}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xs font-black text-white leading-snug">{post.title}</h3>
-                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed font-medium">
-                    {post.content}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9.5px] font-bold text-slate-400">
-                    <span className="flex items-center gap-1">
-                      💬 {post._count?.comments || 0} {isAr ? 'تعليق' : 'comments'}
-                    </span>
-                    <span className="text-[var(--accent)] font-black group-hover:translate-x-1 transition-transform">
-                      {isAr ? 'عرض المناقشة ←' : 'View Thread →'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-12 text-slate-500 font-bold text-xs bg-slate-900/40 border border-white/5 rounded-2xl space-y-2">
-                <span className="text-3xl block">📚</span>
-                <p>{isAr ? 'لا توجد مواضيع في المنتدى الأكاديمي حالياً. كن أول من يضيف موضوعاً!' : 'No forum threads found. Create one!'}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── 4. WHATSAPP-STYLE "MESSAGE INFO" MODAL ── */}
-      <AnimatePresence>
-        {selectedMsgForInfo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" dir={isAr ? 'rtl' : 'ltr'}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-md bg-slate-900 border border-white/15 rounded-[24px] p-5 space-y-4 shadow-2xl font-sans"
-            >
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">ℹ️</span>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    {isAr ? 'معلومات الرسالة (Message Info)' : 'Message Info'}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setSelectedMsgForInfo(null)}
-                  className="text-slate-400 hover:text-white text-base leading-none"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-1">
-                <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block">
-                  {isAr ? 'محتوى الرسالة' : 'Message Content'}
-                </span>
-                <p className="text-xs font-semibold text-white leading-relaxed">
-                  {selectedMsgForInfo.content}
-                </p>
-              </div>
-
-              {(() => {
-                const { readList, deliveredList } = getMessageReadInfo(selectedMsgForInfo);
-                return (
-                  <div className="space-y-4 text-xs">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-1">
-                        <span className="font-black text-sky-400 flex items-center gap-1.5">
-                          <span className="text-sm">✓✓</span> {isAr ? 'قُرئت بواسطة (Read by)' : 'Read by'}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400 font-bold">{readList.length} {isAr ? 'طالب' : 'students'}</span>
-                      </div>
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                        {readList.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-2 rounded-xl bg-slate-950/60 border border-white/5 text-[11px]">
-                            <div className="flex items-center gap-2">
-                              <span>{item.avatar}</span>
-                              <span className="font-bold text-white">{item.name}</span>
-                            </div>
-                            <span className="text-[9px] font-mono text-slate-400">{item.time}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-1">
-                        <span className="font-black text-slate-300 flex items-center gap-1.5">
-                          <span className="text-sm">✓✓</span> {isAr ? 'تم التسليم إلى (Delivered to)' : 'Delivered to'}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400 font-bold">{deliveredList.length} {isAr ? 'طالب' : 'students'}</span>
-                      </div>
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-                        {deliveredList.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-2 rounded-xl bg-slate-950/40 border border-white/5 text-[11px]">
-                            <div className="flex items-center gap-2">
-                              <span>{item.avatar}</span>
-                              <span className="font-bold text-slate-200">{item.name}</span>
-                            </div>
-                            <span className="text-[9px] font-mono text-slate-400">{item.time}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <button
-                onClick={() => setSelectedMsgForInfo(null)}
-                className="w-full py-2.5 rounded-xl bg-slate-800 text-white font-black text-xs hover:bg-slate-700 transition-all active:scale-95"
-              >
-                {isAr ? 'إغلاق' : 'Close'}
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ── 5. NEW THREAD MODAL ── */}
-      <AnimatePresence>
-        {isNewPostModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" dir={isAr ? 'rtl' : 'ltr'}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-slate-900 border border-white/15 rounded-[24px] p-5 space-y-4 shadow-2xl font-sans"
-            >
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-white">
-                  + {isAr ? 'إضافة موضوع جديد في المنتدى' : 'Create New Thread'}
-                </h3>
-                <button onClick={() => setIsNewPostModalOpen(false)} className="text-slate-400 hover:text-white text-base">✕</button>
-              </div>
-
-              <form onSubmit={onCreatePostSubmit} className="space-y-3 text-xs font-bold">
-                <div className="space-y-1">
-                  <label className="text-slate-400 block">{isAr ? 'عنوان الموضوع' : 'Title'}</label>
-                  <input
-                    type="text"
-                    required
-                    value={newPostTitle}
-                    onChange={(e) => setNewPostTitle(e.target.value)}
-                    placeholder={isAr ? 'مثال: ملخص المحاضرة الثالثة برمجيات' : 'e.g. Lecture 3 Summary'}
-                    className="w-full p-3 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-[var(--accent)] font-medium"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-400 block">{isAr ? 'تصنيف الموضوع' : 'Category'}</label>
-                  <select
-                    value={newPostCategory}
-                    onChange={(e) => setNewPostCategory(e.target.value)}
-                    className="w-full p-3 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none font-bold"
+                <div className="flex items-center justify-between">
+                  <motion.button whileTap={{ scale: 0.93 }} type="button"
+                    onClick={() => setNewIsAnon(!newIsAnon)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${
+                      newIsAnon ? 'bg-amber-500/15 text-amber-300 border-amber-500/35' : 'bg-white/4 text-slate-500 border-white/6'
+                    }`}
                   >
-                    <option value="GENERAL">{isAr ? 'نقاش عام' : 'General'}</option>
-                    <option value="QUESTION">{isAr ? 'سؤال استفساري ❓' : 'Question'}</option>
-                    <option value="RESOURCE">{isAr ? 'مرجع أو تلخيص دراسي 📚' : 'Study Resource'}</option>
-                    <option value="HELP">{isAr ? 'طلب مساعدة عاجلة 🆘' : 'Help Request'}</option>
-                  </select>
-                </div>
+                    🕵️ {isAr ? 'مجهول' : 'Anonymous'}
+                  </motion.button>
 
-                <div className="space-y-1">
-                  <label className="text-slate-400 block">{isAr ? 'تفاصيل الموضوع' : 'Content'}</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={newPostContent}
-                    onChange={(e) => setNewPostContent(e.target.value)}
-                    placeholder={isAr ? 'اكتب الشرح أو التفاصيل هنا...' : 'Write thread details...'}
-                    className="w-full p-3 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-[var(--accent)] font-medium resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 select-none pt-1">
-                  <input
-                    type="checkbox"
-                    id="newPostIsAnon"
-                    checked={newPostIsAnonymous}
-                    onChange={(e) => setNewPostIsAnonymous(e.target.checked)}
-                    className="accent-[var(--accent)] h-4 w-4 rounded border-white/10 bg-black cursor-pointer"
-                  />
-                  <label htmlFor="newPostIsAnon" className="text-slate-300 text-xs font-bold cursor-pointer">
-                    🕵️ {isAr ? 'نشر بهوية مجهولة' : 'Post anonymously'}
-                  </label>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewPostModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 font-bold hover:bg-white/10"
-                  >
-                    {isAr ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={postSubmitting}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-lg active:scale-95 disabled:opacity-50"
-                  >
-                    {postSubmitting ? (isAr ? 'نشر...' : 'Posting...') : (isAr ? 'نشر الموضوع 🚀' : 'Post Thread 🚀')}
-                  </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowNewPost(false)}
+                      className="px-4 py-2 rounded-2xl bg-white/5 text-slate-400 text-[11px] font-bold hover:bg-white/8 transition-colors">
+                      {isAr ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    <motion.button whileTap={{ scale: 0.95 }} type="submit"
+                      disabled={postSubmitting}
+                      className="px-5 py-2 rounded-2xl bg-[var(--accent)] text-slate-950 text-[11px] font-black shadow-[0_0_14px_var(--accent-glow)] disabled:opacity-50 transition-all">
+                      {postSubmitting ? '...' : (isAr ? 'نشر 🚀' : 'Post 🚀')}
+                    </motion.button>
+                  </div>
                 </div>
               </form>
             </motion.div>
@@ -1167,90 +972,178 @@ export default function ExchangeHubTab({
         )}
       </AnimatePresence>
 
-      {/* ── 6. AI CO-PILOT & QUIZ MODAL ── */}
+      {/* ═════════════════════════════════════════════════════════════════════
+          AI BOTTOM SHEET
+      ═════════════════════════════════════════════════════════════════════ */}
       <AnimatePresence>
-        {isAiModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" dir={isAr ? 'rtl' : 'ltr'}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg bg-slate-900 border border-white/15 rounded-[24px] p-5 space-y-4 shadow-2xl font-sans max-h-[90vh] overflow-y-auto"
+        {showAiSheet && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md"
+            dir={isAr ? 'rtl' : 'ltr'} onClick={e => e.target === e.currentTarget && setShowAiSheet(false)}>
+            <motion.div {...slideFromBottom}
+              className="w-full max-w-[420px] bg-slate-900 border border-white/12 rounded-t-[28px] shadow-2xl max-h-[80vh] flex flex-col overflow-hidden"
             >
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
+              {/* Sheet drag handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+
+              <div className="flex items-center justify-between px-5 pb-3 border-b border-white/8">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🤖</span>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400">
-                    {isAr ? 'مساعد الكويزات والشروحات الذكية (AI Co-Pilot)' : 'AI Quiz & Study Co-Pilot'}
-                  </h3>
+                  <span className="text-lg">✨</span>
+                  <h3 className="text-[12px] font-black text-white">{isAr ? 'المساعد الذكي' : 'AI Co-Pilot'}</h3>
                 </div>
-                <button onClick={() => setIsAiModalOpen(false)} className="text-slate-400 hover:text-white text-base">✕</button>
+                <button onClick={() => setShowAiSheet(false)} className="text-slate-500 hover:text-white text-sm transition-colors">✕</button>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-slate-400 block text-xs font-bold">{isAr ? 'اسم المادة الدراسية' : 'Subject Name'}</label>
-                  <input
-                    type="text"
-                    value={aiSubjectName}
-                    onChange={(e) => setAiSubjectName(e.target.value)}
-                    placeholder={isAr ? 'مثال: ذكاء اصطناعي / برمجيات' : 'e.g. AI / Software Engineering'}
-                    className="w-full p-3 bg-slate-950 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-400 font-medium"
-                  />
-                </div>
-
-                {/* Actions */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleGenerateAiQuiz}
-                    disabled={quizLoading}
-                    className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 active:scale-95 transition-all disabled:opacity-50"
+              {/* AI Sub-tabs */}
+              <div className="flex gap-1 px-4 pt-3">
+                {[
+                  { id: 'summary', labelAr: 'ملخص المحادثة', labelEn: 'Chat Summary', icon: '📋' },
+                  { id: 'quiz',    labelAr: 'كويز ذكي',       labelEn: 'AI Quiz',      icon: '⚡' },
+                  { id: 'explain', labelAr: 'شرح موضوع',       labelEn: 'Explain',      icon: '💡' },
+                ].map(tab => (
+                  <button key={tab.id} type="button"
+                    onClick={() => { setAiTab(tab.id); if (tab.id === 'summary' && !summary) handleSummarize(); }}
+                    className={`flex-1 py-2 rounded-2xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all border ${
+                      aiTab === tab.id
+                        ? 'bg-[var(--accent)]/12 text-[var(--accent)] border-[var(--accent)]/30'
+                        : 'bg-white/4 text-slate-500 border-white/6 hover:text-slate-300'
+                    }`}
                   >
-                    {quizLoading ? <div className="h-4 w-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" /> : '⚡ ' + (isAr ? 'توليد كويز تجريبي' : 'Generate Quiz')}
+                    <span>{tab.icon}</span>
+                    <span>{isAr ? tab.labelAr : tab.labelEn}</span>
                   </button>
+                ))}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={handleGenerateAiExplain}
-                    disabled={aiSummaryLoading}
-                    className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black flex items-center justify-center gap-1.5 hover:bg-amber-500/25 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    {aiSummaryLoading ? <div className="h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" /> : '💡 ' + (isAr ? 'شرح موضوع معين' : 'Explain Topic')}
-                  </button>
-                </div>
-
-                {/* Quiz Questions output */}
-                {quizQuestions.length > 0 && (
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-3">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                      <span className="text-xs font-black text-emerald-400">{isAr ? 'أسئلة الكويز الذكي' : 'Generated Quiz Questions'}</span>
-                    </div>
-                    {quizQuestions.map((q, idx) => (
-                      <div key={idx} className="space-y-1.5 text-xs">
-                        <p className="font-bold text-white">{idx + 1}. {q.question}</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {q.options?.map((opt, oIdx) => (
-                            <div key={oIdx} className="p-2 rounded-xl bg-white/5 text-[11px] text-slate-300 font-medium">
-                              {opt}
-                            </div>
-                          ))}
-                        </div>
+              <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-4 space-y-3">
+                {/* Summary tab */}
+                {aiTab === 'summary' && (
+                  <div className="space-y-3">
+                    {summaryLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-xs">
+                        <Spinner /><span>{isAr ? 'جاري قراءة المحادثة...' : 'Analyzing chat...'}</span>
                       </div>
-                    ))}
+                    ) : summary ? (
+                      <div className="bg-slate-950/60 border border-[var(--accent)]/15 rounded-2xl p-4">
+                        <p className="text-[11px] text-slate-200 leading-relaxed whitespace-pre-line">{summary}</p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-slate-600 text-xs">
+                        {isAr ? 'اضغط لتحليل المحادثة' : 'Tap to analyze chat'}
+                      </div>
+                    )}
+                    <motion.button whileTap={{ scale: 0.95 }} type="button"
+                      onClick={handleSummarize} disabled={summaryLoading}
+                      className="w-full py-2.5 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] text-[11px] font-bold hover:bg-[var(--accent)]/16 transition-colors disabled:opacity-50">
+                      {summaryLoading ? '...' : (isAr ? '🔄 تحديث الملخص' : '🔄 Refresh Summary')}
+                    </motion.button>
                   </div>
                 )}
 
-                {/* AI Explanation output */}
-                {aiSummaryResult && (
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-2">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                      <span className="text-xs font-black text-amber-300">{isAr ? 'الشرح والتلخيص الأكاديمي' : 'AI Explanation'}</span>
-                    </div>
-                    <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed font-medium">{aiSummaryResult}</p>
+                {/* Quiz tab */}
+                {aiTab === 'quiz' && (
+                  <div className="space-y-3">
+                    <input type="text" value={aiSubject} onChange={e => setAiSubject(e.target.value)}
+                      placeholder={isAr ? 'اسم المادة...' : 'Subject name...'}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-4 py-2.5 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-emerald-400/45 font-medium"
+                    />
+                    <motion.button whileTap={{ scale: 0.95 }} type="button"
+                      onClick={handleGenQuiz} disabled={quizLoading}
+                      className="w-full py-2.5 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 text-emerald-300 text-[11px] font-bold hover:bg-emerald-500/18 transition-colors disabled:opacity-50">
+                      {quizLoading ? <div className="flex items-center justify-center gap-2"><Spinner size={4} color="#6ee7b7" /><span>...</span></div>
+                        : (isAr ? '⚡ توليد كويز تجريبي' : '⚡ Generate Quiz')}
+                    </motion.button>
+                    {quizQuestions.length > 0 && (
+                      <div className="space-y-3">
+                        {quizQuestions.map((q, i) => (
+                          <div key={i} className="bg-slate-950/60 border border-emerald-500/15 rounded-2xl p-3 space-y-2">
+                            <p className="text-[11px] font-bold text-white">{i+1}. {q.question}</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {q.options?.map((opt, oi) => (
+                                <div key={oi} className="px-2.5 py-1.5 rounded-xl bg-white/4 border border-white/6 text-[10px] text-slate-300">{opt}</div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Explain tab */}
+                {aiTab === 'explain' && (
+                  <div className="space-y-3">
+                    <input type="text" value={aiSubject} onChange={e => setAiSubject(e.target.value)}
+                      placeholder={isAr ? 'اسم المادة (اختياري)...' : 'Subject (optional)...'}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-4 py-2.5 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/45 font-medium"
+                    />
+                    <input type="text" value={aiTopic} onChange={e => setAiTopic(e.target.value)}
+                      placeholder={isAr ? 'موضوع الشرح...' : 'Topic to explain...'}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-4 py-2.5 text-[12px] text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/45 font-medium"
+                    />
+                    <motion.button whileTap={{ scale: 0.95 }} type="button"
+                      onClick={handleGenExplain} disabled={explainLoading}
+                      className="w-full py-2.5 rounded-2xl bg-amber-500/12 border border-amber-500/25 text-amber-300 text-[11px] font-bold hover:bg-amber-500/18 transition-colors disabled:opacity-50">
+                      {explainLoading ? <div className="flex items-center justify-center gap-2"><Spinner size={4} color="#fcd34d" /><span>...</span></div>
+                        : (isAr ? '💡 شرح الموضوع' : '💡 Explain Topic')}
+                    </motion.button>
+                    {aiExplain && (
+                      <div className="bg-slate-950/60 border border-amber-500/15 rounded-2xl p-4">
+                        <p className="text-[11px] text-slate-200 leading-relaxed whitespace-pre-line">{aiExplain}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═════════════════════════════════════════════════════════════════════
+          MESSAGE INFO MODAL
+      ═════════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {msgInfoTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
+            dir={isAr ? 'rtl' : 'ltr'} onClick={e => e.target === e.currentTarget && setMsgInfoTarget(null)}>
+            <motion.div {...fadeScale}
+              className="w-full max-w-sm bg-slate-900 border border-white/12 rounded-[24px] p-5 space-y-4 shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-white/8 pb-3">
+                <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider">
+                  ℹ️ {isAr ? 'معلومات الرسالة' : 'Message Info'}
+                </span>
+                <button onClick={() => setMsgInfoTarget(null)} className="text-slate-500 hover:text-white transition-colors">✕</button>
+              </div>
+
+              <div className="bg-amber-500/8 border border-amber-500/18 rounded-2xl px-4 py-3">
+                <p className="text-[11px] text-slate-200 leading-relaxed">{msgInfoTarget.content}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>✓✓</span>{isAr ? 'قُرئت بواسطة' : 'Read by'}
+                </p>
+                {getMsgInfo(msgInfoTarget).readList.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/50 border border-white/5">
+                    <div className="flex items-center gap-2">
+                      <span>{item.avatar}</span>
+                      <span className="text-[11px] font-bold text-white">{item.name}</span>
+                    </div>
+                    <span className="text-[9px] text-slate-500 font-mono">{getMsgInfo(msgInfoTarget).timeStr}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => setMsgInfoTarget(null)}
+                className="w-full py-2.5 rounded-2xl bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700 transition-colors">
+                {isAr ? 'إغلاق' : 'Close'}
+              </button>
             </motion.div>
           </div>
         )}
