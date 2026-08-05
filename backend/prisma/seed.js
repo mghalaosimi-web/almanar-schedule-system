@@ -797,7 +797,38 @@ async function main() {
   await prisma.major.deleteMany();
   await prisma.department.deleteMany();
   await prisma.admin.deleteMany();
+  await prisma.tenantConfig.deleteMany();
+  await prisma.college.deleteMany();
+  await prisma.university.deleteMany();
+  await prisma.governorate.deleteMany();
   console.log('All tables cleared.');
+
+  console.log('Creating Governorate, University, College, and TenantConfig...');
+  const governorate = await prisma.governorate.create({
+    data: { name: 'صنعاء' }
+  });
+  const university = await prisma.university.create({
+    data: {
+      name: 'كلية المنار الجامعية',
+      slug: 'almanar-college',
+      themeColor: '#84cc16',
+      governorateId: governorate.id
+    }
+  });
+  const college = await prisma.college.create({
+    data: {
+      name: 'كلية المنار الجامعية',
+      slug: 'almanar-main',
+      universityId: university.id
+    }
+  });
+  await prisma.tenantConfig.create({
+    data: {
+      collegeId: college.id,
+      themeColor: '#84cc16',
+      enabledFeatures: { qrAttendance: true, notifications: true }
+    }
+  });
 
   // Create Levels
   console.log('Creating Levels...');
@@ -815,7 +846,8 @@ async function main() {
   for (const deptConfig of almanarDeptsData) {
     const dept = await prisma.department.create({
       data: {
-        name: deptConfig.name
+        name: deptConfig.name,
+        collegeId: college.id
       }
     });
 
@@ -843,7 +875,8 @@ async function main() {
           data: {
             name: groupName,
             majorId: major.id,
-            levelId: lvl.id
+            levelId: lvl.id,
+            collegeId: college.id
           }
         });
         almanarGroupsMap[`${major.id}_${lvl.id}_${suffix}`] = grp;
@@ -857,7 +890,8 @@ async function main() {
     const createdRoom = await prisma.room.create({
       data: {
         name: rm.name,
-        capacity: rm.capacity
+        capacity: rm.capacity,
+        collegeId: college.id
       }
     });
     almanarRoomsMap[rm.name] = createdRoom;
@@ -874,7 +908,8 @@ async function main() {
         name,
         email,
         password: lecturerPasswordHash,
-        phone: `+96773` + String(Math.floor(1000000 + Math.random() * 9000000))
+        phone: `+96773` + String(Math.floor(1000000 + Math.random() * 9000000)),
+        collegeId: college.id
       }
     });
     almanarLecturersMap[cleanName(name)] = lecturer;
@@ -892,7 +927,8 @@ async function main() {
         data: {
           name: item.subjectName,
           code: `M-SUB-${subjectIdx++}`,
-          type: 'THEORY'
+          type: 'THEORY',
+          collegeId: college.id
         }
       });
       almanarSubjectsMap[item.subjectName] = subject;
@@ -920,7 +956,8 @@ async function main() {
         groupId: group.id,
         dayOfWeek: item.day,
         startTime: item.startTime,
-        endTime: item.endTime
+        endTime: item.endTime,
+        collegeId: college.id
       });
     }
   }
@@ -936,7 +973,9 @@ async function main() {
       name: 'عبد الملك الحداد',
       email: 'admin@almanar.edu.ye',
       password: adminPasswordHash,
-      role: 'ADMIN'
+      role: 'ADMIN',
+      collegeId: college.id,
+      universityId: university.id
     }
   });
 
@@ -946,13 +985,17 @@ async function main() {
     update: {
       name: 'م. محمد العليمي (SUPER_ADMIN)',
       password: superAdminPasswordHash,
-      role: 'ADMIN'
+      role: 'SUPER_ADMIN',
+      collegeId: college.id,
+      universityId: university.id
     },
     create: {
       name: 'م. محمد العليمي (SUPER_ADMIN)',
       email: 'm.gh.alosimi@gmail.com',
       password: superAdminPasswordHash,
-      role: 'ADMIN'
+      role: 'SUPER_ADMIN',
+      collegeId: college.id,
+      universityId: university.id
     }
   });
   console.log(`Master Admin created successfully: ${masterAdmin.name} (${masterAdmin.email}) & SUPER_ADMIN m.gh.alosimi@gmail.com`);
@@ -997,7 +1040,8 @@ async function main() {
       password: studentPasswordHash,
       majorId: major.id,
       levelId: level.id,
-      groupId: group.id
+      groupId: group.id,
+      collegeId: college.id
     });
   }
 
@@ -1005,11 +1049,11 @@ async function main() {
   await prisma.student.createMany({ data: studentsToCreate });
   console.log('1,000 dummy students seeded successfully.');
 
-  await injectTestStudents();
+  await injectTestStudents(college.id);
   console.log('Seeding completed successfully.');
 }
 
-async function injectTestStudents() {
+async function injectTestStudents(collegeId) {
   console.log('Injecting 5 test students for Al-Manar University College...');
   
   const majors = await prisma.major.findMany();
@@ -1048,7 +1092,8 @@ async function injectTestStudents() {
       majorId: major.id,
       levelId: level.id,
       groupId: group ? group.id : null,
-      googleId: null
+      googleId: null,
+      collegeId: collegeId
     });
   }
   
