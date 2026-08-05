@@ -11,7 +11,7 @@ const scheduleService = require('../services/scheduleService');
 const router = express.Router();
 
 function isAuthorizedAdmin(req) {
-  return req.user && req.user.role === 'ADMIN';
+  return req.user && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN');
 }
 
 // 1. GET Admin Metrics
