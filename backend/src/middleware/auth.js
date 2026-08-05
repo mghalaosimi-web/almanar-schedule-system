@@ -114,10 +114,18 @@ async function isSuperAdmin(req, res, next) {
   // ── Cache miss: validate against DB ──────────────────────────────────────
   try {
     const { prisma } = require('../db');
-    const admin = await prisma.admin.findUnique({
+    let admin = await prisma.admin.findUnique({
       where: { id: req.user.id },
       select: { email: true }
     });
+
+    // Fallback: If not found by ID (e.g. database re-seeded), search by email if the token has it
+    if (!admin && req.user.email) {
+      admin = await prisma.admin.findUnique({
+        where: { email: req.user.email },
+        select: { email: true }
+      });
+    }
 
     // Developer emails stored in env — never hardcoded
     const allowedEmails = [
