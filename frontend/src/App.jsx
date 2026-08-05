@@ -1066,9 +1066,9 @@ function AppLayout() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-10 bg-purple-500/20 animate-pulse" style={{ animationDelay: '2s' }} />
 
         {isStudentHome ? (
-          <div className="w-full min-h-screen flex flex-col" style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}>
+          <main className="w-full min-h-screen flex flex-col" style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}>
             {studentRoutes}
-          </div>
+          </main>
         ) : (
           <div className="w-full max-w-md min-h-screen flex flex-col relative pb-24 z-10" style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '104px' : '64px', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }}>
             
@@ -1099,9 +1099,9 @@ function AppLayout() {
             </header>
 
             {/* Content */}
-            <div className="flex-1 flex flex-col overflow-y-auto">
+            <main className="flex-1 flex flex-col overflow-y-auto">
               {studentRoutes}
-            </div>
+            </main>
 
             {/* Premium floating glass nav dock */}
             <nav
@@ -1162,7 +1162,7 @@ function AppLayout() {
 
   // Welcome / Default Landing Page Layout
   return (
-    <div style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}>
+    <main style={{ paddingTop: localStorage.getItem('manar_super_admin_token') ? '40px' : '0px' }}>
       {renderImpersonationBanner()}
       <Routes>
         <Route path="/"               element={<Navigate to="/c/almanar-college" replace />} />
@@ -1177,7 +1177,7 @@ function AppLayout() {
         <Route path="/license-suspended" element={<LicenseSuspended />} />
         <Route path="*"               element={<Navigate to="/c/almanar-college" replace />} />
       </Routes>
-    </div>
+    </main>
   );
 }
 

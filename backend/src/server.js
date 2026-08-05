@@ -52,8 +52,8 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],
       frameSrc: ["'self'", "https://accounts.google.com/gsi/"],
       connectSrc: ["'self'", "https://accounts.google.com/gsi/", "https://*.googleapis.com", "https://content.googleapis.com", "*"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/style", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/style", "https://fonts.googleapis.com", "https://unpkg.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:", "https://unpkg.com"],
       imgSrc: ["'self'", "data:", "https://*.googleusercontent.com", "https://lh3.googleusercontent.com", "*"],
     }
   },

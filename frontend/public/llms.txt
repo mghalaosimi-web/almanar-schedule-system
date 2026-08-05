@@ -1,0 +1,13 @@
+# Al-Manar College Schedule System
+
+Welcome to the AI-browsable interface of Al-Manar College Schedule System (نظام جداول منار الذكي).
+
+## Information and Resources
+
+- [App Home Page](https://almanar-schedule-system.onrender.com/) - The student portal dashboard.
+- [Instructions](https://almanar-schedule-system.onrender.com/instructions) - How to use the portal.
+- [Student Login](https://almanar-schedule-system.onrender.com/login) - Standard portal login.
+- [Teacher Login](https://almanar-schedule-system.onrender.com/teacher-login) - Faculty login portal.
+
+## Overview
+This platform manages real-time lecture timetables, notification streams, representative announcements, and QR-based attendance tracking for Al-Manar College students and lecturers.

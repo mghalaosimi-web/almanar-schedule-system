@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dev/
+Sitemap: https://almanar-schedule-system.onrender.com/sitemap.xml
