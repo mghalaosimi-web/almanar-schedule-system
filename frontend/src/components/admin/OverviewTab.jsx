@@ -156,7 +156,7 @@ export default function OverviewTab({
                 {isAr ? 'الشعب الأكثر كثافة طلابية' : 'Largest Cohort Groups by Population'}
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                {analytics.groupBreakdown.map((g) => (
+                {(analytics.groupBreakdown || []).map((g) => (
                   <div key={g.groupId} className="bg-slate-950 border border-slate-800/60 rounded-xl p-3.5 text-center">
                     <span className="block text-xs font-black text-white truncate">{g.groupName}</span>
                     <span className="block text-[10px] font-bold text-slate-500 mt-1">

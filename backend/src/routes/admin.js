@@ -7,6 +7,7 @@ const { broadcastSSE, sendPushNotification } = require('../services/notification
 
 const excelParserService = require('../services/excelParserService');
 const scheduleService = require('../services/scheduleService');
+const adminService = require('../services/adminService');
 
 const router = express.Router();
 
@@ -43,32 +44,15 @@ router.get('/admin/analytics', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
 
-    const totalStudents = await prisma.student.count();
-    const totalGroups = await prisma.group.count();
-    const totalSchedules = await prisma.schedule.count();
-
-    const attendances = await prisma.attendanceRecord.findMany({
-      take: 1000,
-      orderBy: { scannedAt: 'desc' }
-    });
-
-    const totalAttendanceLogs = attendances.length;
-    const presentLogs = attendances.filter(a => a.status === 'PRESENT').length;
-    const attendanceHealth = totalAttendanceLogs > 0 ? Math.round((presentLogs / totalAttendanceLogs) * 100) : 100;
+    const collegeId = req.query.collegeId ? parseInt(req.query.collegeId) : null;
+    const analyticsData = await adminService.getAnalytics(collegeId, req.user);
 
     res.status(200).json({
       success: true,
-      data: {
-        totalStudents,
-        totalGroups,
-        totalSchedules,
-        attendanceHealth,
-        totalAttendanceLogs,
-        presentLogs
-      }
+      data: analyticsData
     });
   } catch (error) {
-    console.error('[API] Error fetching analytics:', error.message);
+    console.error('[API] Error fetching analytics:', error.message || error);
     res.status(500).json({ success: false, error: 'Failed to fetch analytics' });
   }
 });
