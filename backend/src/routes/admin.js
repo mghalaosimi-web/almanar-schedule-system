@@ -135,7 +135,17 @@ router.get('/students', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
     const { page, limit, searchQuery, majorId, levelId, groupId, showUnverifiedOnly } = req.query;
+    const { role, collegeId: adminCollegeId, universityId: adminUniversityId } = req.user;
     let whereClause = {};
+
+    // ── [SEC] Tenant scoping: enforce data isolation per admin role ──────────
+    if (role === 'COLLEGE_ADMIN' && adminCollegeId) {
+      whereClause.collegeId = parseInt(adminCollegeId);
+    } else if (role === 'UNI_ADMIN' && adminUniversityId) {
+      whereClause.college = { universityId: parseInt(adminUniversityId) };
+    }
+    // SUPER_ADMIN: no filter → full access across all tenants
+    // ────────────────────────────────────────────────────────────────────────
 
     if (searchQuery) {
       whereClause.OR = [

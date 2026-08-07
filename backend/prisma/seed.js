@@ -965,15 +965,43 @@ async function main() {
   await prisma.schedule.createMany({ data: schedulesToCreate });
   console.log(`Seeded ${schedulesToCreate.length} schedules for Al-Manar University College.`);
 
-  // Create Master Admin User: عبد الملك الحداد
-  console.log('Creating Master System Admin: عبد الملك الحداد...');
+  // Create Master Admin User: أ.د. عبد الملك الحداد (Dean of College)
+  console.log('Creating Master System Admin: أ.د. عبد الملك الحداد...');
   const adminPasswordHash = await bcrypt.hash('12345678', 10);
-  const masterAdmin = await prisma.admin.create({
-    data: {
-      name: 'عبد الملك الحداد',
+  const masterAdmin = await prisma.admin.upsert({
+    where: { email: 'admin@almanar.edu.ye' },
+    update: {
+      name: 'أ.د. عبد الملك الحداد',
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      collegeId: college.id,
+      universityId: university.id
+    },
+    create: {
+      name: 'أ.د. عبد الملك الحداد',
       email: 'admin@almanar.edu.ye',
       password: adminPasswordHash,
       role: 'ADMIN',
+      collegeId: college.id,
+      universityId: university.id
+    }
+  });
+
+  // Dedicated Dean email alias for Abdulmalik Al-Haddath
+  await prisma.admin.upsert({
+    where: { email: 'a.alhaddath@almanar.edu.ye' },
+    update: {
+      name: 'أ.د. عبد الملك الحداد (عميد الكلية)',
+      password: adminPasswordHash,
+      role: 'COLLEGE_ADMIN',
+      collegeId: college.id,
+      universityId: university.id
+    },
+    create: {
+      name: 'أ.د. عبد الملك الحداد (عميد الكلية)',
+      email: 'a.alhaddath@almanar.edu.ye',
+      password: adminPasswordHash,
+      role: 'COLLEGE_ADMIN',
       collegeId: college.id,
       universityId: university.id
     }

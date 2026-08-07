@@ -228,45 +228,55 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
     }
 
     if (!user) {
-      try {
-        const filePath = path.join(__dirname, '../../data/fallback_metadata.json');
-        if (fs.existsSync(filePath)) {
-          const fallback = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-          if (fallback && fallback.users) {
-            // Check admins
-            const fallbackAdmin = fallback.users.admins.find(
-              a => (a.email === identifier || a.name === identifier) && a.passwordRaw === password
-            );
-            if (fallbackAdmin) {
-              user = fallbackAdmin;
-              role = fallbackAdmin.role;
-            }
-
-            if (!user) {
-              // Check lecturers
-              const fallbackLecturer = fallback.users.lecturers.find(
-                l => (l.email === identifier || l.name === identifier) && l.passwordRaw === password
+      // ── [SEC] OFFLINE FALLBACK LOGIN ─────────────────────────────────────
+      // STRICTLY DISABLED in production environment.
+      // The fallback_metadata.json file uses plaintext `passwordRaw` fields
+      // which are acceptable ONLY during development/testing with no DB access.
+      // In production, users MUST authenticate via the primary database.
+      // ─────────────────────────────────────────────────────────────────────
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('[OFFLINE FALLBACK] Fallback login is DISABLED in production. DB must be reachable.');
+      } else {
+        try {
+          const filePath = path.join(__dirname, '../../data/fallback_metadata.json');
+          if (fs.existsSync(filePath)) {
+            const fallback = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (fallback && fallback.users) {
+              // Check admins
+              const fallbackAdmin = fallback.users.admins.find(
+                a => (a.email === identifier || a.name === identifier) && a.passwordRaw === password
               );
-              if (fallbackLecturer) {
-                user = fallbackLecturer;
-                role = 'LECTURER';
+              if (fallbackAdmin) {
+                user = fallbackAdmin;
+                role = fallbackAdmin.role;
               }
-            }
 
-            if (!user) {
-              // Check students
-              const fallbackStudent = fallback.users.students.find(
-                s => (s.email === identifier || s.idNumber === identifier) && s.passwordRaw === password
-              );
-              if (fallbackStudent) {
-                user = fallbackStudent;
-                role = 'STUDENT';
+              if (!user) {
+                // Check lecturers
+                const fallbackLecturer = fallback.users.lecturers.find(
+                  l => (l.email === identifier || l.name === identifier) && l.passwordRaw === password
+                );
+                if (fallbackLecturer) {
+                  user = fallbackLecturer;
+                  role = 'LECTURER';
+                }
+              }
+
+              if (!user) {
+                // Check students
+                const fallbackStudent = fallback.users.students.find(
+                  s => (s.email === identifier || s.idNumber === identifier) && s.passwordRaw === password
+                );
+                if (fallbackStudent) {
+                  user = fallbackStudent;
+                  role = 'STUDENT';
+                }
               }
             }
           }
+        } catch (err) {
+          console.error('[OFFLINE FALLBACK] Fallback login check error:', err);
         }
-      } catch (err) {
-        console.error('[OFFLINE FALLBACK] Fallback login check error:', err);
       }
     }
 

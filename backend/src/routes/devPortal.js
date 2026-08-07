@@ -28,18 +28,61 @@ const router = express.Router();
 router.use('/admin/dev', verifyToken, isSuperAdmin);
 router.use('/dev', verifyToken, isSuperAdmin);
 
+// ── In-memory brute-force guard for DevPortal passcode ──────────────────────
+const devKeyAttempts = new Map(); // email → { count, resetAt }
+const DEV_KEY_MAX_ATTEMPTS = 5;
+const DEV_KEY_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
 // Verification endpoint for Developer Passcode
 // SECURITY: requires valid SUPER_ADMIN JWT + DB-verified developer identity
 router.post('/admin/dev/verify-key', verifyToken, isSuperAdmin, (req, res) => {
   const { passcode } = req.body;
-  const devKey = process.env.DEV_PORTAL_KEY || '708090';
-  if (!process.env.DEV_PORTAL_KEY) {
-    console.warn('[DevPortal] DEV_PORTAL_KEY is not set in environment variables. Using default key fallback.');
+
+  // ── [SEC] Never fall back to a weak default in production ─────────────────
+  const devKey = process.env.DEV_PORTAL_KEY;
+  if (!devKey) {
+    console.error('[DevPortal][CRITICAL] DEV_PORTAL_KEY is not set. Dev portal access is BLOCKED until it is configured.');
+    return res.status(503).json({ success: false, error: 'Developer portal is locked: environment key not configured.' });
   }
+  if (devKey.length < 12) {
+    console.error('[DevPortal][CRITICAL] DEV_PORTAL_KEY is too short (< 12 chars). Dev portal access is BLOCKED.');
+    return res.status(503).json({ success: false, error: 'Developer portal is locked: key does not meet security policy (min 12 chars).' });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── Brute-force guard ─────────────────────────────────────────────────────
+  const callerKey = req.user?.email || req.ip;
+  const now = Date.now();
+  const attempt = devKeyAttempts.get(callerKey);
+  if (attempt) {
+    if (now < attempt.resetAt && attempt.count >= DEV_KEY_MAX_ATTEMPTS) {
+      const waitMins = Math.ceil((attempt.resetAt - now) / 60000);
+      return res.status(429).json({
+        success: false,
+        error: `تم تجاوز الحد المسموح به للمحاولات. حاول مجدداً بعد ${waitMins} دقيقة.`
+      });
+    }
+    if (now >= attempt.resetAt) {
+      devKeyAttempts.delete(callerKey); // reset window
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (passcode === devKey) {
+    devKeyAttempts.delete(callerKey); // clear on success
     return res.status(200).json({ success: true });
   }
-  return res.status(401).json({ success: false, error: 'رمز مرور المطور غير صحيح' });
+
+  // Wrong passcode — record attempt
+  const cur = devKeyAttempts.get(callerKey) || { count: 0, resetAt: now + DEV_KEY_WINDOW_MS };
+  cur.count += 1;
+  devKeyAttempts.set(callerKey, cur);
+
+  const remaining = DEV_KEY_MAX_ATTEMPTS - cur.count;
+  return res.status(401).json({
+    success: false,
+    error: `رمز مرور المطور غير صحيح. المحاولات المتبقية: ${Math.max(0, remaining)}`
+  });
 });
 
 // ── DEV PORTAL INSTITUTION HIERARCHY MANAGEMENT ───────────────────────
@@ -2310,21 +2353,17 @@ router.post('/admin/dev/patches/trigger-test-error', verifyToken, async (req, re
   }
 });
 
-// ── FIREWALL MANAGEMENT ENDPOINTS ──
-
-// GET all blocked IPs
-router.get('/admin/dev/firewall/blocked', verifyToken, async (req, res) => {
-  try {
-    const list = await prisma.blockedIP.findMany({ orderBy: { blockedAt: 'desc' } });
-    res.status(200).json({ success: true, data: list });
-  } catch (error) {
-    console.error('[API] Fetch blocked IPs error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch firewall logs' });
-  }
-});
+// ── FIREWALL MANAGEMENT ENDPOINTS (see primary definitions above with isSuperAdmin guard) ──
+// NOTE: GET /admin/dev/firewall/blocked   → defined at line ~2168 (with isSuperAdmin)
+// NOTE: POST /admin/dev/firewall/block    → defined at line ~2181 (with isSuperAdmin)
+// NOTE: DELETE /admin/dev/firewall/blocked/:id → defined at line ~2211 (with isSuperAdmin)
+//
+// The following routes (block/unblock) supplement those with in-memory cache sync
+// but do NOT duplicate the blocked list reader.
 
 // POST block an IP
-router.post('/admin/dev/firewall/block', verifyToken, async (req, res) => {
+router.post('/admin/dev/firewall/block-sync', verifyToken, async (req, res) => {
+
   try {
     const { ip, reason } = req.body;
     if (!ip) {

@@ -283,7 +283,15 @@ router.get('/rooms', verifyToken, async (req, res) => {
 // 10. GET all lecturers
 router.get('/lecturers', verifyToken, async (req, res) => {
   try {
+    // ── [SEC] Scope lecturers to the requesting user's college ─────────────
+    // This prevents students from college A from listing lecturers in college B.
+    const userCollegeId = req.user.collegeId ? parseInt(req.user.collegeId) : null;
+    const whereClause = userCollegeId ? { collegeId: userCollegeId } : {};
+    // ───────────────────────────────────────────────────────────────────────
+
     const lecturers = await prisma.lecturer.findMany({
+      where: whereClause,
+      select: { id: true, name: true, email: true, phone: true, collegeId: true },
       orderBy: { name: 'asc' }
     });
     res.status(200).json({ success: true, data: lecturers });
@@ -292,6 +300,7 @@ router.get('/lecturers', verifyToken, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch lecturers' });
   }
 });
+
 
 // 11. GET all schedules
 router.get('/schedules', verifyToken, async (req, res) => {
