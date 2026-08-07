@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { API_URL } from '../config';
+import { API_URL, GOOGLE_CLIENT_ID } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import ThemeSwitcher from '../ThemeSwitcher';
 import Logo from '../Logo';
 import DevSignature from '../DevSignature';
@@ -170,21 +170,23 @@ export default function GoogleLinkInterceptor() {
               </p>
             </div>
           ) : (
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => {
-                toast.error(
-                  isAr
-                    ? 'فشل الاتصال بخدمة Google'
-                    : 'Google connection failed'
-                );
-              }}
-              theme="filled_black"
-              size="large"
-              shape="rectangular"
-              width="320"
-              text="signin_with"
-            />
+            <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => {
+                  toast.error(
+                    isAr
+                      ? 'فشل الاتصال بخدمة Google'
+                      : 'Google connection failed'
+                  );
+                }}
+                theme="filled_black"
+                size="large"
+                shape="rectangular"
+                width="320"
+                text="signin_with"
+              />
+            </GoogleOAuthProvider>
           )}
         </div>
 

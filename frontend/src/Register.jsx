@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { API_URL } from './config';
+import { API_URL, GOOGLE_CLIENT_ID } from './config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,7 +10,7 @@ import Logo from './Logo';
 import DevSignature from './DevSignature';
 import { staticData, staticLevels } from './staticData';
 import { getFriendlyErrorMessage } from './utils/errorHelpers';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 
 class SafeGoogleLogin extends React.Component {
   constructor(props) {
@@ -697,16 +697,18 @@ export default function Register() {
                               </div>
                             ) : (
                               <div className="w-full flex justify-center google-login-container animate-fade-in" dir="ltr">
-                                <GoogleLogin
-                                  onSuccess={handleGoogleSuccess}
-                                  onError={() => {
-                                    toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
-                                  }}
-                                  theme="filled_black"
-                                  size="large"
-                                  shape="rectangular"
-                                  width="320"
-                                />
+                                <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                                  <GoogleLogin
+                                    onSuccess={handleGoogleSuccess}
+                                    onError={() => {
+                                      toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
+                                    }}
+                                    theme="filled_black"
+                                    size="large"
+                                    shape="rectangular"
+                                    width="320"
+                                  />
+                                </GoogleOAuthProvider>
                               </div>
                             )}
                           </div>

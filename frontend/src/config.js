@@ -23,3 +23,5 @@ const getApiUrl = () => {
 };
 
 export const API_URL = getApiUrl();
+
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '425434500913-qd4j47g4pf11dq8plpr8c7n4s9mi5q84.apps.googleusercontent.com';

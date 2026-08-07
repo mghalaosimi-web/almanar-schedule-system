@@ -83,7 +83,7 @@ export default function DevSignature({ centered = true }) {
               initial={{ opacity: 0, scale: 0.95, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 30 }}
-              className="bg-white/5 border border-white/10 backdrop-blur-2xl p-8 rounded-3xl shadow-2xl w-full max-w-sm relative text-center"
+              className="frosted-panel p-8 rounded-3xl w-full max-w-sm relative text-center"
             >
               {/* Close Button */}
               <button

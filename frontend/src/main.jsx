@@ -1,10 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import "@phosphor-icons/web/regular";
+import "@phosphor-icons/web/fill";
+import "@phosphor-icons/web/bold";
 import App from './App.jsx'
 import { EntityProvider } from './context/EntityProvider.jsx'
 import './i18n'
-import { GoogleOAuthProvider } from '@react-oauth/google'
 import { restoreUserTheme } from './utils/themeEngine.js'
 
 import { registerSW } from 'virtual:pwa-register'
@@ -43,12 +45,8 @@ try {
   console.warn('[PWA] registerSW failed (possibly in dev mode):', e);
 }
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '425434500913-qd4j47g4pf11dq8plpr8c7n4s9mi5q84.apps.googleusercontent.com';
-
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={clientId}>
-      <EntityProvider><App /></EntityProvider>
-    </GoogleOAuthProvider>
+    <EntityProvider><App /></EntityProvider>
   </StrictMode>,
 )

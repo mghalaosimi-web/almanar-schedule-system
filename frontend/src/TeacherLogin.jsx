@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { API_URL } from './config';
+import { API_URL, GOOGLE_CLIENT_ID } from './config';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,7 +9,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import Logo from './Logo';
 import DevSignature from './DevSignature';
 import { getFriendlyErrorMessage } from './utils/errorHelpers';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 
 class SafeGoogleLogin extends React.Component {
   constructor(props) {
@@ -525,18 +525,20 @@ export default function TeacherLogin() {
 
                   {/* Google Login Button */}
                   <div className="w-full flex justify-center google-login-container py-2" dir="ltr">
-                    <SafeGoogleLogin>
-                      <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={() => {
-                          toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
-                        }}
-                        theme="filled_black"
-                        size="large"
-                        shape="rectangular"
-                        width="340"
-                      />
-                    </SafeGoogleLogin>
+                    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                      <SafeGoogleLogin>
+                        <GoogleLogin
+                          onSuccess={handleGoogleSuccess}
+                          onError={() => {
+                            toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
+                          }}
+                          theme="filled_black"
+                          size="large"
+                          shape="rectangular"
+                          width="340"
+                        />
+                      </SafeGoogleLogin>
+                    </GoogleOAuthProvider>
                   </div>
 
                   <div className="pt-2">
@@ -615,18 +617,20 @@ export default function TeacherLogin() {
 
                     {/* Google Login Button */}
                     <div className="w-full flex justify-center google-login-container" dir="ltr">
-                      <SafeGoogleLogin>
-                        <GoogleLogin
-                          onSuccess={handleGoogleSuccess}
-                          onError={() => {
-                            toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
-                          }}
-                          theme="filled_black"
-                          size="large"
-                          shape="rectangular"
-                          width="384"
-                        />
-                      </SafeGoogleLogin>
+                      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                        <SafeGoogleLogin>
+                          <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => {
+                              toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
+                            }}
+                            theme="filled_black"
+                            size="large"
+                            shape="rectangular"
+                            width="384"
+                          />
+                        </SafeGoogleLogin>
+                      </GoogleOAuthProvider>
                     </div>
 
                     <p className="text-[11px] text-white/55 text-center leading-relaxed mt-4 p-4 rounded-2xl bg-white/2 border border-white/5 backdrop-blur-sm">
@@ -712,7 +716,7 @@ export default function TeacherLogin() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
               transition={{ type: 'spring', duration: 0.5 }}
-              className="w-full max-w-md backdrop-blur-2xl bg-black/60 border border-white/15 rounded-3xl p-8 shadow-2xl relative overflow-hidden text-center"
+              className="w-full max-w-md frosted-panel rounded-3xl p-8 relative overflow-hidden text-center"
             >
               {/* Glowing Top Border */}
               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-emerald-500 animate-pulse" />

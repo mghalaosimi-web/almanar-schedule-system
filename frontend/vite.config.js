@@ -33,6 +33,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         importScripts: ['/push-sw.js'],
         // Only cache static assets — navigation always goes to network first
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],

@@ -57,11 +57,11 @@
   --text-primary:   #0f172a;
   --text-secondary: #475569;
   --text-muted:     #64748b;
-  --accent:         #b8860b;
-  --accent-dim:     rgba(218, 165, 32, 0.12);
-  --accent-glow:    rgba(218, 165, 32, 0.25);
-  --glow-lime:    rgba(218, 165, 32, 0.12);
-  --glow-emerald: rgba(218, 165, 32, 0.10);
+  --accent:         #935f00;
+  --accent-dim:     rgba(147, 95, 0, 0.12);
+  --accent-glow:    rgba(147, 95, 0, 0.25);
+  --glow-lime:    rgba(147, 95, 0, 0.12);
+  --glow-emerald: rgba(147, 95, 0, 0.10);
 }
 
 /* ── Light Mode Colored Theme Specificity Overrides ─────────── */
