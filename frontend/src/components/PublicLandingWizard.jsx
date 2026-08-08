@@ -9,7 +9,20 @@ import Logo from '../Logo';
 import ThemeSwitcher from '../ThemeSwitcher';
 import PWAInstallModal from './PWAInstallModal';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Instant Default Majors (Zero Delay / Offline Ready) ─────────────────────
+const DEFAULT_ALMANAR_MAJORS = [
+  { id: 1, name: 'تقنية المعلومات IT' },
+  { id: 2, name: 'أمن سيبراني' },
+  { id: 3, name: 'إدارة أعمال' },
+  { id: 4, name: 'محاسبة' },
+  { id: 5, name: 'شريعة وقانون' },
+  { id: 6, name: 'إدارة صحية' },
+  { id: 7, name: 'صيدلة' },
+  { id: 8, name: 'تمريض' },
+  { id: 9, name: 'فني عمليات جراحية' }
+];
+
+// ─── Constants & Formatting ──────────────────────────────────────────────────
 const SCHED_DAYS = ['SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'];
 const DAYS_AR = {
   SUNDAY: 'الأحد', MONDAY: 'الاثنين', TUESDAY: 'الثلاثاء',
@@ -20,7 +33,7 @@ const DAYS_EN = {
   WEDNESDAY: 'Wednesday', THURSDAY: 'Thursday', FRIDAY: 'Friday', SATURDAY: 'Saturday'
 };
 
-// Assign color + icon per major name
+// Assign theme & icon per major name
 const getMajorTheme = (name = '') => {
   const n = name;
   if (n.includes('صيدل') || n.toLowerCase().includes('pharma'))
@@ -50,7 +63,7 @@ const fmt = (t) => {
 // ─── DevSplash ─────────────────────────────────────────────────────────────────
 function DevSplash({ onDone }) {
   useEffect(() => {
-    const t = setTimeout(onDone, 3000);
+    const t = setTimeout(onDone, 2500);
     return () => clearTimeout(t);
   }, [onDone]);
 
@@ -59,7 +72,7 @@ function DevSplash({ onDone }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.05 }}
-      transition={{ duration: 0.6 }}
+      transition={{ duration: 0.5 }}
       className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[var(--bg-primary)]"
       style={{ fontFamily: "'Urbanist', sans-serif" }}
     >
@@ -70,7 +83,7 @@ function DevSplash({ onDone }) {
       <motion.div
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 14, delay: 0.2 }}
+        transition={{ type: 'spring', stiffness: 120, damping: 14, delay: 0.15 }}
         className="relative z-10 flex flex-col items-center gap-5"
       >
         <div className="relative">
@@ -95,7 +108,7 @@ function DevSplash({ onDone }) {
         </p>
         <div className="w-40 h-0.5 bg-white/10 rounded-full overflow-hidden">
           <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full"
-            initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 2.5, ease: 'easeInOut' }} />
+            initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 2.0, ease: 'easeInOut' }} />
         </div>
       </motion.div>
     </motion.div>
@@ -133,6 +146,7 @@ function InfoModal({ type, onClose }) {
             </p>
             <div className="space-y-2">
               {[
+                { icon: '⚡', text: 'استجابة فورية بدون أي تأخير' },
                 { icon: '📅', text: 'جداول دراسية محدّثة لحظياً' },
                 { icon: '🔔', text: 'إشعارات عند تعديل أي محاضرة' },
                 { icon: '📲', text: 'تسجيل الحضور عبر QR' },
@@ -285,7 +299,6 @@ function ScheduleView({ schedules, selectedMajor, isAr, loading, collegeId, onBa
             background: 'var(--bg-primary)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border-color)',
-            focusRingColor: 'var(--accent)'
           }}
         >
           <option value="">{isAr ? '— المستوى الدراسي —' : '— Study Level —'}</option>
@@ -339,10 +352,10 @@ function ScheduleView({ schedules, selectedMajor, isAr, loading, collegeId, onBa
         <div className="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center">
           <div className="text-4xl">📭</div>
           <p className="text-sm font-black text-[var(--text-primary)]">
-            {isAr ? 'لا يوجد جدول متاح حالياً' : 'No schedule available yet'}
+            {isAr ? 'لا يوجد جدول متاح حالياً لهذا التخصص' : 'No schedule available for this major'}
           </p>
           <p className="text-xs text-[var(--text-muted)]">
-            {isAr ? 'جرّب تغيير المستوى أو الشعبة' : 'Try changing level or group filter'}
+            {isAr ? 'جرّب تغيير المستوى أو الشعبة أو تواصل مع إدارة الكلية' : 'Try changing level filter or contact admin'}
           </p>
         </div>
       ) : (
@@ -417,15 +430,34 @@ export default function PublicLandingWizard() {
   // Splash
   const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('splash_shown'));
 
-  // Phase: 'loading' | 'majors' | 'schedule'
-  const [phase, setPhase] = useState('loading');
-  const [collegeId, setCollegeId] = useState(null);
-  const [collegeName, setCollegeName] = useState('كلية المنار الأهلية');
-  const [majors, setMajors] = useState([]);
+  // Phase: 'majors' | 'schedule' (NO 'loading' phase! Instant display!)
+  const [phase, setPhase] = useState('majors');
+  
+  const [collegeId, setCollegeId] = useState(() => {
+    return parseInt(localStorage.getItem('almanar_college_id') || '3');
+  });
+  
+  const [collegeName, setCollegeName] = useState(() => {
+    return localStorage.getItem('almanar_college_name') || 'كلية المنار الأهلية';
+  });
+  
+  // Instant local majors list so there's ZERO wait time or loading spinner
+  const [majors, setMajors] = useState(() => {
+    const cached = localStorage.getItem('almanar_majors');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { /* fallback */ }
+    }
+    return DEFAULT_ALMANAR_MAJORS;
+  });
+
   const [selectedMajor, setSelectedMajor] = useState(null);
   const [schedules, setSchedules] = useState([]);
   const [schedulesLoading, setSchedulesLoading] = useState(false);
   const [modalType, setModalType] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // PWA
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -459,30 +491,18 @@ export default function PublicLandingWizard() {
     }
   }, [navigate]);
 
-  // PWA prompt
+  // PWA prompt listener
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // ── Silent Bootstrap: fetch tenant + majors ──────────────────────────────────
+  // ── Silent Background Sync: Update tenant + majors non-blockingly ───────────
   useEffect(() => {
-    const bootstrap = async () => {
-      // Serve from cache immediately for instant UX
-      const cachedId = localStorage.getItem('almanar_college_id');
-      const cachedMajors = localStorage.getItem('almanar_majors');
-      const cachedName = localStorage.getItem('almanar_college_name');
-      if (cachedId && cachedMajors) {
-        setCollegeId(parseInt(cachedId));
-        setMajors(JSON.parse(cachedMajors));
-        if (cachedName) setCollegeName(cachedName);
-        setPhase('majors');
-      }
-
-      // Then refresh from network
+    const silentSync = async () => {
       try {
-        const tenantRes = await axios.get(`${API_URL}/api/public/tenant/info?slug=almanar-college`);
+        const tenantRes = await axios.get(`${API_URL}/api/public/tenant/info?slug=almanar-college`, { timeout: 4000 });
         if (tenantRes.data?.success && tenantRes.data.data) {
           const config = tenantRes.data.data;
           const cId = config.college?.id ?? config.collegeId;
@@ -491,9 +511,9 @@ export default function PublicLandingWizard() {
           if (cId) {
             setCollegeId(cId);
             setCollegeName(cName);
-            localStorage.setItem('almanar_college_id', cId);
+            localStorage.setItem('almanar_college_id', cId.toString());
             localStorage.setItem('almanar_college_name', cName);
-            localStorage.setItem('selectedCollegeId', cId);
+            localStorage.setItem('selectedCollegeId', cId.toString());
             localStorage.setItem('selectedCollegeName', cName);
 
             // Apply theme color if provided
@@ -505,33 +525,21 @@ export default function PublicLandingWizard() {
               localStorage.setItem('selectedUniversityThemeColor', themeColor);
             }
 
-            // Fetch majors
-            const majorsRes = await axios.get(`${API_URL}/api/public/majors?collegeId=${cId}`);
-            if (majorsRes.data?.success && majorsRes.data.data?.length > 0) {
+            // Fetch latest majors silently
+            const majorsRes = await axios.get(`${API_URL}/api/public/majors?collegeId=${cId}`, { timeout: 4000 });
+            if (majorsRes.data?.success && Array.isArray(majorsRes.data.data) && majorsRes.data.data.length > 0) {
               const list = majorsRes.data.data;
               setMajors(list);
               localStorage.setItem('almanar_majors', JSON.stringify(list));
             }
-            setPhase('majors');
           }
         }
       } catch (err) {
-        console.warn('[AlManar Portal] Network error during bootstrap:', err.message);
-        // Already served from cache above; if not cached use static fallback
-        if (!cachedId) {
-          setCollegeId(3);
-          setMajors([
-            { id: 1, name: 'صيدلة' },
-            { id: 2, name: 'تمريض' },
-            { id: 3, name: 'فني عمليات جراحية' },
-            { id: 4, name: 'إدارة صحية' },
-          ]);
-          setPhase('majors');
-        }
+        // Silent catch: no error toast or lag for user! Local defaults remain active smoothly.
+        console.warn('[AlManar Portal] Silent background sync completed with local fallback active.');
       }
     };
-    bootstrap();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    silentSync();
   }, []);
 
   // ── Fetch schedules when major is chosen ─────────────────────────────────────
@@ -541,7 +549,8 @@ export default function PublicLandingWizard() {
       setSchedulesLoading(true);
       try {
         const res = await axios.get(
-          `${API_URL}/api/public/schedules?collegeId=${collegeId}&majorId=${selectedMajor.id}`
+          `${API_URL}/api/public/schedules?collegeId=${collegeId}&majorId=${selectedMajor.id}`,
+          { timeout: 5000 }
         );
         if (res.data?.success) {
           setSchedules(res.data.data);
@@ -552,10 +561,14 @@ export default function PublicLandingWizard() {
       } catch (err) {
         const cached = localStorage.getItem(`almanar_sched_${selectedMajor.id}`);
         if (cached) {
-          setSchedules(JSON.parse(cached));
-          toast(isAr ? '📡 جدول مخزن — قد لا يكون محدّثاً' : '📡 Cached schedule shown', { duration: 3000 });
+          try {
+            setSchedules(JSON.parse(cached));
+            toast(isAr ? '📡 عرض الجدول المخزن محلياً' : '📡 Showing local cached schedule', { duration: 3000 });
+          } catch (e) {
+            setSchedules([]);
+          }
         } else {
-          toast.error(isAr ? 'فشل تحميل الجدول' : 'Failed to load schedule');
+          setSchedules([]);
         }
       } finally {
         setSchedulesLoading(false);
@@ -592,6 +605,13 @@ export default function PublicLandingWizard() {
     state: { prefilledData: { collegeId, majorId: selectedMajor?.id } }
   });
 
+  // Filtered majors by search query
+  const filteredMajors = useMemo(() => {
+    if (!searchQuery.trim()) return majors;
+    const q = searchQuery.toLowerCase().trim();
+    return majors.filter((m) => m.name.toLowerCase().includes(q));
+  }, [majors, searchQuery]);
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <>
@@ -616,7 +636,7 @@ export default function PublicLandingWizard() {
             style={{ fontFamily: 'var(--font-family, "Urbanist", "Cairo", sans-serif)' }}
           >
             {/* Centered container — max 480px (mobile-first) */}
-            <div className="w-full max-w-[480px] mx-auto flex flex-col min-h-screen relative">
+            <div className="w-full max-w-[480px] mx-auto flex flex-col min-h-screen relative shadow-2xl">
 
               {/* ── Top Header Bar ─────────────────────────────────────────────── */}
               <header className="sticky top-0 z-40 bg-[var(--bg-card)] border-b border-[var(--border-color)]">
@@ -679,28 +699,15 @@ export default function PublicLandingWizard() {
               <main className="flex-1 overflow-auto">
                 <AnimatePresence mode="wait">
 
-                  {/* Loading phase */}
-                  {phase === 'loading' && (
-                    <motion.div key="loading"
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="flex flex-col items-center justify-center py-32 gap-4"
-                    >
-                      <div className="w-8 h-8 rounded-full border-2 animate-spin"
-                        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-                      <p className="text-xs font-bold text-[var(--text-muted)]">
-                        {isAr ? 'جاري تحميل التخصصات...' : 'Loading majors...'}
-                      </p>
-                    </motion.div>
-                  )}
-
                   {/* Majors selection phase */}
                   {phase === 'majors' && (
                     <motion.div key="majors"
-                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
                     >
                       {/* Admin/Faculty entry strip */}
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between"
+                        style={{ background: 'var(--bg-card)' }}>
                         <p className="text-xs font-bold text-[var(--text-muted)]">
                           {isAr ? 'من أعضاء الهيئة التدريسية أو الإدارة؟' : 'Faculty or Admin member?'}
                         </p>
@@ -713,43 +720,73 @@ export default function PublicLandingWizard() {
                         </button>
                       </div>
 
-                      {/* Section title */}
-                      <div className="px-4 pt-4 pb-2">
-                        <h1 className="text-base font-black text-[var(--text-primary)]">
-                          {isAr ? 'التخصصات الدراسية' : 'Academic Majors'}
-                        </h1>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                          {isAr ? 'اختر تخصصك لعرض الجدول الدراسي الكامل' : 'Select your major to view the full schedule'}
-                        </p>
+                      {/* Section title & search bar */}
+                      <div className="px-4 pt-4 pb-3 space-y-2.5">
+                        <div>
+                          <h1 className="text-base font-black text-[var(--text-primary)]">
+                            {isAr ? 'التخصصات الدراسية' : 'Academic Majors'}
+                          </h1>
+                          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                            {isAr ? 'اختر تخصصك لعرض الجدول الدراسي المباشر' : 'Select your major to view the full schedule'}
+                          </p>
+                        </div>
+
+                        {/* Facebook-style Search bar */}
+                        <div className="relative flex items-center">
+                          <span className="absolute right-3 text-sm text-[var(--text-muted)] pointer-events-none">🔍</span>
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={isAr ? 'ابحث عن تخصصك الدراسي...' : 'Search your major...'}
+                            className="w-full text-xs font-bold rounded-xl pr-9 pl-4 py-2.5 transition-all focus:outline-none focus:ring-1"
+                            style={{
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--border-color)',
+                            }}
+                          />
+                          {searchQuery && (
+                            <button
+                              onClick={() => setSearchQuery('')}
+                              className="absolute left-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Major cards list */}
-                      {majors.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-6">
-                          <div className="text-4xl">🏛️</div>
+                      {filteredMajors.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-6">
+                          <div className="text-3xl">🔍</div>
                           <p className="text-sm font-black text-[var(--text-primary)]">
-                            {isAr ? 'لا توجد تخصصات مسجلة حالياً' : 'No majors registered yet'}
+                            {isAr ? 'لا توجد نتائج مطابقة' : 'No matching majors'}
                           </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {isAr ? 'سيتم إضافتها قريباً من الإدارة' : 'Admin will add them soon'}
-                          </p>
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="text-xs text-[var(--accent)] font-bold underline mt-1"
+                          >
+                            {isAr ? 'إعادة عرض جميع التخصصات' : 'Show all majors'}
+                          </button>
                         </div>
                       ) : (
                         <div className="divide-y divide-[var(--border-color)]">
-                          {majors.map((major, i) => {
+                          {filteredMajors.map((major, i) => {
                             const th = getMajorTheme(major.name);
                             return (
                               <motion.button
-                                key={major.id}
-                                initial={{ opacity: 0, x: isAr ? 20 : -20 }}
+                                key={major.id || i}
+                                initial={{ opacity: 0, x: isAr ? 15 : -15 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.04, duration: 0.2 }}
+                                transition={{ delay: i * 0.03, duration: 0.18 }}
                                 onClick={() => handleSelectMajor(major)}
-                                className="w-full flex items-center gap-3 px-4 py-3.5 text-right hover:bg-[var(--accent-dim)] active:scale-[0.99] transition-all"
+                                className="w-full flex items-center gap-3 px-4 py-3.5 text-right hover:bg-[var(--accent-dim)] active:scale-[0.99] transition-all cursor-pointer"
                                 aria-label={major.name}
                               >
                                 {/* Colored icon square */}
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-sm"
                                   style={{ background: th.iconBg }}>
                                   {th.icon}
                                 </div>
@@ -777,10 +814,10 @@ export default function PublicLandingWizard() {
                   {/* Schedule view phase */}
                   {phase === 'schedule' && selectedMajor && (
                     <motion.div key="schedule"
-                      initial={{ opacity: 0, x: isAr ? -30 : 30 }}
+                      initial={{ opacity: 0, x: isAr ? -20 : 20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: isAr ? 30 : -30 }}
-                      transition={{ duration: 0.25 }}
+                      exit={{ opacity: 0, x: isAr ? 20 : -20 }}
+                      transition={{ duration: 0.2 }}
                     >
                       <ScheduleView
                         schedules={schedules}
@@ -800,7 +837,7 @@ export default function PublicLandingWizard() {
 
               {/* ── Footer ───────────────────────────────────────────────────── */}
               {phase !== 'schedule' && (
-                <footer className="border-t border-[var(--border-color)] px-4 py-4 bg-[var(--bg-card)]">
+                <footer className="border-t border-[var(--border-color)] px-4 py-4 bg-[var(--bg-card)] mt-auto">
                   {/* Info links */}
                   <div className="flex items-center justify-center gap-4 mb-3">
                     <button onClick={() => setModalType('about')}
