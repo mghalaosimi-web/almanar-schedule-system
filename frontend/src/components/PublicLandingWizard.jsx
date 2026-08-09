@@ -498,9 +498,21 @@ export default function PublicLandingWizard() {
                         exit={{ opacity: 0, height: 0 }}
                         className="mb-4 overflow-hidden"
                       >
-                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2">
-                          <span>⚠️</span>
-                          <span>{error}</span>
+                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span>⚠️</span>
+                            <span>{error}</span>
+                          </div>
+                          {error.includes('غير مربوط') && (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/register')}
+                              className="w-full py-2 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <span>🚀</span>
+                              <span>{isAr ? 'اضغط هنا لإنشاء حساب طالب جديد وتوثيقه' : 'Click here to register & link account'}</span>
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     )}
