@@ -30,7 +30,7 @@ class SafeGoogleLogin extends React.Component {
 // ─── DevSplash ─────────────────────────────────────────────────────────────────
 function DevSplash({ onDone }) {
   useEffect(() => {
-    const t = setTimeout(onDone, 2200);
+    const t = setTimeout(onDone, 2400);
     return () => clearTimeout(t);
   }, [onDone]);
 
@@ -38,44 +38,59 @@ function DevSplash({ onDone }) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.05 }}
-      transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[var(--bg-primary)]"
-      style={{ fontFamily: "'Urbanist', sans-serif" }}
+      exit={{ opacity: 0, scale: 1.04 }}
+      transition={{ duration: 0.4 }}
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]"
+      style={{ fontFamily: 'var(--font-family, "Urbanist", "Cairo", sans-serif)' }}
     >
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full blur-[120px] opacity-20 bg-cyan-500/30" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full blur-[150px] opacity-10 bg-purple-500/30" />
+      {/* Background Glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-[140px] opacity-25 bg-[var(--accent)]" />
       </div>
+
       <motion.div
-        initial={{ scale: 0.6, opacity: 0 }}
+        initial={{ scale: 0.7, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 14, delay: 0.15 }}
-        className="relative z-10 flex flex-col items-center gap-5"
+        transition={{ type: 'spring', stiffness: 130, damping: 15, delay: 0.1 }}
+        className="relative z-10 flex flex-col items-center gap-4 text-center px-6"
       >
+        {/* Al-Manar Emblem Shield */}
         <div className="relative">
-          <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-cyan-500/30 to-purple-500/20 blur-xl animate-pulse" />
-          <div className="relative w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-black/60 border border-white/20 shadow-2xl flex items-center justify-center">
-            <span className="text-4xl font-black tracking-tighter select-none"
-              style={{ background: 'linear-gradient(135deg, #22d3ee, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              M
-            </span>
+          <div className="absolute -inset-4 rounded-3xl bg-[var(--accent-dim)] blur-xl animate-pulse" />
+          <div className="relative w-24 h-24 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl p-3 flex items-center justify-center">
+            <img src="/almanar-logo.png" alt="كلية المنار الجامعية" className="w-full h-full object-contain" />
           </div>
         </div>
-        <div className="text-center space-y-1">
-          <a href="https://github.com/mghalaosimi-web" target="_blank" rel="noopener noreferrer">
-            <h1 className="text-xl font-black tracking-widest text-white uppercase hover:text-cyan-400 transition-colors cursor-pointer">
-              M.GH.AL
-            </h1>
-          </a>
-          <p className="text-[11px] font-black tracking-[0.3em] uppercase text-cyan-400">Full-Stack Engineer</p>
+
+        {/* Welcome Headline */}
+        <div className="space-y-1 mt-2">
+          <h2 className="text-sm font-black tracking-widest text-[var(--accent)] uppercase">
+            كلية المنار الجامعية ترحب بكم
+          </h2>
+          <h1 className="text-xl font-black text-[var(--text-primary)] tracking-tight">
+            بوابة الطالب الأكاديمية
+          </h1>
         </div>
-        <p className="text-[11px] text-white/50 font-bold text-center max-w-xs leading-relaxed px-4" dir="rtl">
-          نظام جداول كلية المنار الجامعية — برمجة وتطوير م. محمد غالب العصيمي
-        </p>
-        <div className="w-40 h-0.5 bg-white/10 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full"
-            initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 1.8, ease: 'easeInOut' }} />
+
+        {/* Developer Badge Signature */}
+        <div className="pt-2 border-t border-[var(--border-color)] w-full max-w-xs space-y-1">
+          <p className="text-xs font-black tracking-wider uppercase text-[var(--text-secondary)]">
+            برمجة وتطوير M.GH.AL
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)] font-bold">
+            Full-Stack Engineer — م. محمد غالب العصيمي
+          </p>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-44 h-1 bg-[var(--border-color)] rounded-full overflow-hidden mt-2">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: 'var(--accent)' }}
+            initial={{ width: 0 }}
+            animate={{ width: '100%' }}
+            transition={{ duration: 2.0, ease: 'easeInOut' }}
+          />
         </div>
       </motion.div>
     </motion.div>
@@ -105,7 +120,7 @@ function InfoModal({ type, onClose }) {
         {type === 'about' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: '#3b82f620' }}>📱</div>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: 'var(--accent-dim)' }}>📱</div>
               <h3 className="text-base font-black text-[var(--text-primary)]">عن كلية المنار الجامعية</h3>
             </div>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
@@ -140,7 +155,7 @@ function InfoModal({ type, onClose }) {
         {type === 'terms' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: '#f59e0b20' }}>📋</div>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: 'var(--accent-dim)' }}>📋</div>
               <h3 className="text-base font-black text-[var(--text-primary)]">الشروط والأحكام</h3>
             </div>
             <div className="space-y-2 text-sm text-[var(--text-secondary)] leading-relaxed max-h-64 overflow-y-auto">
@@ -161,7 +176,7 @@ function InfoModal({ type, onClose }) {
         {type === 'instructions' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: '#8b5cf620' }}>📖</div>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: 'var(--accent-dim)' }}>📖</div>
               <h3 className="text-base font-black text-[var(--text-primary)]">تعليمات الاستخدام</h3>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -357,14 +372,14 @@ export default function PublicLandingWizard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             dir={isAr ? 'rtl' : 'ltr'}
-            className="min-h-screen flex flex-col items-center justify-start bg-[var(--bg-primary)]"
+            className="min-h-screen flex flex-col items-center justify-start bg-[var(--bg-primary)] text-[var(--text-primary)]"
             style={{ fontFamily: 'var(--font-family, "Urbanist", "Cairo", sans-serif)' }}
           >
             {/* Centered Mobile-First Gateway Container (max 460px) */}
             <div className="w-full max-w-[460px] mx-auto flex flex-col min-h-screen relative shadow-2xl border-x border-[var(--border-color)]">
 
-              {/* ── Top Header Bar ─────────────────────────────────────────────── */}
-              <header className="sticky top-0 z-40 bg-[var(--bg-card)] border-b border-[var(--border-color)]">
+              {/* ── Integrated Header Bar ─────────────────────────────────────────────── */}
+              <header className="sticky top-0 z-40 bg-[var(--bg-card)] border-b border-[var(--border-color)] backdrop-blur-md">
                 <div className="flex items-center gap-3 px-4 py-3">
                   {/* Logo (10x tap dev trigger) */}
                   <button onClick={handleLogoTap} className="shrink-0 focus:outline-none select-none" aria-label="logo">
@@ -376,7 +391,7 @@ export default function PublicLandingWizard() {
                   </button>
 
                   {/* College Title */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 text-right">
                     <p className="text-sm font-black text-[var(--text-primary)] truncate">{collegeName}</p>
                     <p className="text-[10px] text-[var(--text-muted)] font-bold truncate">
                       {isAr ? 'البوابة الأكاديمية الذكية' : 'Smart Academic Gateway'}
@@ -430,7 +445,7 @@ export default function PublicLandingWizard() {
                   {/* Top glowing accent bar */}
                   <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--accent)] via-cyan-500 to-[var(--accent-dim)]" />
 
-                  {/* Institution Shield / Brand */}
+                  {/* Institution Shield / Brand Header */}
                   <div className="flex flex-col items-center text-center mb-5 pt-2">
                     <div onClick={handleLogoTap} className="w-16 h-16 rounded-2xl bg-[var(--accent-dim)] border border-[var(--accent-glow)] p-2 flex items-center justify-center mb-3 shadow-lg cursor-pointer">
                       <Logo size="md" customLogoUrl="/almanar-logo.png" />
@@ -619,17 +634,17 @@ export default function PublicLandingWizard() {
                 {/* Info links */}
                 <div className="flex items-center justify-center gap-4 mb-3">
                   <button onClick={() => setModalType('about')}
-                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1">
+                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 cursor-pointer">
                     📱 {isAr ? 'عن الكلية' : 'About'}
                   </button>
                   <span className="text-[var(--border-color)]">•</span>
                   <button onClick={() => setModalType('terms')}
-                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1">
+                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 cursor-pointer">
                     📋 {isAr ? 'الشروط' : 'Terms'}
                   </button>
                   <span className="text-[var(--border-color)]">•</span>
                   <button onClick={() => setModalType('instructions')}
-                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1">
+                    className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 cursor-pointer">
                     📖 {isAr ? 'تعليمات' : 'Guide'}
                   </button>
                 </div>
@@ -641,7 +656,7 @@ export default function PublicLandingWizard() {
                     <a href="https://github.com/mghalaosimi-web" target="_blank" rel="noopener noreferrer"
                       className="font-black hover:text-[var(--accent)] transition-colors"
                       style={{ color: 'var(--text-secondary)' }}>
-                      M.GH.AL
+                      M.GH.AL — م. محمد غالب العصيمي
                     </a>
                   </p>
                   {/* Social mini icons */}
