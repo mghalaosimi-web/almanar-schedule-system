@@ -107,20 +107,19 @@ export default function Register() {
   const [timer, setTimer] = useState(0);
   const [otpLoading, setOtpLoading] = useState(false);
 
-  const selectedCollegeId = localStorage.getItem('selectedCollegeId');
-  const selectedCollegeName = localStorage.getItem('selectedCollegeName');
-  const selectedUniversityName = localStorage.getItem('selectedUniversityName');
+  const selectedCollegeId = localStorage.getItem('selectedCollegeId') || '3';
+  const selectedCollegeName = localStorage.getItem('selectedCollegeName') || 'كلية المنار الجامعية';
+  const selectedUniversityName = localStorage.getItem('selectedUniversityName') || 'كلية المنار الجامعية';
   const selectedUniversityLogoRaw = localStorage.getItem('selectedUniversityLogo');
   const selectedUniversitySlug = localStorage.getItem('selectedUniversitySlug') || 'almanar-college';
-  const selectedUniversityLogo = selectedUniversitySlug === 'hajjah-university' ? '/hajjah-logo-new.png' :
-                                 selectedUniversitySlug === 'almanar-college' ? '/almanar-logo.png' : selectedUniversityLogoRaw;
+  const selectedUniversityLogo = '/almanar-logo.png';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Load static data locally
-  const uniConfig = staticData[selectedUniversitySlug] || staticData['almanar-college'];
-  const activeCollege = uniConfig.colleges?.find(c => c.id === parseInt(selectedCollegeId)) || uniConfig.colleges?.[0];
+  const uniConfig = staticData['almanar-college'] || staticData[selectedUniversitySlug];
+  const activeCollege = uniConfig.colleges?.[0];
 
   const departmentsList = activeCollege?.departments || [];
   const activeDept = departmentsList.find(d => d.id === parseInt(selectedDeptId));
@@ -505,25 +504,16 @@ export default function Register() {
                   {step === 2 && (isAr ? 'البرنامج الأكاديمي' : 'Academic Program')}
                   {step === 3 && (isAr ? 'تأكيد الحساب والأمان' : 'Account Security & Auth')}
                 </h1>
-                {isPrefilledState && selectedCollegeName && (
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-white/80">
-                      🏫 {selectedCollegeName}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <span className="px-3.5 py-1.5 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-xs font-black" style={{ color: 'var(--accent)' }}>
+                    🏫 {selectedCollegeName || 'كلية المنار الجامعية'}
+                  </span>
+                  {localStorage.getItem('preselectedMajorName') && (
+                    <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-white/90">
+                      📖 {localStorage.getItem('preselectedMajorName')}
                     </span>
-                    {localStorage.getItem('preselectedMajorName') && (
-                      <span className="px-3 py-1.5 rounded-full bg-[var(--accent-dim)] border border-[var(--accent)]/20 text-xs font-bold text-[var(--accent)]">
-                        📖 {localStorage.getItem('preselectedMajorName')}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleClearPrefilled}
-                      className="text-[10px] font-bold text-red-400 hover:text-red-300 underline cursor-pointer ml-1"
-                    >
-                      [{isAr ? 'تغيير' : 'Change'}]
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Error Alert Panel */}
