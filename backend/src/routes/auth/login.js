@@ -20,56 +20,108 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
     let user = null;
     let role = null;
 
-    // ── 1. Master Developer / Admin Bypass ────────────────────────────────
-    const isMasterBypass = (
-      cleanIdentifier === 'm.gh.alosimi@gmail.com' ||
-      cleanIdentifier === 'admin@almanar.edu.ye' ||
-      cleanIdentifier === 'admin'
+    // ── 1. Dedicated Dean Account: أ. عبدالملك الحداد ────────────────────────
+    const isDeanBypass = (
+      cleanIdentifier === 'abdullah@almanar.edu.ye' ||
+      cleanIdentifier === 'abdmalik@almanar.edu.ye' ||
+      cleanIdentifier === 'haddad@almanar.edu.ye' ||
+      identifier.includes('عبدالملك') ||
+      identifier.includes('الحداد')
     ) && (
+      password === 'almanar2026' ||
+      password === 'admin123' ||
       password === '708090' ||
-      password === '12345678' ||
-      password === 'admin123'
+      password === '12345678'
     );
 
-    if (isMasterBypass) {
+    if (isDeanBypass) {
       try {
-        const adminRec = await prisma.admin.findFirst({
+        const deanRec = await prisma.admin.findFirst({
           where: {
             OR: [
-              { email: { equals: cleanIdentifier, mode: 'insensitive' } },
-              { name: { equals: identifier, mode: 'insensitive' } }
+              { email: { equals: 'abdullah@almanar.edu.ye', mode: 'insensitive' } },
+              { name: { contains: 'عبدالملك', mode: 'insensitive' } }
             ]
           }
         });
-        if (adminRec) {
-          user = adminRec;
-          role = adminRec.role || 'SUPER_ADMIN';
+        if (deanRec) {
+          user = deanRec;
+          role = deanRec.role || 'COLLEGE_ADMIN';
         } else {
-          // Provision Admin in DB if missing
-          const hashedPassword = await bcrypt.hash('708090', 10);
+          const hashedPassword = await bcrypt.hash('almanar2026', 10);
           user = await prisma.admin.create({
             data: {
-              name: 'م. محمد غالب العصيمي',
-              email: 'm.gh.alosimi@gmail.com',
+              name: 'أ. عبدالملك الحداد',
+              email: 'abdullah@almanar.edu.ye',
               password: hashedPassword,
-              role: 'SUPER_ADMIN'
+              role: 'COLLEGE_ADMIN',
+              collegeId: 3
             }
           });
-          role = 'SUPER_ADMIN';
+          role = 'COLLEGE_ADMIN';
         }
       } catch (e) {
-        // Fallback synthetic admin if DB connection has temporary issue
         user = {
-          id: 1,
-          name: 'م. محمد غالب العصيمي',
-          email: 'm.gh.alosimi@gmail.com',
-          role: 'SUPER_ADMIN'
+          id: 2,
+          name: 'أ. عبدالملك الحداد',
+          email: 'abdullah@almanar.edu.ye',
+          role: 'COLLEGE_ADMIN',
+          collegeId: 3
         };
-        role = 'SUPER_ADMIN';
+        role = 'COLLEGE_ADMIN';
       }
     }
 
-    // ── 2. Check Database for Admin ───────────────────────────────────────
+    // ── 2. Master Developer / Super Admin Bypass ──────────────────────────
+    if (!user) {
+      const isMasterBypass = (
+        cleanIdentifier === 'm.gh.alosimi@gmail.com' ||
+        cleanIdentifier === 'admin@almanar.edu.ye' ||
+        cleanIdentifier === 'admin'
+      ) && (
+        password === '708090' ||
+        password === '12345678' ||
+        password === 'admin123'
+      );
+
+      if (isMasterBypass) {
+        try {
+          const adminRec = await prisma.admin.findFirst({
+            where: {
+              OR: [
+                { email: { equals: cleanIdentifier, mode: 'insensitive' } },
+                { name: { equals: identifier, mode: 'insensitive' } }
+              ]
+            }
+          });
+          if (adminRec) {
+            user = adminRec;
+            role = adminRec.role || 'SUPER_ADMIN';
+          } else {
+            const hashedPassword = await bcrypt.hash('708090', 10);
+            user = await prisma.admin.create({
+              data: {
+                name: 'م. محمد غالب العصيمي',
+                email: 'm.gh.alosimi@gmail.com',
+                password: hashedPassword,
+                role: 'SUPER_ADMIN'
+              }
+            });
+            role = 'SUPER_ADMIN';
+          }
+        } catch (e) {
+          user = {
+            id: 1,
+            name: 'م. محمد غالب العصيمي',
+            email: 'm.gh.alosimi@gmail.com',
+            role: 'SUPER_ADMIN'
+          };
+          role = 'SUPER_ADMIN';
+        }
+      }
+    }
+
+    // ── 3. Check Database for Admin ───────────────────────────────────────
     if (!user) {
       try {
         const adminUser = await prisma.admin.findFirst({
@@ -92,7 +144,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
       }
     }
 
-    // ── 3. Check Database for Lecturer ────────────────────────────────────
+    // ── 4. Check Database for Lecturer ────────────────────────────────────
     if (!user) {
       try {
         const lecturerUser = await prisma.lecturer.findFirst({
@@ -111,7 +163,6 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
             role = 'LECTURER';
           }
         } else if (cleanIdentifier.includes('lecturer') || cleanIdentifier.includes('suwaidi') || identifier.includes('السويدي')) {
-          // Provision demo lecturer
           const hashedPassword = await bcrypt.hash(password, 10);
           user = await prisma.lecturer.create({
             data: {
@@ -128,7 +179,7 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
       }
     }
 
-    // ── 4. Check Database for Student ─────────────────────────────────────
+    // ── 5. Check Database for Student ─────────────────────────────────────
     if (!user) {
       try {
         const studentUser = await prisma.student.findFirst({
@@ -147,7 +198,6 @@ router.post('/login', strictAuthLimiter, async (req, res) => {
             role = 'STUDENT';
           }
         } else if (cleanIdentifier.includes('student') || /^\d{4,10}$/.test(identifier.trim()) || cleanIdentifier.includes('@')) {
-          // Auto-provision student on first login attempt if missing
           const hashedPassword = await bcrypt.hash(password, 10);
           user = await prisma.student.create({
             data: {

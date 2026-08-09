@@ -718,8 +718,9 @@ export default function AdminDashboard({ tab }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700/80 text-[10px] font-black uppercase text-slate-300">
-              🔑 {user?.name} ({user?.role})
+            <span className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-black text-cyan-400 flex items-center gap-2 shadow-sm">
+              <span>🏛️</span>
+              <span>{user?.name || 'أ. عبدالملك الحداد'} — {user?.role === 'COLLEGE_ADMIN' ? (isAr ? 'مدير الكلية' : 'College Dean') : (isAr ? 'المطور الرئيسي' : 'Chief Architect')}</span>
             </span>
           </div>
         </header>
