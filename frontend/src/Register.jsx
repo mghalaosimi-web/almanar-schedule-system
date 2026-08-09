@@ -47,6 +47,16 @@ const wizardVariants = {
   })
 };
 
+// ── 6 Official Al-Manar University College Majors ────────────────────────────
+const ALMANAR_SIX_MAJORS = [
+  { id: 1, deptId: 1, name: 'تقنية المعلومات IT', dept: 'قسم الهندسة وتكنولوجيا المعلومات', icon: '💻', color: '#14b8a6' },
+  { id: 2, deptId: 1, name: 'أمن سيبراني', dept: 'قسم الهندسة وتكنولوجيا المعلومات', icon: '🛡️', color: '#3b82f6' },
+  { id: 5, deptId: 2, name: 'إدارة أعمال', dept: 'قسم العلوم الإدارية والمالية', icon: '📈', color: '#8b5cf6' },
+  { id: 6, deptId: 2, name: 'محاسبة', dept: 'قسم العلوم الإدارية والمالية', icon: '📊', color: '#0ea5e9' },
+  { id: 8, deptId: 3, name: 'شريعة وقانون', dept: 'قسم الشريعة والعلوم الصحية', icon: '⚖️', color: '#ef4444' },
+  { id: 9, deptId: 3, name: 'إدارة صحية', dept: 'قسم الشريعة والعلوم الصحية', icon: '🏥', color: '#10b981' }
+];
+
 const Field = ({ label, children }) => (
   <div className="space-y-1.5 text-right">
     <label className="block text-[11px] font-black tracking-wider uppercase text-[var(--text-secondary)]">
@@ -78,56 +88,21 @@ export default function Register() {
   const [selectedMajorId, setSelectedMajorId] = useState(localStorage.getItem('preselectedMajorId') || '');
   const [selectedLevelId, setSelectedLevelId] = useState('');
 
-  const [isPrefilledState, setIsPrefilledState] = useState(
-    !!(location.state?.prefilledData || (localStorage.getItem('selectedCollegeId') && localStorage.getItem('preselectedMajorId')))
-  );
+  const [isPrefilledState, setIsPrefilledState] = useState(false);
 
   // Google Login Auth State
   const [googleIdToken, setGoogleIdToken] = useState(location.state?.googleIdToken || '');
   const [googleEmail, setGoogleEmail] = useState(location.state?.googleEmail || '');
   const [isGoogleLinked, setIsGoogleLinked] = useState(!!location.state?.googleIdToken);
-  const [usePasswordAuth, setUsePasswordAuth] = useState(false);
-
-  // Captcha & OTP State
-  const [captchaQuestion, setCaptchaQuestion] = useState('');
-  const [captchaChallengeId, setCaptchaChallengeId] = useState('');
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const [otpLoading, setOtpLoading] = useState(false);
 
   const selectedCollegeId = localStorage.getItem('selectedCollegeId') || '3';
   const selectedCollegeName = localStorage.getItem('selectedCollegeName') || 'كلية المنار الجامعية';
   const selectedUniversityName = localStorage.getItem('selectedUniversityName') || 'كلية المنار الجامعية';
-  const selectedUniversityLogo = '/almanar-logo.png';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load static data locally
-  const uniConfig = staticData['almanar-college'];
-  const activeCollege = uniConfig.colleges?.[0];
-
-  const departmentsList = activeCollege?.departments || [];
-  const activeDept = departmentsList.find(d => d.id === parseInt(selectedDeptId));
-  const majorsList = activeDept?.majors || [];
   const levelsList = staticLevels;
-
-  const fetchCaptcha = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/auth/captcha`);
-      if (res.data?.success) {
-        setCaptchaQuestion(res.data.question);
-        setCaptchaChallengeId(res.data.challengeId);
-        setCaptchaAnswer('');
-      }
-    } catch { /* silent */ }
-  };
-
-  useEffect(() => {
-    fetchCaptcha();
-  }, []);
 
   // Session Restoration Redirect
   useEffect(() => {
@@ -156,34 +131,18 @@ export default function Register() {
       if (prefilled.collegeId) {
         localStorage.setItem('selectedCollegeId', prefilled.collegeId.toString());
       }
-      setIsPrefilledState(true);
     }
   }, [location.state]);
 
   // Automatically resolve department from selectedMajorId
   useEffect(() => {
-    if (selectedMajorId && activeCollege?.departments) {
-      const dept = activeCollege.departments.find(d => 
-        d.majors?.some(m => m.id === parseInt(selectedMajorId))
-      );
-      if (dept) {
-        setSelectedDeptId(dept.id.toString());
+    if (selectedMajorId) {
+      const match = ALMANAR_SIX_MAJORS.find(m => m.id.toString() === selectedMajorId);
+      if (match) {
+        setSelectedDeptId(match.deptId.toString());
       }
     }
-  }, [selectedMajorId, activeCollege]);
-
-  // Timer logic for OTP
-  useEffect(() => {
-    let interval = null;
-    if (timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0) {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [timer]);
+  }, [selectedMajorId]);
 
   const parseJwt = (token) => {
     try {
@@ -238,15 +197,10 @@ export default function Register() {
         toast.error(isAr ? 'يرجى اختيار المستوى الدراسي' : 'Please select your academic level');
         return;
       }
-      if (isPrefilledState) {
-        setDirection(1);
-        setStep(3);
-        return;
-      }
     }
     if (step === 2) {
-      if ((!isPrefilledState && !selectedDeptId) || !selectedMajorId) {
-        toast.error(isAr ? 'يرجى إكمال البيانات الأكاديمية' : 'Please complete academic details');
+      if (!selectedMajorId) {
+        toast.error(isAr ? 'يرجى اختيار التخصص الدراسي' : 'Please select your major');
         return;
       }
     }
@@ -255,11 +209,6 @@ export default function Register() {
   };
 
   const prevStep = () => {
-    if (step === 3 && isPrefilledState) {
-      setDirection(-1);
-      setStep(1);
-      return;
-    }
     setDirection(-1);
     setStep((prev) => prev - 1);
   };
@@ -267,7 +216,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     
-    if (!isGoogleLinked && !usePasswordAuth) {
+    if (!isGoogleLinked) {
       toast.error(isAr ? 'الرجاء ربط حساب Google الخاص بك للمتابعة' : 'Please link your Google account to proceed');
       return;
     }
@@ -277,15 +226,14 @@ export default function Register() {
     try {
       const payload = {
         fullName,
-        email: isGoogleLinked ? googleEmail : email,
-        password: usePasswordAuth ? password : undefined,
+        email: googleEmail,
         phone: `+967${phoneSuffix}`,
         idNumber,
         idPhotoUrl: idPhotoUrl || undefined,
         majorId: selectedMajorId,
         levelId: selectedLevelId,
         collegeId: selectedCollegeId,
-        googleIdToken: isGoogleLinked ? googleIdToken : undefined,
+        googleIdToken,
       };
 
       const res = await axios.post(`${API_URL}/api/auth/register`, payload);
@@ -293,12 +241,13 @@ export default function Register() {
         const { token, user } = res.data;
         localStorage.setItem('manar_token', token);
         localStorage.setItem('manar_user', JSON.stringify(user));
+        const matchedMajor = ALMANAR_SIX_MAJORS.find(m => m.id.toString() === selectedMajorId);
         localStorage.setItem('student_profile', JSON.stringify({
           name: user.name,
           email: user.email,
           phone: `+967${phoneSuffix}`,
           idPhotoUrl: idPhotoUrl || '',
-          department: departmentsList.find(d => d.id === parseInt(selectedDeptId))?.name || '',
+          department: matchedMajor?.dept || '',
           level: levelsList.find(l => l.id === parseInt(selectedLevelId))?.name || '',
           groupId: null,
         }));
@@ -309,7 +258,6 @@ export default function Register() {
       const msg = getFriendlyErrorMessage(err, isAr ? 'فشل التسجيل. حاول مجدداً.' : 'Registration failed. Please try again.', isAr);
       setError(msg);
       toast.error(msg);
-      fetchCaptcha();
     } finally {
       setLoading(false);
     }
@@ -388,7 +336,7 @@ export default function Register() {
               </p>
               <h1 className="text-lg font-black text-[var(--text-primary)]">
                 {step === 1 && (isAr ? 'المعلومات الشخصية' : 'Personal Information')}
-                {step === 2 && (isAr ? 'البرنامج الأكاديمي' : 'Academic Program')}
+                {step === 2 && (isAr ? 'اختر تخصصك الأكاديمي' : 'Choose Academic Major')}
                 {step === 3 && (isAr ? 'تأكيد الحساب والأمان' : 'Account Security & Auth')}
               </h1>
 
@@ -397,9 +345,9 @@ export default function Register() {
                 <span className="px-3 py-1 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-xs font-black" style={{ color: 'var(--accent)' }}>
                   🏫 {selectedCollegeName}
                 </span>
-                {localStorage.getItem('preselectedMajorName') && (
+                {selectedMajorId && (
                   <span className="px-3 py-1 rounded-full bg-[var(--bg-primary)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-primary)]">
-                    📖 {localStorage.getItem('preselectedMajorName')}
+                    📖 {ALMANAR_SIX_MAJORS.find(m => m.id.toString() === selectedMajorId)?.name}
                   </span>
                 )}
               </div>
@@ -495,43 +443,49 @@ export default function Register() {
                     </div>
                   )}
 
-                  {/* ── STEP 2: Academic Info ───────────────────────── */}
+                  {/* ── STEP 2: CHOOSE YOUR MAJOR (الـ 6 تخصصات) ──────────── */}
                   {step === 2 && (
-                    <div className="space-y-3.5">
-                      <Field label={isAr ? 'القسم الأكاديمي' : 'Department'}>
-                        <div className="relative flex items-center">
-                          <select 
-                            required 
-                            value={selectedDeptId}
-                            onChange={e => setSelectedDeptId(e.target.value)}
-                            className={selectClass}
-                          >
-                            <option value="">{isAr ? '— اختر القسم —' : '— Select Department —'}</option>
-                            {departmentsList.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                          </select>
-                          <div className={`absolute ${isAr ? 'left-3' : 'right-3'} pointer-events-none text-xs text-[var(--text-muted)]`}>
-                            ▼
-                          </div>
-                        </div>
-                      </Field>
-
-                      <Field label={isAr ? 'التخصص الدراسي' : 'Specialization'}>
-                        <div className="relative flex items-center">
-                          <select 
-                            required 
-                            disabled={!selectedDeptId} 
-                            value={selectedMajorId}
-                            onChange={e => setSelectedMajorId(e.target.value)}
-                            className={`${selectClass} disabled:opacity-40`}
-                          >
-                            <option value="">{isAr ? '— اختر التخصص —' : '— Select Major —'}</option>
-                            {majorsList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
-                          <div className={`absolute ${isAr ? 'left-3' : 'right-3'} pointer-events-none text-xs text-[var(--text-muted)]`}>
-                            ▼
-                          </div>
-                        </div>
-                      </Field>
+                    <div className="space-y-3">
+                      <label className="block text-[11px] font-black tracking-wider uppercase text-[var(--text-secondary)] text-right mb-2">
+                        {isAr ? 'اختر تخصصك الأكاديمي' : 'Choose Your Academic Major'}
+                      </label>
+                      
+                      <div className="grid grid-cols-1 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+                        {ALMANAR_SIX_MAJORS.map((m) => {
+                          const isSelected = selectedMajorId === m.id.toString();
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMajorId(m.id.toString());
+                                setSelectedDeptId(m.deptId.toString());
+                                localStorage.setItem('preselectedMajorId', m.id.toString());
+                                localStorage.setItem('preselectedMajorName', m.name);
+                              }}
+                              className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-right transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-[var(--accent)] bg-[var(--accent-dim)] shadow-sm'
+                                  : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:bg-[var(--bg-card)]'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                                style={{ background: `${m.color}20` }}>
+                                {m.icon}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-[var(--text-primary)] truncate">{m.name}</p>
+                                <p className="text-[10px] text-[var(--text-muted)] font-bold truncate">{m.dept}</p>
+                              </div>
+                              {isSelected && (
+                                <span className="w-6 h-6 rounded-full bg-[var(--accent)] text-black flex items-center justify-center text-xs font-black shrink-0">
+                                  ✓
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -628,7 +582,7 @@ export default function Register() {
               <button 
                 type="button" 
                 onClick={() => navigate('/')}
-                className="font-black underline transition-colors"
+                className="font-black underline transition-colors cursor-pointer"
                 style={{ color: 'var(--accent)' }}
               >
                 {isAr ? 'تسجيل الدخول' : 'Sign in'}

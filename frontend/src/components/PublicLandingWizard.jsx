@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -26,16 +26,6 @@ class SafeGoogleLogin extends React.Component {
     return this.props.children;
   }
 }
-
-// ─── 6 Official Al-Manar University College Majors ────────────────────────────
-const ALMANAR_SIX_MAJORS = [
-  { id: 1, name: 'تقنية المعلومات IT', dept: 'قسم الهندسة وتكنولوجيا المعلومات', icon: '💻', color: '#14b8a6', iconBg: '#14b8a620' },
-  { id: 2, name: 'أمن سيبراني', dept: 'قسم الهندسة وتكنولوجيا المعلومات', icon: '🛡️', color: '#3b82f6', iconBg: '#3b82f620' },
-  { id: 3, name: 'إدارة أعمال', dept: 'قسم العلوم الإدارية والمالية', icon: '📈', color: '#8b5cf6', iconBg: '#8b5cf620' },
-  { id: 4, name: 'محاسبة', dept: 'قسم العلوم الإدارية والمالية', icon: '📊', color: '#0ea5e9', iconBg: '#0ea5e920' },
-  { id: 5, name: 'شريعة وقانون', dept: 'قسم الشريعة والعلوم الصحية', icon: '⚖️', color: '#ef4444', iconBg: '#ef444420' },
-  { id: 6, name: 'إدارة صحية', dept: 'قسم الشريعة والعلوم الصحية', icon: '🏥', color: '#10b981', iconBg: '#10b98120' }
-];
 
 // ─── DevSplash ─────────────────────────────────────────────────────────────────
 function DevSplash({ onDone }) {
@@ -123,7 +113,7 @@ function InfoModal({ type, onClose }) {
             </p>
             <div className="space-y-2">
               {[
-                { icon: '⚡', text: 'اختيار التخصص والدخول المباشر للنظام' },
+                { icon: '⚡', text: 'تسجيل دخول موحد وسريع للطلاب والكادر' },
                 { icon: '📅', text: 'جداول دراسية وحضور لحظي' },
                 { icon: '🔔', text: 'تنبيهات فورية عند تعديل أي قاعة' },
                 { icon: '📲', text: 'تسجيل الحضور التلقائي عبر الـ QR' },
@@ -176,10 +166,10 @@ function InfoModal({ type, onClose }) {
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {[
-                { step: '١', icon: '📚', title: 'اختر تخصصك', desc: 'انقر على بطاقة تخصصك لتحديده والدخول المباشر للبوابة.' },
-                { step: '٢', icon: '🔑', title: 'تسجيل الدخول', desc: 'أدخل بريدك الجامعي/الرقم الجامعي أو سجل بنقرة واحدة عبر Google.' },
-                { step: '٣', icon: '👨‍🏫', title: 'دخول الكادر', desc: 'أعضاء هيئة التدريس والإدارة يمكنهم تسجيل الدخول مباشرة من تبويب الكادر.' },
-                { step: '٤', icon: '📲', title: 'تثبيت التطبيق', desc: 'استخدم زر "تحميل التطبيق" لتثبيته كـ PWA أو APK على هاتفك.' },
+                { step: '١', icon: '🔑', title: 'تسجيل الدخول', desc: 'أدخل بريدك الجامعي/الرقم الجامعي وكلمة المرور للدخول المباشر للنظام.' },
+                { step: '٢', icon: '🌐', title: 'دخول Google', desc: 'يمكن للطلاب تسجيل الدخول مباشرة بحساب Google الموثق بنقرة واحدة.' },
+                { step: '٣', icon: '👨‍🏫', title: 'دخول الكادر', desc: 'أعضاء هيئة التدريس يمكنهم التبديل لتبويب الكادر لتسجيل الدخول.' },
+                { step: '٤', icon: '📲', title: 'تثبيت التطبيق', desc: 'استخدم زر "تحميل التطبيق" لتثبيته كـ PWA أو APK.' },
               ].map((s) => (
                 <div key={s.step} className="flex gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-primary)' }}>
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
@@ -198,26 +188,19 @@ function InfoModal({ type, onClose }) {
   );
 }
 
-// ─── Main Dedicated Al-Manar University College Portal ─────────────────────────
+// ─── Main Al-Manar University College Dedicated Portal ─────────────────────────
 export default function PublicLandingWizard() {
   const { i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const navigate = useNavigate();
 
-  // Splash overlay state
+  // Splash
   const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('splash_shown'));
 
-  // College Name
+  // College details
   const collegeName = 'كلية المنار الجامعية';
 
-  // View Mode: 'MAJORS_GRID' | 'LOGIN_PORTAL'
-  const [viewMode, setViewMode] = useState('MAJORS_GRID');
-  
-  // Selected Major
-  const [selectedMajor, setSelectedMajor] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Role Tab in Login Portal: 'STUDENT' | 'FACULTY'
+  // Login role tab: 'STUDENT' | 'FACULTY'
   const [activeRoleTab, setActiveRoleTab] = useState('STUDENT');
 
   // Form states
@@ -260,30 +243,14 @@ export default function PublicLandingWizard() {
     }
   }, [navigate]);
 
-  // PWA listener
+  // Listen for PWA prompt
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Filtered Majors
-  const filteredMajors = useMemo(() => {
-    if (!searchQuery.trim()) return ALMANAR_SIX_MAJORS;
-    const q = searchQuery.toLowerCase().trim();
-    return ALMANAR_SIX_MAJORS.filter(m => m.name.toLowerCase().includes(q) || m.dept.toLowerCase().includes(q));
-  }, [searchQuery]);
-
-  const handleSelectMajor = (major) => {
-    setSelectedMajor(major);
-    localStorage.setItem('preselectedMajorId', major.id.toString());
-    localStorage.setItem('preselectedMajorName', major.name);
-    localStorage.setItem('selectedCollegeId', '3');
-    localStorage.setItem('selectedCollegeName', collegeName);
-    setViewMode('LOGIN_PORTAL');
-  };
-
-  // Login Handler
+  // Login handler
   const handleDirectLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -324,7 +291,7 @@ export default function PublicLandingWizard() {
     }
   };
 
-  // Google SSO Handler
+  // Google OAuth Success Handler
   const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
     setError(null);
@@ -393,8 +360,8 @@ export default function PublicLandingWizard() {
             className="min-h-screen flex flex-col items-center justify-start bg-[var(--bg-primary)]"
             style={{ fontFamily: 'var(--font-family, "Urbanist", "Cairo", sans-serif)' }}
           >
-            {/* Centered Mobile-First Gateway Container (max 480px) */}
-            <div className="w-full max-w-[480px] mx-auto flex flex-col min-h-screen relative shadow-2xl border-x border-[var(--border-color)]">
+            {/* Centered Mobile-First Gateway Container (max 460px) */}
+            <div className="w-full max-w-[460px] mx-auto flex flex-col min-h-screen relative shadow-2xl border-x border-[var(--border-color)]">
 
               {/* ── Top Header Bar ─────────────────────────────────────────────── */}
               <header className="sticky top-0 z-40 bg-[var(--bg-card)] border-b border-[var(--border-color)]">
@@ -412,7 +379,7 @@ export default function PublicLandingWizard() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-black text-[var(--text-primary)] truncate">{collegeName}</p>
                     <p className="text-[10px] text-[var(--text-muted)] font-bold truncate">
-                      {isAr ? 'نظام الجداول والخدمات الأكاديمية' : 'Academic Services & Schedules'}
+                      {isAr ? 'البوابة الأكاديمية الذكية' : 'Smart Academic Gateway'}
                     </p>
                   </div>
 
@@ -452,345 +419,199 @@ export default function PublicLandingWizard() {
                 </div>
               </header>
 
-              {/* ── Main Content Area ──────────────────────────────────────────── */}
-              <main className="flex-1 overflow-auto">
-                <AnimatePresence mode="wait">
+              {/* ── Main Dedicated Login Gateway ───────────────────────────────── */}
+              <main className="flex-1 flex flex-col justify-center px-4 py-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+                >
+                  {/* Top glowing accent bar */}
+                  <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--accent)] via-cyan-500 to-[var(--accent-dim)]" />
 
-                  {/* ── VIEW 1: MAJORS GRID ("اختر تخصصك الدراسي") ───────────────── */}
-                  {viewMode === 'MAJORS_GRID' && (
-                    <motion.div
-                      key="majors"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex flex-col min-h-full"
+                  {/* Institution Shield / Brand */}
+                  <div className="flex flex-col items-center text-center mb-5 pt-2">
+                    <div onClick={handleLogoTap} className="w-16 h-16 rounded-2xl bg-[var(--accent-dim)] border border-[var(--accent-glow)] p-2 flex items-center justify-center mb-3 shadow-lg cursor-pointer">
+                      <Logo size="md" customLogoUrl="/almanar-logo.png" />
+                    </div>
+                    <h1 className="text-lg font-black text-[var(--text-primary)]">
+                      {collegeName}
+                    </h1>
+                    <p className="text-xs text-[var(--text-muted)] font-bold mt-0.5">
+                      {isAr ? 'تسجيل الدخول المباشر إلى النظام' : 'Direct System Access Portal'}
+                    </p>
+                  </div>
+
+                  {/* Role Selector Tabs (Student vs Faculty) */}
+                  <div className="flex p-1 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] mb-5 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => { setActiveRoleTab('STUDENT'); setError(null); }}
+                      className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                        activeRoleTab === 'STUDENT'
+                          ? 'shadow-md font-black'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      }`}
+                      style={activeRoleTab === 'STUDENT' ? { background: 'var(--accent)', color: '#000' } : {}}
                     >
-                      {/* Faculty / Admin Entry Strip */}
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between"
-                        style={{ background: 'var(--bg-card)' }}>
-                        <p className="text-xs font-bold text-[var(--text-muted)]">
-                          {isAr ? 'من الكادر التدريسي أو الإداري؟' : 'Faculty or Staff member?'}
-                        </p>
-                        <button
-                          onClick={() => { setActiveRoleTab('FACULTY'); setViewMode('LOGIN_PORTAL'); }}
-                          className="text-xs font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer"
-                          style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
-                        >
-                          {isAr ? 'دخول الكادر ←' : 'Faculty Access →'}
-                        </button>
-                      </div>
+                      <span>🎓</span>
+                      <span>{isAr ? 'بوابة الطالب' : 'Student Portal'}</span>
+                    </button>
 
-                      {/* Title & Search Bar */}
-                      <div className="px-4 pt-4 pb-3 space-y-3">
-                        <div>
-                          <h1 className="text-base font-black text-[var(--text-primary)]">
-                            {isAr ? 'اختر تخصصك الدراسي' : 'Choose Your Academic Major'}
-                          </h1>
-                          <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            {isAr ? 'انقر على تخصصك للدخول المباشر للنظام والبوابة الأكاديمية' : 'Select your major to enter the direct academic portal'}
-                          </p>
-                        </div>
-
-                        {/* Search input */}
-                        <div className="relative flex items-center">
-                          <span className="absolute right-3 text-sm text-[var(--text-muted)] pointer-events-none">🔍</span>
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={isAr ? 'ابحث عن تخصصك الدراسي...' : 'Search your major...'}
-                            className="w-full text-xs font-bold rounded-xl pr-9 pl-4 py-2.5 transition-all focus:outline-none focus:ring-1"
-                            style={{
-                              background: 'var(--bg-card)',
-                              color: 'var(--text-primary)',
-                              border: '1px solid var(--border-color)',
-                            }}
-                          />
-                          {searchQuery && (
-                            <button
-                              onClick={() => setSearchQuery('')}
-                              className="absolute left-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 6 Al-Manar Major Cards */}
-                      <div className="divide-y divide-[var(--border-color)] flex-1">
-                        {filteredMajors.map((major, i) => (
-                          <motion.button
-                            key={major.id}
-                            initial={{ opacity: 0, x: isAr ? 15 : -15 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.03, duration: 0.18 }}
-                            onClick={() => handleSelectMajor(major)}
-                            className="w-full flex items-center gap-3.5 px-4 py-4 text-right hover:bg-[var(--accent-dim)] active:scale-[0.99] transition-all cursor-pointer group"
-                            aria-label={major.name}
-                          >
-                            {/* Colored icon box */}
-                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm border border-white/5"
-                              style={{ background: major.iconBg }}>
-                              {major.icon}
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0 text-right">
-                              <p className="text-sm font-black text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
-                                {major.name}
-                              </p>
-                              <p className="text-[11px] text-[var(--text-muted)] font-bold mt-0.5 truncate">
-                                {major.dept}
-                              </p>
-                            </div>
-
-                            {/* Arrow button */}
-                            <div className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0"
-                              style={{ background: `${major.color}15`, border: `1px solid ${major.color}30` }}>
-                              <svg className="w-3.5 h-3.5" style={{ fill: major.color }} viewBox="0 0 24 24">
-                                <path d={isAr ? 'M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z' : 'M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z'} />
-                              </svg>
-                            </div>
-                          </motion.button>
-                        ))}
-                      </div>
-
-                      {/* Direct Login Button Footer Banner */}
-                      <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
-                        <button
-                          onClick={() => setViewMode('LOGIN_PORTAL')}
-                          className="w-full py-3.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                          style={{ background: 'var(--accent)', color: '#000' }}
-                        >
-                          <span>🔑</span>
-                          <span>{isAr ? 'تسجيل الدخول المباشر إلى النظام' : 'Direct Login To System'}</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* ── VIEW 2: DEDICATED DIRECT LOGIN PORTAL ────────────────────── */}
-                  {viewMode === 'LOGIN_PORTAL' && (
-                    <motion.div
-                      key="login"
-                      initial={{ opacity: 0, x: isAr ? -20 : 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: isAr ? 20 : -20 }}
-                      transition={{ duration: 0.2 }}
-                      className="p-4 flex flex-col justify-center min-h-full"
+                    <button
+                      type="button"
+                      onClick={() => { setActiveRoleTab('FACULTY'); setError(null); }}
+                      className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                        activeRoleTab === 'FACULTY'
+                          ? 'shadow-md font-black'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      }`}
+                      style={activeRoleTab === 'FACULTY' ? { background: 'var(--accent)', color: '#000' } : {}}
                     >
-                      {/* Back to Major Selection */}
-                      <button
-                        onClick={() => { setViewMode('MAJORS_GRID'); setSelectedMajor(null); }}
-                        className="self-start text-xs font-black text-[var(--accent)] hover:text-[var(--text-primary)] transition-colors mb-3 flex items-center gap-1 cursor-pointer"
+                      <span>👨‍🏫</span>
+                      <span>{isAr ? 'الهيئة التدريسية والإدارة' : 'Faculty & Admin'}</span>
+                    </button>
+                  </div>
+
+                  {/* Error Alert Box */}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mb-4 overflow-hidden"
                       >
-                        <span>{isAr ? '←' : '→'}</span>
-                        <span>{isAr ? 'العودة لاختيار التخصص' : 'Back to Major Selection'}</span>
-                      </button>
-
-                      {/* Login Card Container */}
-                      <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                        {/* Top Accent Stripe */}
-                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--accent)] via-cyan-500 to-[var(--accent-dim)]" />
-
-                        {/* Brand Banner */}
-                        <div className="flex flex-col items-center text-center mb-5 pt-2">
-                          <div onClick={handleLogoTap} className="w-14 h-14 rounded-2xl bg-[var(--accent-dim)] border border-[var(--accent-glow)] p-2 flex items-center justify-center mb-2.5 shadow-lg cursor-pointer">
-                            <Logo size="md" customLogoUrl="/almanar-logo.png" />
-                          </div>
-                          <h1 className="text-base font-black text-[var(--text-primary)]">
-                            {collegeName}
-                          </h1>
-
-                          {/* Selected Major Badge */}
-                          {selectedMajor ? (
-                            <span className="mt-1.5 px-3 py-1 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-xs font-black flex items-center gap-1.5"
-                              style={{ color: 'var(--accent)' }}>
-                              <span>{selectedMajor.icon}</span>
-                              <span>{isAr ? `تخصص: ${selectedMajor.name}` : `Major: ${selectedMajor.name}`}</span>
-                            </span>
-                          ) : (
-                            <p className="text-xs text-[var(--text-muted)] font-bold mt-0.5">
-                              {isAr ? 'بوابة تسجيل الدخول المباشر' : 'Direct Access Portal'}
-                            </p>
-                          )}
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2">
+                          <span>⚠️</span>
+                          <span>{error}</span>
                         </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                        {/* Role Switcher Tabs */}
-                        <div className="flex p-1 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] mb-5 text-xs font-bold">
-                          <button
-                            type="button"
-                            onClick={() => { setActiveRoleTab('STUDENT'); setError(null); }}
-                            className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                              activeRoleTab === 'STUDENT'
-                                ? 'shadow-md font-black'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                            }`}
-                            style={activeRoleTab === 'STUDENT' ? { background: 'var(--accent)', color: '#000' } : {}}
-                          >
-                            <span>🎓</span>
-                            <span>{isAr ? 'بوابة الطالب' : 'Student Portal'}</span>
-                          </button>
+                  {/* Direct Login Form */}
+                  <form onSubmit={handleDirectLogin} className="space-y-4">
+                    {/* Identifier */}
+                    <div className="space-y-1 text-right">
+                      <label className="text-[11px] font-black uppercase text-[var(--text-secondary)] block">
+                        {activeRoleTab === 'STUDENT'
+                          ? (isAr ? 'البريد الجامعي / الرقم الجامعي' : 'University Email / Student ID')
+                          : (isAr ? 'اسم المستخدم / البريد الإلكتروني' : 'Username / Faculty Email')}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoComplete="username"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        placeholder={
+                          activeRoleTab === 'STUDENT'
+                            ? (isAr ? 'مثال: 20241001 أو student@almanar.edu.ye' : 'e.g. 20241001 or student@almanar.edu.ye')
+                            : (isAr ? 'أدخل اسم المستخدم أو البريد' : 'Enter username or email')
+                        }
+                        className="w-full text-xs font-bold rounded-xl px-4 py-3 transition-all focus:outline-none focus:ring-1"
+                        style={{
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      />
+                    </div>
 
-                          <button
-                            type="button"
-                            onClick={() => { setActiveRoleTab('FACULTY'); setError(null); }}
-                            className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                              activeRoleTab === 'FACULTY'
-                                ? 'shadow-md font-black'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                            }`}
-                            style={activeRoleTab === 'FACULTY' ? { background: 'var(--accent)', color: '#000' } : {}}
-                          >
-                            <span>👨‍🏫</span>
-                            <span>{isAr ? 'الهيئة التدريسية والإدارة' : 'Faculty & Staff'}</span>
-                          </button>
-                        </div>
-
-                        {/* Error Alert Box */}
-                        <AnimatePresence>
-                          {error && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="mb-4 overflow-hidden"
-                            >
-                              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2">
-                                <span>⚠️</span>
-                                <span>{error}</span>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        {/* Login Form */}
-                        <form onSubmit={handleDirectLogin} className="space-y-4">
-                          {/* Identifier */}
-                          <div className="space-y-1 text-right">
-                            <label className="text-[11px] font-black uppercase text-[var(--text-secondary)] block">
-                              {activeRoleTab === 'STUDENT'
-                                ? (isAr ? 'البريد الجامعي / الرقم الجامعي' : 'University Email / Student ID')
-                                : (isAr ? 'اسم المستخدم / البريد الإلكتروني' : 'Username / Faculty Email')}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              autoComplete="username"
-                              value={identifier}
-                              onChange={(e) => setIdentifier(e.target.value)}
-                              placeholder={
-                                activeRoleTab === 'STUDENT'
-                                  ? (isAr ? 'مثال: 20241001 أو student@almanar.edu.ye' : 'e.g. 20241001 or student@almanar.edu.ye')
-                                  : (isAr ? 'أدخل اسم المستخدم أو البريد' : 'Enter username or email')
-                              }
-                              className="w-full text-xs font-bold rounded-xl px-4 py-3 transition-all focus:outline-none focus:ring-1"
-                              style={{
-                                background: 'var(--bg-primary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                              }}
-                            />
-                          </div>
-
-                          {/* Password */}
-                          <div className="space-y-1 text-right">
-                            <label className="text-[11px] font-black uppercase text-[var(--text-secondary)] block">
-                              {isAr ? 'كلمة المرور' : 'Password'}
-                            </label>
-                            <div className="relative flex items-center">
-                              <input
-                                type={showPassword ? 'text' : 'password'}
-                                required
-                                autoComplete="current-password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••••••"
-                                className="w-full text-xs font-bold rounded-xl pr-4 pl-10 py-3 transition-all focus:outline-none focus:ring-1"
-                                style={{
-                                  background: 'var(--bg-primary)',
-                                  color: 'var(--text-primary)',
-                                  border: '1px solid var(--border-color)',
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute left-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                              >
-                                {showPassword ? '👁️' : '🔒'}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Submit Button */}
-                          <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-3.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                            style={{
-                              background: 'var(--accent)',
-                              color: '#000',
-                              boxShadow: '0 4px 20px var(--accent-glow)'
-                            }}
-                          >
-                            {loading ? (
-                              <span className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
-                            ) : (
-                              <>
-                                <span>🚀</span>
-                                <span>{isAr ? 'تسجيل الدخول إلى النظام' : 'Sign In To System'}</span>
-                              </>
-                            )}
-                          </button>
-                        </form>
-
-                        {/* Google SSO */}
-                        {activeRoleTab === 'STUDENT' && (
-                          <div className="mt-5 pt-4 border-t border-[var(--border-color)] space-y-3">
-                            <p className="text-[10px] text-center font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                              {isAr ? 'أو الدخول بنقرة واحدة لطلاب كلية المنار' : 'Or 1-Click Google Sign-In'}
-                            </p>
-                            <div className="w-full flex justify-center google-login-container" dir="ltr">
-                              <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-                                <SafeGoogleLogin>
-                                  <GoogleLogin
-                                    onSuccess={handleGoogleSuccess}
-                                    onError={() => {
-                                      toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
-                                    }}
-                                    theme="filled_black"
-                                    size="large"
-                                    shape="rectangular"
-                                    width="340"
-                                  />
-                                </SafeGoogleLogin>
-                              </GoogleOAuthProvider>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Create Account Link */}
-                        <div className="mt-5 pt-4 border-t border-[var(--border-color)] text-center">
-                          <p className="text-xs text-[var(--text-muted)] font-bold">
-                            {isAr ? 'طالب جديد في كلية المنار؟ ' : "New Student at Al-Manar? "}
-                            <button
-                              type="button"
-                              onClick={() => navigate('/register')}
-                              className="font-black underline transition-colors"
-                              style={{ color: 'var(--accent)' }}
-                            >
-                              {isAr ? 'أنشئ حسابك الآن' : 'Create an Account'}
-                            </button>
-                          </p>
-                        </div>
+                    {/* Password */}
+                    <div className="space-y-1 text-right">
+                      <label className="text-[11px] font-black uppercase text-[var(--text-secondary)] block">
+                        {isAr ? 'كلمة المرور' : 'Password'}
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          autoComplete="current-password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full text-xs font-bold rounded-xl pr-4 pl-10 py-3 transition-all focus:outline-none focus:ring-1"
+                          style={{
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        >
+                          {showPassword ? '👁️' : '🔒'}
+                        </button>
                       </div>
-                    </motion.div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                      style={{
+                        background: 'var(--accent)',
+                        color: '#000',
+                        boxShadow: '0 4px 20px var(--accent-glow)'
+                      }}
+                    >
+                      {loading ? (
+                        <span className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                      ) : (
+                        <>
+                          <span>🚀</span>
+                          <span>{isAr ? 'تسجيل الدخول إلى النظام' : 'Sign In To System'}</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  {/* Google 1-Click Login for Students */}
+                  {activeRoleTab === 'STUDENT' && (
+                    <div className="mt-5 pt-4 border-t border-[var(--border-color)] space-y-3">
+                      <p className="text-[10px] text-center font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                        {isAr ? 'أو الدخول بنقرة واحدة لطلاب كلية المنار' : 'Or 1-Click Google Sign-In'}
+                      </p>
+                      <div className="w-full flex justify-center google-login-container" dir="ltr">
+                        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                          <SafeGoogleLogin>
+                            <GoogleLogin
+                              onSuccess={handleGoogleSuccess}
+                              onError={() => {
+                                toast.error(isAr ? 'فشل الاتصال بخدمة Google' : 'Google connection failed');
+                              }}
+                              theme="filled_black"
+                              size="large"
+                              shape="rectangular"
+                              width="340"
+                            />
+                          </SafeGoogleLogin>
+                        </GoogleOAuthProvider>
+                      </div>
+                    </div>
                   )}
 
-                </AnimatePresence>
+                  {/* Register New Account Link */}
+                  <div className="mt-5 pt-4 border-t border-[var(--border-color)] text-center">
+                    <p className="text-xs text-[var(--text-muted)] font-bold">
+                      {isAr ? 'طالب جديد في كلية المنار؟ ' : "New Student at Al-Manar? "}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/register')}
+                        className="font-black underline transition-colors cursor-pointer"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {isAr ? 'أنشئ حسابك الآن' : 'Create an Account'}
+                      </button>
+                    </p>
+                  </div>
+                </motion.div>
               </main>
 
               {/* ── Footer ───────────────────────────────────────────────────── */}
