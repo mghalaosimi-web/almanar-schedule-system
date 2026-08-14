@@ -769,38 +769,48 @@ const almanarSchedulesData = [
 
 async function main() {
   console.log('Clearing existing database tables...');
-  await prisma.seatAllocation.deleteMany();
-  await prisma.attendanceRecord.deleteMany();
-  await prisma.verificationCode.deleteMany();
-  await prisma.pushSubscription.deleteMany();
-  await prisma.scheduleOverride.deleteMany();
-  await prisma.notificationLog.deleteMany();
-  await prisma.rescheduleRequest.deleteMany();
-  await prisma.studentGoalCompletion.deleteMany();
-  await prisma.academicGoal.deleteMany();
-  await prisma.attendance.deleteMany();
-  await prisma.groupResource.deleteMany();
-  await prisma.pollVote.deleteMany();
-  await prisma.poll.deleteMany();
-  await prisma.exchangeComment.deleteMany();
-  await prisma.exchangePost.deleteMany();
-  await prisma.feedback.deleteMany();
-  await prisma.studentTask.deleteMany();
-  await prisma.student.deleteMany();
-  await prisma.schedule.deleteMany();
-  await prisma.examSchedule.deleteMany();
-  await prisma.lecturer.deleteMany();
-  await prisma.room.deleteMany();
-  await prisma.subject.deleteMany();
-  await prisma.group.deleteMany();
-  await prisma.level.deleteMany();
-  await prisma.major.deleteMany();
-  await prisma.department.deleteMany();
-  await prisma.admin.deleteMany();
-  await prisma.tenantConfig.deleteMany();
-  await prisma.college.deleteMany();
-  await prisma.university.deleteMany();
-  await prisma.governorate.deleteMany();
+  const safeDelete = async (modelName) => {
+    try {
+      if (prisma[modelName] && typeof prisma[modelName].deleteMany === 'function') {
+        await prisma[modelName].deleteMany();
+      }
+    } catch (e) {
+      console.warn(`[SEED WARNING] Could not clear ${modelName}:`, e.message);
+    }
+  };
+
+  await safeDelete('seatAllocation');
+  await safeDelete('attendanceRecord');
+  await safeDelete('verificationCode');
+  await safeDelete('pushSubscription');
+  await safeDelete('scheduleOverride');
+  await safeDelete('notificationLog');
+  await safeDelete('rescheduleRequest');
+  await safeDelete('studentGoalCompletion');
+  await safeDelete('academicGoal');
+  await safeDelete('attendance');
+  await safeDelete('groupResource');
+  await safeDelete('pollVote');
+  await safeDelete('poll');
+  await safeDelete('exchangeComment');
+  await safeDelete('exchangePost');
+  await safeDelete('feedback');
+  await safeDelete('studentTask');
+  await safeDelete('student');
+  await safeDelete('schedule');
+  await safeDelete('examSchedule');
+  await safeDelete('lecturer');
+  await safeDelete('room');
+  await safeDelete('subject');
+  await safeDelete('group');
+  await safeDelete('level');
+  await safeDelete('major');
+  await safeDelete('department');
+  await safeDelete('admin');
+  await safeDelete('tenantConfig');
+  await safeDelete('college');
+  await safeDelete('university');
+  await safeDelete('governorate');
   console.log('All tables cleared.');
 
   console.log('Creating Governorate, University, College, and TenantConfig...');

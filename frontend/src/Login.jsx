@@ -155,11 +155,57 @@ export default function Login() {
     setClickTimeout(timeoutId);
   };
 
-  const selectedCollegeId = 1;
-  const selectedCollegeName = 'كلية المنار الجامعية';
-  const selectedUniversityName = 'كلية المنار الجامعية';
-  const selectedUniversityLogo = '/almanar-logo.png';
-  const selectedUniversitySlug = 'almanar-college';
+  const { uniSlug, collegeSlug } = useParams();
+  const [tenantInfo, setTenantInfo] = useState({
+    collegeId: localStorage.getItem('selectedCollegeId'),
+    collegeName: localStorage.getItem('selectedCollegeName'),
+    universityName: localStorage.getItem('selectedUniversityName'),
+    universityLogoRaw: localStorage.getItem('selectedUniversityLogo'),
+    universitySlug: localStorage.getItem('selectedUniversitySlug') || 'almanar-college'
+  });
+
+  React.useEffect(() => {
+    const fetchTenantInfo = async () => {
+      const slug = uniSlug || collegeSlug;
+      if (!slug) return;
+      try {
+        const res = await axios.get(`${API_URL}/api/public/tenant/info?slug=${slug}`);
+        if (res.data?.success) {
+          const { university: uni, college } = res.data.data;
+          if (uni) {
+            localStorage.setItem('selectedUniversityId', String(uni.id || ''));
+            localStorage.setItem('selectedUniversityName', uni.name || '');
+            localStorage.setItem('selectedUniversitySlug', uni.slug || '');
+            localStorage.setItem('selectedUniversityLogo', uni.logoUrl || '');
+          }
+          if (college) {
+            localStorage.setItem('selectedCollegeId', String(college.id || ''));
+            localStorage.setItem('selectedCollegeName', college.name || '');
+            localStorage.setItem('selectedCollegeSlug', college.slug || '');
+          }
+          
+          setTenantInfo({
+            collegeId: college ? String(college.id) : null,
+            collegeName: college ? college.name : null,
+            universityName: uni ? uni.name : null,
+            universityLogoRaw: uni ? uni.logoUrl : null,
+            universitySlug: uni ? uni.slug : 'almanar-college'
+          });
+        }
+      } catch (err) {
+        console.error('Error resolving tenant slug:', err);
+      }
+    };
+    fetchTenantInfo();
+  }, [uniSlug, collegeSlug]);
+
+  const selectedCollegeId = tenantInfo.collegeId;
+  const selectedCollegeName = tenantInfo.collegeName;
+  const selectedUniversityName = tenantInfo.universityName;
+  const selectedUniversityLogoRaw = tenantInfo.universityLogoRaw;
+  const selectedUniversitySlug = tenantInfo.universitySlug;
+  const selectedUniversityLogo = selectedUniversitySlug === 'hajjah-university' ? '/hajjah-logo-new.png' :
+                                 selectedUniversitySlug === 'almanar-college' ? '/almanar-logo.png' : selectedUniversityLogoRaw;
 
   const [pendingLinkEmail, setPendingLinkEmail] = useState('');
 
@@ -636,6 +682,25 @@ export default function Login() {
 
 
             </motion.div>
+
+            {/* Back to gateway button */}
+            <motion.div variants={item} className="text-center mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  const uniSlug = localStorage.getItem('selectedUniversitySlug');
+                  const collegeSlug = localStorage.getItem('selectedCollegeSlug');
+                  if (collegeSlug) navigate(`/c/${collegeSlug}`);
+                  else if (uniSlug) navigate(`/u/${uniSlug}`);
+                  else navigate('/');
+                }}
+                className="text-[11px] font-black text-white/50 hover:text-white transition-colors duration-200 inline-flex items-center gap-1.5 uppercase tracking-wider"
+              >
+                <span>{isAr ? '←' : '→'}</span>
+                <span>{isAr ? 'العودة لاختيار الجامعة' : 'Back to gateway'}</span>
+              </button>
+            </motion.div>
+
           </motion.div>
         </div>
 

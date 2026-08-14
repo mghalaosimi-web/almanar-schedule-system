@@ -1,8 +1,9 @@
 services:
   - type: web
-    name: manar-schedule-backend
+    name: almanar-college-backend
     runtime: node
     plan: starter
+    branch: main
     buildCommand: npm install && npm run build
     startCommand: node backend/src/server.js
     envVars:

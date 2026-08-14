@@ -487,6 +487,8 @@ function AppLayout() {
 
   const isAdminPath = path.startsWith('/admin') || path.startsWith('/super-admin');
   const isStudentPath = path.startsWith('/student');
+  const isLecturerPath = path.startsWith('/lecturer');
+
   const userJson = localStorage.getItem('manar_user');
   let user = null;
   if (userJson) {
@@ -496,8 +498,32 @@ function AppLayout() {
       console.error(e);
     }
   }
-  const universityLogoUrl = '/almanar-logo.png';
-  const getBrandedTitle = (isAr) => isAr ? 'كلية المنار الجامعية' : 'Al-Manar University College';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const universityLogoUrlRaw = isSuperAdmin
+    ? (localStorage.getItem('superadmin_selectedUniversityLogo') || '')
+    : (user?.universityLogo || localStorage.getItem('selectedUniversityLogo'));
+
+  const selectedSlug = localStorage.getItem('selectedUniversitySlug');
+  const activeName = user?.universityName || localStorage.getItem('selectedUniversityName') || '';
+  const activeSlug = selectedSlug || (isSuperAdmin ? localStorage.getItem('superadmin_selectedUniversitySlug') : '');
+
+  const universityLogoUrl = activeSlug === 'hajjah-university' || activeName.includes('حجة') || activeName.includes('Hajjah') ? '/hajjah-logo-new.png' :
+                            activeSlug === 'almanar-college' || activeName.includes('المنار') || activeName.includes('Manar') ? '/almanar-logo.png' : universityLogoUrlRaw;
+
+  const getBrandedTitle = (isAr) => {
+    const uniName = isSuperAdmin
+      ? localStorage.getItem('superadmin_selectedUniversityName')
+      : (user?.universityName || localStorage.getItem('selectedUniversityName'));
+    const colName = isSuperAdmin
+      ? localStorage.getItem('superadmin_selectedCollegeName')
+      : (user?.collegeName || localStorage.getItem('selectedCollegeName'));
+    
+    if (uniName && colName) {
+      if (uniName === colName) return uniName;
+      return `${uniName} - ${colName}`;
+    }
+    return colName || uniName || (isAr ? 'بوابة الطالب الجامعي' : 'University Student Portal');
+  };
 
   const renderLogo = (size) => {
     const logoEl = universityLogoUrl ? (
@@ -724,6 +750,53 @@ function AppLayout() {
             <span className="text-xs md:text-sm font-black tracking-wider uppercase truncate" style={{ color: 'var(--accent)' }}>
               {getBrandedTitle(isAr)}
             </span>
+            {user?.role === 'SUPER_ADMIN' && tenants.length > 0 && (
+              <div className="ms-3 relative">
+                <select
+                  value={localStorage.getItem('superadmin_selectedCollegeId') || ''}
+                  onChange={(e) => {
+                    const colId = parseInt(e.target.value);
+                    let selectedUni = null;
+                    let selectedCol = null;
+                    for (const uni of tenants) {
+                      const col = uni.colleges?.find(c => c.id === colId);
+                      if (col) {
+                        selectedUni = uni;
+                        selectedCol = col;
+                        break;
+                      }
+                    }
+                    if (selectedCol && selectedUni) {
+                      localStorage.setItem('superadmin_selectedCollegeId', selectedCol.id);
+                      localStorage.setItem('superadmin_selectedCollegeName', selectedCol.name);
+                      localStorage.setItem('superadmin_selectedUniversityName', selectedUni.name);
+                      localStorage.setItem('superadmin_selectedUniversityLogo', selectedUni.logoUrl || '');
+                      localStorage.setItem('superadmin_selectedThemeColor', selectedUni.themeColor || '');
+                      
+                      // Dispatch switch event
+                      window.dispatchEvent(new CustomEvent('MANAR_COLLEGE_SWITCH'));
+                      
+                      toast.success(isAr 
+                        ? `تم الانتقال إلى: ${selectedCol.name}` 
+                        : `Switched to: ${selectedCol.name}`
+                      );
+                    }
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase text-white/95 focus:outline-none focus:border-[var(--accent)] px-3 py-1.5 cursor-pointer"
+                  style={{ maxWidth: '160px' }}
+                >
+                  {tenants.map(uni => (
+                    <optgroup key={uni.id} label={uni.name} className="bg-[#0c0c0c] text-white/60">
+                      {uni.colleges?.map(col => (
+                        <option key={col.id} value={col.id} className="bg-[#0c0c0c] text-white">
+                          {col.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <ThemeSwitcher />
