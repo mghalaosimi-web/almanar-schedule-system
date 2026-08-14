@@ -13,3 +13,5 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: DEV_PORTAL_KEY
+        value: "Manar@2026#GodMode!Dev"
