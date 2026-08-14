@@ -6,6 +6,9 @@
     "backend",
     "frontend"
   ],
+  "prisma": {
+    "schema": "backend/prisma/schema.prisma"
+  },
   "scripts": {
     "postinstall": "cd backend && npx prisma generate",
     "start": "node backend/src/server.js",
@@ -13,7 +16,8 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:frontend": "node build.js",
-    "build": "npm run build:frontend"
+    "build": "npm run build:frontend",
+    "db:push": "npx prisma db push --schema=backend/prisma/schema.prisma"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
