@@ -21,6 +21,7 @@ obj/
 frontend/android/app/build/
 frontend/android/.gradle/
 *.apk
+!frontend/public/Manar_Schedule.apk
 *.keystore
 *.jks
 

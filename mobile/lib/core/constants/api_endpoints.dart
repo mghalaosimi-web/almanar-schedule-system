@@ -11,7 +11,7 @@ class ApiEndpoints {
     if (overrideUrl.isNotEmpty) return overrideUrl;
 
     if (kReleaseMode) {
-      return 'https://manar-schedule-system.onrender.com/api';
+      return 'https://almanar-schedule-system.onrender.com/api';
     }
 
     if (kIsWeb) {
