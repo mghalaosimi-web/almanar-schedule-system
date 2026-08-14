@@ -176,7 +176,7 @@ export default function PWAInstallModal({ isOpen, onClose, deferredPrompt, onIns
                 <span>تحميل ملف APK مباشر (Android)</span>
               </a>
               <p className="text-[10px] text-white/40 text-center font-bold">
-                حجم الملف: 40 ميجابايت • متوافق مع جميع أجهزة أندرويد
+                الإصدار v2.0.0 (Build 2) • حجم الملف: 53.8 ميجابايت • متوافق مع جميع أجهزة أندرويد
               </p>
             </div>
           )}

@@ -489,6 +489,30 @@ router.get('/schedules', async (req, res) => {
   }
 });
 
+// 6. GET /api/public/version or /api/public/app-version
+router.get(['/version', '/app-version'], (req, res) => {
+  try {
+    const filePath = path.join(__dirname, '../../data/release_metadata.json');
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return res.status(200).json(data);
+    }
+  } catch (err) {
+    console.error('[PUBLIC API] Error reading release metadata:', err);
+  }
+
+  res.status(200).json({
+    success: true,
+    latestVersion: '2.0.0',
+    latestBuild: 2,
+    minimumSupportedVersion: '2.0.0',
+    minimumSupportedBuild: 2,
+    downloadUrl: '/Manar_Schedule.apk',
+    releaseNotes: ['تطبيق جداول كلية المنار الجامعية الرسمية'],
+    releaseDate: '2026-08-15'
+  });
+});
+
 module.exports = router;
 
 

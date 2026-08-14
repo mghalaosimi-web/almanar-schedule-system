@@ -1,0 +1,105 @@
+{
+  "report_metadata": {
+    "title": "Flutter Application Forensic Audit & Handoff Report",
+    "generated_at": "2026-08-14T23:50:00+03:00",
+    "scope": "FLUTTER_APP_ONLY",
+    "status": "COMPLETED"
+  },
+  "project_identity": {
+    "root_path": "f:\\almanar-college-system\\mobile",
+    "app_name": "manar_schedule",
+    "android_app_label": "جداول المنار",
+    "ios_display_name": "Manar Schedule",
+    "package_name": "com.mghal.manar_schedule",
+    "android_application_id": "com.mghal.manar_schedule",
+    "ios_bundle_id": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+    "version": "2.0.0",
+    "build_number": 2,
+    "version_full": "2.0.0+2",
+    "flutter_sdk_constraint": "^3.11.0",
+    "target_platforms": ["android", "ios", "web", "windows", "macos", "linux"]
+  },
+  "development_history": {
+    "start_date": "2026-07-26T02:35:53+03:00",
+    "last_commit_date": "2026-08-14T03:28:21+03:00",
+    "initial_commit": "44c4bfb",
+    "latest_commit": "e0ee1c4",
+    "original_goal": "Offline-First native Flutter application for Al-Manar University College schedule management."
+  },
+  "features_inventory": [
+    { "name": "Authentication (Login)", "status": "WORKING", "connected": true, "endpoint": "/api/auth/login" },
+    { "name": "Offline Login", "status": "WORKING", "connected": true, "storage": "Hive current_user_box" },
+    { "name": "User Registration", "status": "STUB", "connected": false, "notes": "UI complete, simulated with 2s delay" },
+    { "name": "Google Sign-In", "status": "PARTIALLY_IMPLEMENTED", "connected": true, "endpoint": "/auth/google" },
+    { "name": "Schedule View (Cache-then-Network)", "status": "WORKING", "connected": true, "endpoint": "/api/schedules/my" },
+    { "name": "Day Selector", "status": "WORKING", "connected": true, "notes": "Filters by current day and week days" },
+    { "name": "Delegate Attendance", "status": "STUB", "connected": false, "notes": "12 mock students, 2s simulated submit" },
+    { "name": "Delegate Broadcast", "status": "STUB", "connected": false, "notes": "Mock notification history, 2s simulated send" },
+    { "name": "Delegate Override Request", "status": "WORKING", "connected": true, "endpoint": "/api/overrides/request" },
+    { "name": "Offline Sync Queue", "status": "PARTIALLY_IMPLEMENTED", "connected": true, "notes": "SyncQueueDao enqueues offline mutations" },
+    { "name": "Local Notifications", "status": "WORKING", "connected": true, "package": "flutter_local_notifications" },
+    { "name": "Push Notifications (FCM)", "status": "NOT_IMPLEMENTED", "connected": false },
+    { "name": "Theme Management", "status": "WORKING", "connected": true, "storage": "SharedPreferences" },
+    { "name": "Profile & Logout", "status": "WORKING", "connected": true },
+    { "name": "Force Update / Version Gate", "status": "NOT_IMPLEMENTED", "connected": false }
+  ],
+  "screens": [
+    { "route": "/splash", "file": "lib/features/auth/screens/splash_screen.dart", "status": "WORKING" },
+    { "route": "/login", "file": "lib/features/auth/screens/login_screen.dart", "status": "WORKING" },
+    { "route": "/register", "file": "lib/features/auth/screens/register_screen.dart", "status": "STUB" },
+    { "route": "/", "file": "lib/features/home/screens/home_screen.dart", "status": "WORKING" },
+    { "route": "/schedule", "file": "lib/features/schedule/screens/schedule_screen.dart", "status": "WORKING" },
+    { "route": "/attendance", "file": "lib/features/representative/screens/attendance_screen.dart", "status": "STUB" },
+    { "route": "/broadcast", "file": "lib/features/representative/screens/broadcast_screen.dart", "status": "STUB" },
+    { "route": "/override-request", "file": "lib/features/representative/screens/override_request_screen.dart", "status": "WORKING" },
+    { "route": "/profile", "file": "lib/features/profile/screens/profile_screen.dart", "status": "WORKING" }
+  ],
+  "api_inventory": [
+    { "method": "POST", "endpoint": "/auth/login", "auth": false, "status": "CONNECTED" },
+    { "method": "GET", "endpoint": "/schedules/my", "auth": true, "status": "CONNECTED" },
+    { "method": "GET", "endpoint": "/schedules", "auth": true, "status": "CONNECTED" },
+    { "method": "GET", "endpoint": "/public/schedules", "auth": false, "status": "CONNECTED" },
+    { "method": "POST", "endpoint": "/overrides/request", "auth": true, "status": "CONNECTED" },
+    { "method": "POST", "endpoint": "/auth/google", "auth": false, "status": "PARTIALLY_CONNECTED" },
+    { "method": "POST", "endpoint": "/attendance", "auth": true, "status": "UNUSED" },
+    { "method": "POST", "endpoint": "/notifications/broadcast", "auth": true, "status": "UNUSED" }
+  ],
+  "apk_release_history": [
+    {
+      "mode": "debug",
+      "path": "mobile/build/app/outputs/apk/debug/app-debug.apk",
+      "size_bytes": 186874776,
+      "size_mb": 178.2,
+      "last_modified": "2026-08-13T06:11:56"
+    },
+    {
+      "mode": "release",
+      "path": "mobile/build/app/outputs/apk/release/app-release.apk",
+      "size_bytes": 56501487,
+      "size_mb": 53.88,
+      "last_modified": "2026-08-13T06:14:51",
+      "web_mirror": "frontend/public/Manar_Schedule.apk"
+    }
+  ],
+  "current_incident": {
+    "issue": "App reported to ask for an update",
+    "cause": "EXTERNAL_BACKEND_OR_METADATA_MISMATCH",
+    "flutter_version_gate_exists": false,
+    "installed_version": "2.0.0+2",
+    "explanation": "No force update or version check logic exists in Flutter Dart source code. Any update requirement stems from backend sessionTracker metadata (e.g. appVersion set to 3.5.0 in backend) or web client download link metadata."
+  },
+  "handoff_summary": {
+    "do_not_rebuild": [
+      "Flutter project architecture & GoRouter setup",
+      "Hive database and DAO implementations",
+      "AuthService, ScheduleService, Provider state management",
+      "LoginScreen, HomeScreen, ScheduleScreen, ProfileScreen"
+    ],
+    "remaining_tasks": [
+      "Connect AttendanceScreen to backend attendance endpoint",
+      "Connect BroadcastScreen to backend broadcast endpoint",
+      "Connect RegisterScreen to backend registration endpoint",
+      "Align backend sessionTracker metadata appVersion with '2.0.0'"
+    ]
+  }
+}

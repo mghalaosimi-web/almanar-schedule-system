@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../data/remote/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
+import '../../../core/services/notification_service.dart';
 
-/// شاشة تسجيل الحضور للمندوب
+/// شاشة تسجيل الحضور للمندوب — متصلة بالـ Backend
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -15,27 +19,76 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  // بيانات وهمية — ستُحل بالـ API لاحقاً
-  final List<_Student> _students = List.generate(
-    12,
-    (i) => _Student(
-      id: '2026-${(1000 + i).toString()}',
-      name: _sampleNames[i % _sampleNames.length],
-      status: AttendanceStatus.absent,
-    ),
-  );
-
+  List<_Student> _students = [];
+  bool _isLoadingStudents = true;
+  String? _errorMessage;
   bool _isSubmitting = false;
   bool _submitted = false;
 
-  static const _sampleNames = [
-    'أحمد محمد الزيدي', 'فاطمة علي الحمود', 'خالد عبدالله الغامدي',
-    'سارة يوسف النجار', 'عمر حسن الزهراني', 'نورة سعد القحطاني',
-    'مصطفى إبراهيم العمري', 'هند طارق البكري', 'يوسف محمود الشمري',
-    'ليلى أحمد الحارثي', 'عبدالرحمن وليد السهلي', 'منى كريم الدوسري',
-  ];
-
   int get _presentCount => _students.where((s) => s.status == AttendanceStatus.present).length;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchClassmates();
+  }
+
+  Future<void> _fetchClassmates() async {
+    setState(() {
+      _isLoadingStudents = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final api = ApiClient();
+      final response = await api.get(ApiEndpoints.classmates);
+
+      if (response.data != null && response.data['success'] == true) {
+        final List rawList = response.data['data'] as List? ?? [];
+        final parsed = rawList.map((item) {
+          final map = item as Map<String, dynamic>;
+          return _Student(
+            id: map['id']?.toString() ?? '',
+            idNumber: map['idNumber'] as String? ?? map['studentId'] as String? ?? '—',
+            name: map['name'] as String? ?? 'طالب غير مسمى',
+            status: AttendanceStatus.absent,
+          );
+        }).toList();
+
+        if (mounted) {
+          setState(() {
+            _students = parsed;
+            _isLoadingStudents = false;
+            if (_students.isEmpty) {
+              _errorMessage = 'لا يوجد طلاب مسجلون في هذه المجموعة حالياً.';
+            }
+          });
+        }
+        return;
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStudents = false;
+          if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+            _errorMessage = 'غير مصرح: خيارات الحضور مقتصرة على مندوبي الشعبة المعينين.';
+          } else {
+            _errorMessage = 'تعذر تحميل قائمة الطلاب. تحقق من الاتصال بالشبكة.';
+          }
+        });
+      }
+      return;
+    } catch (e) {
+      debugPrint('[AttendanceScreen] Fetch error: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingStudents = false;
+        _errorMessage = 'حدث خطأ في تحميل كشف الطلاب.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,45 +103,53 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ],
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.representativeColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.representativeColor.withOpacity(0.3)),
-                ),
-                child: Text(
-                  '$_presentCount / ${_students.length}',
-                  style: AppTextStyles.labelLarge.copyWith(
-                      color: AppColors.representativeColor),
+          if (!_isLoadingStudents && _students.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.representativeColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.representativeColor.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    '$_presentCount / ${_students.length}',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.representativeColor,
+                    ),
+                  ),
                 ),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.accent),
+            onPressed: _fetchClassmates,
+            tooltip: 'تحديث القائمة',
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
           // ── Progress Bar ─────────────────────────────────────
-          _buildProgressBar(),
+          if (!_isLoadingStudents && _students.isNotEmpty) _buildProgressBar(),
 
-          // ── Student List ──────────────────────────────────────
+          // ── Student List Body ─────────────────────────────────
           Expanded(
-            child: _submitted ? _buildSuccessState() : _buildStudentList(),
+            child: _buildBody(),
           ),
 
           // ── Submit Button ─────────────────────────────────────
-          if (!_submitted)
+          if (!_submitted && !_isLoadingStudents && _students.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
               child: GradientButton(
                 label: AppStrings.submitAttendance,
                 icon: Icons.upload_rounded,
                 isLoading: _isSubmitting,
-                gradientColors: [
+                gradientColors: const [
                   AppColors.representativeColor,
                   AppColors.warning,
                 ],
@@ -110,7 +171,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('نسبة الحضور', style: AppTextStyles.bodySmall),
+              Text('نسبة الحضور الحالية', style: AppTextStyles.bodySmall),
               Text('${(ratio * 100).toStringAsFixed(0)}%',
                   style: AppTextStyles.accentLabel.copyWith(
                       color: AppColors.representativeColor)),
@@ -129,6 +190,49 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildBody() {
+    if (_isLoadingStudents) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: AppColors.representativeColor),
+            const SizedBox(height: 16),
+            Text('جاري تحميل طلاب الشعبة...', style: AppTextStyles.bodyMedium),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null && _students.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 48),
+              const SizedBox(height: 16),
+              Text(_errorMessage!, style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _fetchClassmates,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_submitted) {
+      return _buildSuccessState();
+    }
+
+    return _buildStudentList();
   }
 
   Widget _buildStudentList() {
@@ -157,7 +261,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.name, style: AppTextStyles.labelLarge),
-                    Text(s.id, style: AppTextStyles.bodySmall),
+                    Text('الرقم: ${s.idNumber}', style: AppTextStyles.bodySmall),
                   ],
                 ),
               ),
@@ -210,7 +314,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 color: AppColors.success, size: 48),
           ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
           const SizedBox(height: 16),
-          Text('تم رفع كشف الحضور!', style: AppTextStyles.headlineMedium),
+          Text('تم رفع كشف الحضور بنجاح!', style: AppTextStyles.headlineMedium),
           const SizedBox(height: 8),
           Text('حضر $_presentCount من ${_students.length} طالب',
               style: AppTextStyles.bodyMedium),
@@ -220,10 +324,60 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _submit() async {
+    if (_students.isEmpty) return;
+
     setState(() => _isSubmitting = true);
-    // محاكاة إرسال
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) setState(() { _isSubmitting = false; _submitted = true; });
+    HapticFeedback.mediumImpact();
+
+    try {
+      final api = ApiClient();
+      final recordsPayload = _students.map((s) => {
+        'studentId': s.id,
+        'status': s.status == AttendanceStatus.present ? 'PRESENT' : 'ABSENT',
+      }).toList();
+
+      final response = await api.post(
+        ApiEndpoints.attendance,
+        data: {
+          'scheduleId': 1,
+          'date': DateTime.now().toIso8601String(),
+          'records': recordsPayload,
+        },
+      );
+
+      if (response.data != null && response.data['success'] == true) {
+        await LocalNotificationService().showNotification(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: '📋 تم رفع كشف الحضور',
+          body: 'تم تسجيل حضور $_presentCount طالب في السيرفر بنجاح ✓',
+        );
+
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+            _submitted = true;
+          });
+        }
+        return;
+      }
+    } on DioException catch (e) {
+      debugPrint('[AttendanceScreen] Submit Dio error: ${e.message}');
+      final msg = e.response?.data?['error'] as String? ?? 'تعذر حفظ الحضور في السيرفر.';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg, style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[AttendanceScreen] Unexpected submit error: $e');
+    }
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+    }
   }
 }
 
@@ -233,9 +387,15 @@ enum AttendanceStatus { present, absent }
 
 class _Student {
   final String id;
+  final String idNumber;
   final String name;
   AttendanceStatus status;
-  _Student({required this.id, required this.name, required this.status});
+  _Student({
+    required this.id,
+    required this.idNumber,
+    required this.name,
+    required this.status,
+  });
 }
 
 class _StatusButton extends StatelessWidget {

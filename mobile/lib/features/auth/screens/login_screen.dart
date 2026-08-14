@@ -14,7 +14,6 @@ import '../../../core/utils/connectivity_service.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../data/remote/api_client.dart';
-import '../../../core/constants/api_endpoints.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 

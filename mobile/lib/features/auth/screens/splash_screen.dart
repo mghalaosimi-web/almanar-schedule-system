@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/version_service.dart';
 import '../../auth/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -30,6 +31,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _navigateToNext() async {
     await Future.delayed(const Duration(milliseconds: 2600));
+    if (!mounted) return;
+
+    // ── Version Check Gate (P1 Update Engine) ───────────────
+    await VersionService.promptUpdateIfAvailable(context);
+
     if (!mounted) return;
     final auth = context.read<AuthService>();
     if (auth.isLoggedIn) {

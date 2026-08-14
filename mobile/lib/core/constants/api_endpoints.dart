@@ -10,6 +10,10 @@ class ApiEndpoints {
     const overrideUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
     if (overrideUrl.isNotEmpty) return overrideUrl;
 
+    if (kReleaseMode) {
+      return 'https://manar-schedule-system.onrender.com/api';
+    }
+
     if (kIsWeb) {
       return 'http://localhost:5001/api';
     }
@@ -34,8 +38,10 @@ class ApiEndpoints {
   static const String overrides = '/overrides';
 
   // ── Representative ───────────────────────────────────────────────
-  static const String attendance      = '/attendance';
-  static const String broadcast       = '/notifications/broadcast';
+  static const String classmates      = '/rep/classmates';
+  static const String attendance      = '/rep/attendance';
+  static const String broadcast       = '/rep/broadcast';
+  static const String broadcasts      = '/rep/broadcasts';
   static const String overrideRequest = '/overrides/request';
 
   // ── Helpers ──────────────────────────────────────────────────────

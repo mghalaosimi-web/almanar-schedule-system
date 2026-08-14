@@ -66,7 +66,7 @@ async function recordLogin(user, role, ipAddress = 'unknown', status = 'SUCCESS'
         userAgent: userAgentFull.substring(0, 500),
         deviceOs: osName,
         browser: browserName,
-        appVersion: '3.5.0',
+        appVersion: '2.0.0',
         country: 'YE'
       }
     });

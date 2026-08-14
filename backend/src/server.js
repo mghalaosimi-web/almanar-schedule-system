@@ -317,7 +317,27 @@ async function boot() {
   }
 }
 
-boot();
+// Direct version metadata endpoint (Single Source of Truth)
+app.get(['/api/app/version', '/api/version'], (req, res) => {
+  const fs = require('fs');
+  const metadataPath = path.join(__dirname, '../data/release_metadata.json');
+  if (fs.existsSync(metadataPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      return res.status(200).json(data);
+    } catch (e) {}
+  }
+  return res.status(200).json({
+    success: true,
+    latestVersion: '2.0.0',
+    latestBuild: 2,
+    minimumSupportedVersion: '2.0.0',
+    minimumSupportedBuild: 2,
+    downloadUrl: '/Manar_Schedule.apk',
+    releaseNotes: ['تطبيق جداول كلية المنار الجامعية الرسمية'],
+    releaseDate: '2026-08-15'
+  });
+});
 
 // Direct APK file download endpoint with proper MIME headers
 app.get(['/Manar_Schedule.apk', '/download/apk', '/api/public/download-apk'], (req, res) => {

@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "latestVersion": "2.0.0",
+  "latestBuild": 2,
+  "minimumSupportedVersion": "2.0.0",
+  "minimumSupportedBuild": 2,
+  "downloadUrl": "/Manar_Schedule.apk",
+  "fullDownloadUrl": "https://almanar-schedule-system.onrender.com/Manar_Schedule.apk",
+  "apkSizeBytes": 56414653,
+  "apkHashSha256": "5F2A8C4BCC4C3EE62EB18400CB9979D5A96D6D38E8CE6B8C632CCAA60C678607",
+  "releaseNotes": [
+    "الإصدار الرسمي التنافسي لتطبيق جداول المنار (Offline-First)",
+    "عرض الجداول الدراسية والتعديلات الاستثنائية فورياً",
+    "دعم كامل لإرسال واستقبال الحضور والبث الجماعي للمندوبين",
+    "تحسين أداء الواجهة وإعدادات الاتصال بالسيرفر الرسمي"
+  ],
+  "releaseDate": "2026-08-15"
+}

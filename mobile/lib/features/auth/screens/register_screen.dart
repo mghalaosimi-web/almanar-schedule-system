@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../data/remote/api_client.dart';
+import '../../../core/constants/api_endpoints.dart';
 
+/// شاشة طلب الانضمام والتسجيل — متصلة بالـ Backend
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -27,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _selectedLevel = '1';
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _errorMessage;
 
   static const _majors = [
     'هندسة البرمجيات',
@@ -52,28 +57,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     HapticFeedback.lightImpact();
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final api = ApiClient();
+      final response = await api.post(
+        ApiEndpoints.register,
+        data: {
+          'fullName': _nameCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'password': _passwordCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          'idNumber': _studentIdCtrl.text.trim(),
+          'majorId': _selectedMajor,
+          'levelId': _selectedLevel,
+          'collegeId': 1,
+        },
+      );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null && (data['success'] == true || response.statusCode == 201)) {
+        final token = data['token'] as String?;
+        if (token != null) {
+          await api.saveToken(token);
+        }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'تم تقديم طلب التسجيل بنجاح! سيتم التواصل معك عبر البريد الإلكتروني ✓',
-          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
-    context.go('/login');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم تقديم طلب التسجيل وإنشاء الحساب بنجاح! ✓',
+              style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        context.go('/login');
+        return;
+      }
+    } on DioException catch (e) {
+      final serverMsg = e.response?.data?['error'] as String? ??
+          e.response?.data?['message'] as String? ??
+          'تعذر إكمال طلب التسجيل. تحقق من البيانات والشبكة.';
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = serverMsg;
+        });
+      }
+      return;
+    } catch (e) {
+      debugPrint('[RegisterScreen] Unexpected error: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'حدث خطأ غير متوقع أثناء إرسال البيانات.';
+      });
+    }
   }
 
   @override
@@ -140,11 +192,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _nameCtrl,
                         style: AppTextStyles.inputText,
                         decoration: const InputDecoration(
-                          labelText: 'الاسم الثلاثي',
-                          hintText: 'أحمد محمد علي',
+                          labelText: 'الاسم الثلاثي أو الرباعي',
+                          hintText: 'أحمد محمد علي الزيدي',
                           prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.accent, size: 20),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'أدخل الاسم الثلاثي' : null,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'أدخل الاسم الكامل';
+                          final parts = v.trim().split(RegExp(r'\s+'));
+                          if (parts.length < 3) return 'يجب إدخال الاسم الثلاثي على الأقل';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -163,7 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Student ID (Optional if new applicant)
+                      // Student ID (Optional)
                       TextFormField(
                         controller: _studentIdCtrl,
                         textDirection: TextDirection.ltr,
@@ -215,7 +272,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           hintText: '+967 770 000 000',
                           prefixIcon: Icon(Icons.phone_android_outlined, color: AppColors.accent, size: 20),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'أدخل رقم الهاتف' : null,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'أدخل رقم الهاتف';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -240,7 +300,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         validator: (v) => (v == null || v.length < 6) ? 'كلمة المرور 6 أحرف على الأقل' : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+
+                      if (_errorMessage != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(_errorMessage!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error)),
+                              ),
+                            ],
+                          ),
+                        ),
 
                       // Submit Button
                       GradientButton(
