@@ -12,12 +12,18 @@ class AuthResult {
   final String? error;
   final UserModel? user;
   final bool isOfflineLogin;
+  final String status; // 'PROFILE_COMPLETE', 'PROFILE_INCOMPLETE', 'NEW_ACCOUNT', 'ERROR'
+  final List<String> missingFields;
+  final Map<String, dynamic>? googleData;
 
   const AuthResult({
     required this.success,
     this.error,
     this.user,
     this.isOfflineLogin = false,
+    this.status = 'PROFILE_COMPLETE',
+    this.missingFields = const [],
+    this.googleData,
   });
 }
 
@@ -48,14 +54,13 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// تسجيل الدخول الموحد لجميع الأدوار
+  /// تسجيل الدخول بالحساب وكلمة المرور دون إجبار تحديد Role
   Future<AuthResult> login({
-    required String identifier, // email أو studentId
+    required String identifier,
     required String password,
-    required UserRole role,
+    UserRole? role,
     bool isConnected = true,
   }) async {
-    // ── Offline Mode ─────────────────────────────────────────────
     if (!isConnected) {
       return _tryOfflineLogin();
     }
@@ -67,10 +72,8 @@ class AuthService extends ChangeNotifier {
       final response = await _api.post(
         ApiEndpoints.login,
         data: {
-          'email': identifier,
-          'studentId': identifier,
+          'identifier': identifier,
           'password': password,
-          'role': role.name,
         },
       );
 
@@ -79,26 +82,168 @@ class AuthService extends ChangeNotifier {
       final userData = data['user'] as Map<String, dynamic>? ?? data;
 
       if (token == null) {
-        return const AuthResult(success: false, error: 'لم يُرسَل token من السيرفر');
+        return const AuthResult(success: false, error: 'لم يُرسَل token من السيرفر', status: 'ERROR');
       }
 
-      // حفظ الـ Token
       await _api.saveToken(token);
-
-      // حفظ بيانات المستخدم
       final user = UserModel.fromJson(userData);
       await _saveUser(user);
 
       _currentUser = user;
-      return AuthResult(success: true, user: user);
+      return AuthResult(success: true, user: user, status: 'PROFILE_COMPLETE');
     } on DioException catch (e) {
       final msg = _parseDioError(e);
-      return AuthResult(success: false, error: msg);
+      return AuthResult(success: false, error: msg, status: 'ERROR');
     } catch (e) {
-      return AuthResult(success: false, error: 'حدث خطأ غير متوقع');
+      return const AuthResult(success: false, error: 'حدث خطأ غير متوقع', status: 'ERROR');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// معالجة استجابة تسجيل الدخول عبر Google
+  Future<AuthResult> handleGoogleSignIn(String idToken) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(
+        '/auth/google',
+        data: {'credential': idToken},
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      final isSuccess = data['success'] == true;
+      final status = data['status'] as String? ?? (isSuccess ? 'PROFILE_COMPLETE' : 'ERROR');
+
+      if (status == 'NEW_ACCOUNT' || data['code'] == 'ACCOUNT_NOT_FOUND') {
+        final googleData = (data['googleData'] as Map<String, dynamic>?) ?? {};
+        return AuthResult(
+          success: false,
+          status: 'NEW_ACCOUNT',
+          error: data['error'] as String? ?? 'لا يوجد لديك حساب حتى الآن',
+          googleData: googleData,
+        );
+      }
+
+      if (isSuccess) {
+        final token = data['token'] as String?;
+        final userData = data['user'] as Map<String, dynamic>?;
+
+        if (token != null) {
+          await _api.saveToken(token);
+        }
+
+        if (userData != null) {
+          final user = UserModel.fromJson(userData);
+          if (status == 'PROFILE_COMPLETE') {
+            await _saveUser(user);
+            _currentUser = user;
+          }
+          return AuthResult(
+            success: true,
+            status: status,
+            user: user,
+            missingFields: (data['missingFields'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          );
+        }
+      }
+
+      return AuthResult(
+        success: false,
+        status: 'ERROR',
+        error: data['error'] as String? ?? 'فشل تسجيل الدخول عبر جوجل',
+      );
+    } on DioException catch (e) {
+      return AuthResult(success: false, status: 'ERROR', error: _parseDioError(e));
+    } catch (e) {
+      return const AuthResult(success: false, status: 'ERROR', error: 'تعذر الاتصال بـ جوجل');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// إكمال البيانات الناقصة فقط بالحساب الموجود
+  Future<AuthResult> completeProfile({
+    required String name,
+    required String phone,
+    String? idNumber,
+    required int collegeId,
+    required int majorId,
+    required int levelId,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(
+        '/auth/complete-profile',
+        data: {
+          'name': name,
+          'phone': phone,
+          'idNumber': idNumber,
+          'collegeId': collegeId,
+          'majorId': majorId,
+          'levelId': levelId,
+        },
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] == true) {
+        final token = data['token'] as String?;
+        final userData = data['user'] as Map<String, dynamic>?;
+
+        if (token != null) await _api.saveToken(token);
+        if (userData != null) {
+          final user = UserModel.fromJson(userData);
+          await _saveUser(user);
+          _currentUser = user;
+          return AuthResult(success: true, status: 'PROFILE_COMPLETE', user: user);
+        }
+      }
+
+      return AuthResult(
+        success: false,
+        status: 'ERROR',
+        error: data['error'] as String? ?? 'فشل إكمال بيانات الحساب',
+      );
+    } on DioException catch (e) {
+      return AuthResult(success: false, status: 'ERROR', error: _parseDioError(e));
+    } catch (e) {
+      return const AuthResult(success: false, status: 'ERROR', error: 'حدث خطأ أثناء حفظ البيانات');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// إرسال طلب استعادة كلمة المرور عبر الواتساب
+  Future<AuthResult> requestPasswordReset(String phone) async {
+    try {
+      final response = await _api.post(
+        '/auth/forgot-password',
+        data: {'phone': phone},
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] == true) {
+        return AuthResult(
+          success: true,
+          status: 'RESET_REQUESTED',
+          error: data['message'] as String? ?? 'تم إرسال طلب استعادة كلمة المرور بنجاح ✓',
+        );
+      }
+      return AuthResult(
+        success: false,
+        status: 'ERROR',
+        error: data['error'] as String? ?? 'فشل إرسال طلب الاستعادة',
+      );
+    } on DioException catch (e) {
+      return AuthResult(success: false, status: 'ERROR', error: _parseDioError(e));
+    } catch (e) {
+      return const AuthResult(success: false, status: 'ERROR', error: 'حدث خطأ في الاتصال بالشبكة');
     }
   }
 
@@ -113,12 +258,14 @@ class AuthService extends ChangeNotifier {
           success: true,
           user: _currentUser,
           isOfflineLogin: true,
+          status: 'PROFILE_COMPLETE',
         );
       }
     } catch (_) {}
     return const AuthResult(
       success: false,
       error: 'لا توجد بيانات محفوظة. اتصل بالإنترنت أولاً',
+      status: 'ERROR',
     );
   }
 
@@ -155,7 +302,7 @@ class AuthService extends ChangeNotifier {
     if (statusCode != null && statusCode >= 500) {
       return 'خطأ في السيرفر. حاول لاحقاً';
     }
-    final serverMsg = e.response?.data?['message'] as String?;
+    final serverMsg = e.response?.data?['error'] as String? ?? e.response?.data?['message'] as String?;
     return serverMsg ?? 'حدث خطأ في تسجيل الدخول';
   }
 }

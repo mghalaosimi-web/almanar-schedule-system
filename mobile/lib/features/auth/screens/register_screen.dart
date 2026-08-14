@@ -92,7 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'تم تقديم طلب التسجيل وإنشاء الحساب بنجاح! ✓',
+              'تم إنشاء الحساب بنجاح! ✓',
               style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
             ),
             backgroundColor: AppColors.success,
@@ -102,13 +102,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
 
-        context.go('/login');
+        context.go('/');
         return;
       }
     } on DioException catch (e) {
       final serverMsg = e.response?.data?['error'] as String? ??
           e.response?.data?['message'] as String? ??
-          'تعذر إكمال طلب التسجيل. تحقق من البيانات والشبكة.';
+          'تعذر إكمال إنشاء الحساب. تحقق من البيانات والشبكة.';
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -138,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
           onPressed: () => context.go('/login'),
         ),
-        title: Text('طلب الانضمام والتسجيل', style: AppTextStyles.headlineSmall),
+        title: Text('إنشاء حساب جديد', style: AppTextStyles.headlineSmall),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -324,7 +324,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Submit Button
                       GradientButton(
-                        label: 'إرسال طلب التسجيل',
+                        label: 'إنشاء الحساب والمتابعة',
                         icon: Icons.check_circle_rounded,
                         isLoading: _isLoading,
                         onPressed: _handleRegister,

@@ -1,4 +1,4 @@
-﻿const express   = require('express');
+const express   = require('express');
 const jwt       = require('jsonwebtoken');
 const bcrypt    = require('bcryptjs');
 const { prisma } = require('../../db');
@@ -14,56 +14,60 @@ const router     = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 // 4. POST /api/auth/complete-profile
 // PATCH [SEC]: verifyToken added — requires valid Google session before allowing profile creation
-router.post('/complete-profile', authenticateToken, async (req, res) => {
+// 4. POST /api/auth/complete-profile
+router.post('/complete-profile', verifyToken, async (req, res) => {
   try {
     const { email, name, phone, idNumber, collegeId, majorId, levelId } = req.body;
     
     if (!name || !phone || !collegeId || !majorId || !levelId) {
-      return res.status(400).json({ success: false, error: 'All profile fields are required' });
+      return res.status(400).json({ success: false, error: 'جميع الحقول الأساسية مطلوبة (الاسم، الهاتف، الكلية، التخصص، المستوى)' });
     }
 
     const nameParts = name.trim().split(/\s+/);
-    if (nameParts.length < 3) {
-      return res.status(400).json({ success: false, error: 'يجب إدخال الاسم الثلاثي أو الرباعي على الأقل' });
+    if (nameParts.length < 2) {
+      return res.status(400).json({ success: false, error: 'يجب إدخال الاسم الكامل' });
     }
-
-    const suffix = phone.replace('+967', '');
-    if (suffix.length !== 9 || !/^\d+$/.test(suffix)) {
-      return res.status(400).json({ success: false, error: 'رقم الهاتف يجب أن يتكون من 9 أرقام بعد الرمز الدولي' });
-    }
-
-    if (idNumber && idNumber.trim() !== '') {
-      if (!/^\d+$/.test(idNumber.trim()) || idNumber.trim().length < 5) {
-        return res.status(400).json({ success: false, error: 'الرقم الجامعي يجب أن يتكون من أرقام فقط ولا يقل عن 5 خانات' });
-      }
-    }
-
-    const resolvedId = (idNumber && idNumber.trim() !== '') ? idNumber.trim() : 'TEMP_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
     const studentId = req.user.id;
     const existingStudent = await prisma.student.findUnique({ where: { id: studentId } });
     if (!existingStudent) {
-      return res.status(404).json({ success: false, error: 'Student account not found' });
+      return res.status(404).json({ success: false, error: 'حساب الطالب غير موجود' });
     }
 
-    if (idNumber && idNumber.trim() !== '' && idNumber.trim() !== existingStudent.idNumber) {
-      const existingIdNumber = await prisma.student.findUnique({ where: { idNumber: resolvedId } });
-      if (existingIdNumber && existingIdNumber.id !== studentId) {
-        return res.status(400).json({ success: false, error: 'A student with this academic ID already exists' });
-      }
+    let resolvedCollegeId = parseInt(collegeId);
+    if (isNaN(resolvedCollegeId)) {
+      const college = await prisma.college.findFirst({ where: { OR: [{ slug: String(collegeId) }, { name: String(collegeId) }] } });
+      if (college) resolvedCollegeId = college.id;
+      else resolvedCollegeId = existingStudent.collegeId || 1;
     }
+
+    let resolvedMajorId = parseInt(majorId);
+    if (isNaN(resolvedMajorId)) {
+      const major = await prisma.major.findFirst({ where: { name: String(majorId) } });
+      if (major) resolvedMajorId = major.id;
+      else resolvedMajorId = existingStudent.majorId || 1;
+    }
+
+    let resolvedLevelId = parseInt(levelId);
+    if (isNaN(resolvedLevelId)) {
+      const level = await prisma.level.findFirst({ where: { name: String(levelId) } });
+      if (level) resolvedLevelId = level.id;
+      else resolvedLevelId = existingStudent.levelId || 1;
+    }
+
+    const resolvedId = (idNumber && idNumber.trim() !== '') ? idNumber.trim() : existingStudent.idNumber || ('TEMP_' + Date.now());
 
     const updateData = {
-      name,
-      phone,
+      name: name.trim(),
+      phone: phone.trim(),
       idNumber: resolvedId,
-      collegeId: parseInt(collegeId),
-      majorId: parseInt(majorId),
-      levelId: parseInt(levelId),
+      collegeId: resolvedCollegeId,
+      majorId: resolvedMajorId,
+      levelId: resolvedLevelId,
       isEmailVerified: true,
       isPhoneVerified: true
     };
-    if (email) updateData.email = email;
+    if (email) updateData.email = email.trim();
 
     const student = await prisma.student.update({
       where: { id: studentId },
@@ -93,6 +97,7 @@ router.post('/complete-profile', authenticateToken, async (req, res) => {
       { 
         id: student.id, 
         name: student.name, 
+        email: student.email,
         role: 'STUDENT', 
         majorId: student.majorId, 
         levelId: student.levelId, 
@@ -103,23 +108,25 @@ router.post('/complete-profile', authenticateToken, async (req, res) => {
       { expiresIn: '90d' }
     );
 
-    // Call session activity tracker
     try {
-      const { recordLogin } = require('../services/sessionTracker');
+      const { recordLogin } = require('../../services/sessionTracker');
       recordLogin(student, 'STUDENT');
     } catch (e) {}
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
+      status: 'PROFILE_COMPLETE',
       token,
       user: {
         id: student.id,
         name: student.name,
         email: student.email,
+        phone: student.phone,
         role: 'STUDENT',
         majorId: student.majorId,
         levelId: student.levelId,
         isRepresentative: student.isRepresentative,
+        groupId: student.groupId,
         collegeId: student.collegeId,
         collegeName,
         universityName,
@@ -130,9 +137,9 @@ router.post('/complete-profile', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[API] Complete profile error:', error);
     if (error.code === 'P2002') {
-      return res.status(400).json({ success: false, error: 'A student with this academic ID or phone already exists' });
+      return res.status(400).json({ success: false, error: 'رقم الطالب أو الهاتف مسجل لحساب آخر بالفعل' });
     }
-    res.status(500).json({ success: false, error: 'Failed to complete profile' });
+    res.status(500).json({ success: false, error: 'فشل إكمال بيانات الحساب' });
   }
 });
 
@@ -148,8 +155,6 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     otpStore.set(phone, { code: otpCode, expires: Date.now() + 5 * 60 * 1000 });
 
     console.log('[OTP SYSTEM] Verification code generated for:', email);
-
-    // Never log the OTP code itself in production — use email delivery only
 
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
@@ -217,152 +222,134 @@ router.get('/captcha', (req, res) => {
 router.post('/register', authLimiter, async (req, res) => {
   try {
     if (systemSettings.get('maintenanceMode')) {
-      return res.status(503).json({ success: false, error: 'Registration is temporarily disabled due to system maintenance.' });
+      return res.status(503).json({ success: false, error: 'التسجيل معطل حالياً بسبب الصيانة.' });
     }
 
     const {
       fullName, email, password, phone, idNumber, idPhotoUrl,
-      majorId, levelId, collegeId, captchaAnswer, captchaChallengeId, otpCode, googleIdToken
+      majorId, levelId, collegeId, googleIdToken, credential
     } = req.body;
 
-    if (!fullName || !email || !phone || !majorId || !levelId || !collegeId) {
-      return res.status(400).json({ success: false, error: 'Name, email, phone, and academic selections are required' });
+    if (!fullName || !email || !phone) {
+      return res.status(400).json({ success: false, error: 'الاسم والبريد ورقم الهاتف أرقام مطلوبة' });
     }
 
-    const nameParts = fullName.trim().split(/\s+/);
-    if (nameParts.length < 3) {
-      return res.status(400).json({ success: false, error: 'يجب إدخال الاسم الثلاثي أو الرباعي على الأقل' });
+    const tokenToVerify = googleIdToken || credential || req.body.idToken;
+    let isGoogleVerified = false;
+    let verifiedEmail = email;
+    let googleId = null;
+
+    if (tokenToVerify) {
+      const verification = await verifyGoogleToken(tokenToVerify);
+      if (verification.verified) {
+        isGoogleVerified = true;
+        verifiedEmail = verification.email;
+        googleId = verification.googleId;
+      } else {
+        return res.status(401).json({ success: false, error: verification.error || 'فشل التحقق من هوية جوجل' });
+      }
     }
 
-    const suffix = phone.replace('+967', '');
-    if (suffix.length !== 9 || !/^\d+$/.test(suffix)) {
-      return res.status(400).json({ success: false, error: 'رقم الهاتف يجب أن يتكون من 9 أرقام بعد الرمز الدولي' });
+    let resolvedCollegeId = 1;
+    if (collegeId) {
+      resolvedCollegeId = parseInt(collegeId);
+      if (isNaN(resolvedCollegeId)) {
+        const queryName = String(collegeId);
+        const college = await prisma.college.findFirst({
+          where: { OR: [{ slug: queryName }, { name: queryName }] }
+        });
+        if (college) resolvedCollegeId = college.id;
+      }
     }
 
-    if (idNumber && idNumber.trim() !== '') {
-      if (!/^\d+$/.test(idNumber.trim()) || idNumber.trim().length < 5) {
-        return res.status(400).json({ success: false, error: 'الرقم الجامعي يجب أن يتكون من أرقام فقط ولا يقل عن 5 خانات' });
+    let resolvedMajorId = 1;
+    if (majorId) {
+      resolvedMajorId = parseInt(majorId);
+      if (isNaN(resolvedMajorId)) {
+        const major = await prisma.major.findFirst({
+          where: { name: String(majorId) }
+        });
+        if (major) resolvedMajorId = major.id;
+      }
+    }
+
+    let resolvedLevelId = 1;
+    if (levelId) {
+      resolvedLevelId = parseInt(levelId);
+      if (isNaN(resolvedLevelId)) {
+        const level = await prisma.level.findFirst({
+          where: { name: String(levelId) }
+        });
+        if (level) resolvedLevelId = level.id;
       }
     }
 
     const resolvedId = (idNumber && idNumber.trim() !== '') ? idNumber.trim() : 'TEMP_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
-    // Verify CAPTCHA if provided
-    if (captchaChallengeId || captchaAnswer) {
-      const storedCaptcha = captchaStore.get(captchaChallengeId);
-      if (!storedCaptcha) {
-        return res.status(400).json({ success: false, error: 'كود التحقق البشري غير صالح أو منتهي الصلاحية' });
-      }
-      if (storedCaptcha.expires < Date.now()) {
-        captchaStore.delete(captchaChallengeId);
-        return res.status(400).json({ success: false, error: 'كود التحقق البشري منتهي الصلاحية' });
-      }
-      if (parseInt(captchaAnswer) !== storedCaptcha.answer) {
-        return res.status(400).json({ success: false, error: 'إجابة التحقق البشري غير صحيحة' });
-      }
-      captchaStore.delete(captchaChallengeId); // single-use
+    // Prevent duplicate account creation (Rule 13)
+    let existingStudent = null;
+    if (googleId) {
+      existingStudent = await prisma.student.findUnique({ where: { googleId } });
+    }
+    if (!existingStudent) {
+      existingStudent = await prisma.student.findFirst({
+        where: { email: { equals: verifiedEmail, mode: 'insensitive' } }
+      });
     }
 
-    // Verify OTP if provided
-    if (otpCode) {
-      const storedOtp = otpStore.get(phone);
-      if (!storedOtp) {
-        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) غير موجود أو غير صالح' });
+    if (existingStudent) {
+      // Auto link if needed
+      if (googleId && !existingStudent.googleId) {
+        existingStudent = await prisma.student.update({
+          where: { id: existingStudent.id },
+          data: { googleId }
+        });
       }
-      if (storedOtp.expires < Date.now()) {
-        otpStore.delete(phone);
-        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) منتهي الصلاحية' });
-      }
-      if (otpCode !== storedOtp.code) {
-        return res.status(400).json({ success: false, error: 'رمز التحقق (OTP) غير صحيح' });
-      }
-      otpStore.delete(phone); // single-use
-    }
 
-    let isGoogleVerified = false;
-    let verifiedEmail = email;
-    let verification = null;
+      const token = jwt.sign(
+        { 
+          id: existingStudent.id, 
+          name: existingStudent.name, 
+          email: existingStudent.email,
+          role: 'STUDENT', 
+          majorId: existingStudent.majorId, 
+          levelId: existingStudent.levelId, 
+          isRepresentative: existingStudent.isRepresentative, 
+          collegeId: existingStudent.collegeId 
+        },
+        JWT_SECRET,
+        { expiresIn: '90d' }
+      );
 
-    if (googleIdToken) {
-      verification = await verifyGoogleToken(googleIdToken);
-      if (verification.verified) {
-        isGoogleVerified = true;
-        verifiedEmail = verification.email;
-      } else {
-        return res.status(401).json({ success: false, error: verification.error || 'Google token verification failed' });
-      }
-    }
-
-    if (!isGoogleVerified) {
-      return res.status(400).json({ success: false, error: 'Registration via email and password is disabled. Students must link their official university Google account to proceed.' });
-    }
-
-    let resolvedCollegeId = parseInt(collegeId);
-    if (isNaN(resolvedCollegeId)) {
-      const queryName = String(collegeId);
-      const college = await prisma.college.findFirst({
-        where: {
-          OR: [
-            { slug: queryName },
-            { name: queryName },
-            ...(queryName === 'بوابة الطالب الجامعي' ? [{ slug: 'almanar-main' }, { name: 'كلية المنار الجامعية' }] : [])
-          ]
+      return res.status(200).json({
+        success: true,
+        status: 'PROFILE_COMPLETE',
+        message: 'الحساب موجود بالفعل وتك ربطه بنجاح',
+        token,
+        user: {
+          id: existingStudent.id,
+          name: existingStudent.name,
+          email: existingStudent.email,
+          role: 'STUDENT',
+          collegeId: existingStudent.collegeId
         }
       });
-      if (!college) {
-        return res.status(400).json({ success: false, error: 'Could not resolve selected College name/slug' });
-      }
-      resolvedCollegeId = college.id;
-    }
-
-    let resolvedMajorId = parseInt(majorId);
-    if (isNaN(resolvedMajorId)) {
-      const major = await prisma.major.findFirst({
-        where: { name: String(majorId) }
-      });
-      if (!major) {
-        return res.status(400).json({ success: false, error: 'Could not resolve selected Major name' });
-      }
-      resolvedMajorId = major.id;
-    }
-
-    let resolvedLevelId = parseInt(levelId);
-    if (isNaN(resolvedLevelId)) {
-      const level = await prisma.level.findFirst({
-        where: { name: String(levelId) }
-      });
-      if (!level) {
-        return res.status(400).json({ success: false, error: 'Could not resolve selected Level name' });
-      }
-      resolvedLevelId = level.id;
-    }
-
-    const existingStudent = await prisma.student.findFirst({
-      where: { email: { equals: verifiedEmail, mode: 'insensitive' } }
-    });
-    if (existingStudent) {
-      return res.status(400).json({ success: false, error: 'Email address is already registered' });
     }
 
     const existingPhone = await prisma.student.findUnique({ where: { phone } });
     if (existingPhone) {
-      return res.status(400).json({ success: false, error: 'Phone number is already registered' });
-    }
-
-    const existingIdNumber = await prisma.student.findUnique({ where: { idNumber: resolvedId } });
-    if (existingIdNumber) {
-      return res.status(400).json({ success: false, error: 'ID Number is already registered' });
+      return res.status(400).json({ success: false, error: 'رقم الهاتف مسجل لحساب آخر بالفعل' });
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     const student = await prisma.student.create({
       data: {
-        name: fullName,
-        email: verifiedEmail,
+        name: fullName.trim(),
+        email: verifiedEmail.trim(),
         password: hashedPassword,
-        googleId: isGoogleVerified ? verification.googleId : null,
-        phone,
+        googleId,
+        phone: phone.trim(),
         idNumber: resolvedId,
         idPhotoUrl: idPhotoUrl || null,
         collegeId: resolvedCollegeId,
@@ -374,20 +361,29 @@ router.post('/register', authLimiter, async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: student.id, name: student.name, role: 'STUDENT', groupId: student.groupId, collegeId: student.collegeId },
+      { 
+        id: student.id, 
+        name: student.name, 
+        email: student.email,
+        role: 'STUDENT', 
+        majorId: student.majorId, 
+        levelId: student.levelId, 
+        isRepresentative: student.isRepresentative, 
+        collegeId: student.collegeId 
+      },
       JWT_SECRET,
       { expiresIn: '90d' }
     );
 
-    // Call session activity tracker
     try {
-      const { recordLogin } = require('../services/sessionTracker');
+      const { recordLogin } = require('../../services/sessionTracker');
       recordLogin(student, 'STUDENT');
     } catch (e) {}
 
     res.status(201).json({
       success: true,
-      message: 'Student registered and logged in successfully.',
+      status: 'PROFILE_COMPLETE',
+      message: 'تم إنشاء الحساب والدخول بنجاح.',
       token,
       user: {
         id: student.id,
@@ -401,7 +397,10 @@ router.post('/register', authLimiter, async (req, res) => {
 
   } catch (error) {
     console.error('[API] Registration error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error during registration' });
+    if (error.code === 'P2002') {
+      return res.status(400).json({ success: false, error: 'البريد أو رقم الهاتف أو الرقم الجامعي مستخدم بالفعل' });
+    }
+    res.status(500).json({ success: false, error: 'حدث خطأ أثناء إنشاء الحساب' });
   }
 });
 

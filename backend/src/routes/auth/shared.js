@@ -77,11 +77,15 @@ async function verifyGoogleToken(token) {
   try {
     const ticket  = await googleOAuthClient.verifyIdToken({ idToken: token, audience: GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
+    if (payload.email_verified === false) {
+      return { verified: false, error: 'Google email is not verified' };
+    }
     return {
       googleId: payload.sub,
       email:    payload.email,
       name:     payload.name || payload.given_name || payload.email.split('@')[0],
       picture:  payload.picture,
+      email_verified: true,
       verified: true,
     };
   } catch (err) {
@@ -100,8 +104,10 @@ async function verifyGoogleToken(token) {
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);
-            if (parsed.email) {
-              resolve({ googleId: parsed.sub, email: parsed.email, name: parsed.name || parsed.email.split('@')[0], picture: parsed.picture, verified: true });
+            if (parsed.email && (parsed.email_verified === true || parsed.email_verified === 'true' || parsed.email_verified === undefined)) {
+              resolve({ googleId: parsed.sub, email: parsed.email, name: parsed.name || parsed.email.split('@')[0], picture: parsed.picture, email_verified: true, verified: true });
+            } else if (parsed.email && parsed.email_verified === false) {
+              resolve({ verified: false, error: 'Google email is not verified' });
             } else {
               resolve({ verified: false, error: parsed.error_description || 'Invalid token' });
             }

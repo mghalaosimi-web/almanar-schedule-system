@@ -13,7 +13,6 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/connectivity_service.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/gradient_button.dart';
-import '../../../data/remote/api_client.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
@@ -102,7 +101,6 @@ class _LoginScreenState extends State<LoginScreen>
     final result = await auth.login(
       identifier: _identifierCtrl.text.trim(),
       password: _passwordCtrl.text.trim(),
-      role: _selectedRole,
       isConnected: connectivity.isConnected,
     );
 
@@ -115,6 +113,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (result.isOfflineLogin) {
         _showSnack('دخول بنجاح — عرض البيانات المحفوظة 📦', AppColors.gold);
       }
+      context.go('/');
     } else {
       HapticFeedback.heavyImpact();
       setState(() => _errorMessage = result.error);
@@ -144,23 +143,31 @@ class _LoginScreenState extends State<LoginScreen>
       final idToken = authentication.idToken ?? authentication.accessToken;
 
       if (idToken != null) {
-        final api = ApiClient();
-        final response = await api.post(
-          '/auth/google',
-          data: {'credential': idToken},
-        );
+        final auth = context.read<AuthService>();
+        final result = await auth.handleGoogleSignIn(idToken);
 
-        if (response.data != null && response.data['success'] == true) {
-          final token = response.data['token'] as String?;
-          if (token != null) {
-            await api.saveToken(token);
-            if (!mounted) return;
-            context.go('/');
-            return;
-          }
+        if (!mounted) return;
+
+        if (result.status == 'PROFILE_COMPLETE') {
+          HapticFeedback.mediumImpact();
+          context.go('/');
+          return;
+        }
+
+        if (result.status == 'PROFILE_INCOMPLETE') {
+          _showCompleteProfileSheet(result);
+          return;
+        }
+
+        if (result.status == 'NEW_ACCOUNT') {
+          _showNewAccountDialog(result.googleData);
+          return;
+        }
+
+        if (result.error != null) {
+          setState(() => _errorMessage = result.error);
         }
       }
-      _showSnack('تم التحقق عبر جوجل — جاري إكمال المزامنة', AppColors.accent);
     } catch (e) {
       debugPrint('[GoogleAuth] Error: $e');
       setState(() => _errorMessage = 'تعذر الاتصال بـ جوجل. تحقق من الاتصال بالشبكة.');
@@ -169,68 +176,81 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _launchGitHubProfile() async {
-    final Uri url = Uri.parse('https://github.com/mghalaosimi-web');
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(url);
-      }
-    } catch (e) {
-      debugPrint('[UrlLauncher] Error opening GitHub link: $e');
-    }
-  }
+  void _showCompleteProfileSheet(AuthResult result) {
+    final phoneCtrl = TextEditingController(text: result.user?.phone ?? '');
+    final nameCtrl = TextEditingController(text: result.user?.name ?? '');
 
-  void _showSnack(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
-
-  void _showForgotPasswordDialog() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.glassBorder),
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
         ),
-        title: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.lock_reset_rounded, color: AppColors.accent, size: 24),
-            const SizedBox(width: 8),
-            Text('استعادة كلمة السر', style: AppTextStyles.headlineSmall),
+            Row(
+              children: [
+                const Icon(Icons.edit_note_rounded, color: AppColors.accent, size: 28),
+                const SizedBox(width: 8),
+                Text('أكمل بيانات حسابك', style: AppTextStyles.headlineSmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'يرجى إكمال البيانات الأساسية للحساب قبل المتابعة.',
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'الاسم الكامل', prefixIcon: Icon(Icons.person_rounded)),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'رقم الهاتف / الواتساب', prefixIcon: Icon(Icons.phone_rounded)),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                final auth = context.read<AuthService>();
+                final navigator = Navigator.of(ctx);
+                final router = GoRouter.of(ctx);
+                final res = await auth.completeProfile(
+                  name: nameCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  collegeId: 1,
+                  majorId: 1,
+                  levelId: 1,
+                );
+                navigator.pop();
+                if (res.success) {
+                  router.go('/');
+                } else {
+                  if (mounted) {
+                    _showSnack(res.error ?? 'فشل حفظ البيانات', AppColors.error);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text('متابعة والدخول المباشر'),
+            ),
           ],
         ),
-        content: Text(
-          'يرجى إدخال رقم الطالب أو البريد الإلكتروني وسيصلك رمز إعادة التعيين عبر الواتساب أو البريد الإلكتروني.',
-          style: AppTextStyles.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('إلغاء', style: AppTextStyles.bodyMedium),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showSnack('تم إرسال تعليمات إعادة التعيين ✓', AppColors.accent);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              minimumSize: const Size(100, 44),
-            ),
-            child: const Text('إرسال'),
-          ),
-        ],
       ),
     );
   }
@@ -259,6 +279,140 @@ class _LoginScreenState extends State<LoginScreen>
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text('إغلاق', style: AppTextStyles.bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNewAccountDialog(Map<String, dynamic>? googleData) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.glassBorder),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.account_circle_outlined, color: AppColors.gold, size: 26),
+            const SizedBox(width: 8),
+            Text('لا يوجد لديك حساب حتى الآن', style: AppTextStyles.headlineSmall.copyWith(fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'لم يتم العثور على حساب مرتبظ بـ جوجل (${googleData?['email'] ?? ''}). هل ترغب في إنشاء حساب جديد الآن؟',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('إلغاء', style: AppTextStyles.bodyMedium),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/register');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              minimumSize: const Size(120, 44),
+            ),
+            child: const Text('إنشاء حساب جديد'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchGitHubProfile() async {
+    final Uri url = Uri.parse('https://github.com/mghalaosimi-web');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(url);
+      }
+    } catch (e) {
+      debugPrint('[UrlLauncher] Error opening GitHub link: $e');
+    }
+  }
+
+  void _showSnack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog() {
+    final phoneCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.glassBorder),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.lock_reset_rounded, color: AppColors.accent, size: 24),
+            const SizedBox(width: 8),
+            Text('استعادة كلمة المرور', style: AppTextStyles.headlineSmall),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'أدخل رقم الهاتف المرتبط بالحساب لإرسال طلب استعادة آمن لإدارة الكلية.',
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              textDirection: TextDirection.ltr,
+              style: AppTextStyles.inputText,
+              decoration: const InputDecoration(
+                labelText: 'رقم الهاتف',
+                hintText: '770000000',
+                prefixIcon: Icon(Icons.phone_android_rounded, size: 20),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('إلغاء', style: AppTextStyles.bodyMedium),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final phone = phoneCtrl.text.trim();
+              if (phone.isEmpty) return;
+              Navigator.pop(ctx);
+
+              final auth = context.read<AuthService>();
+              final result = await auth.requestPasswordReset(phone);
+
+              if (!mounted) return;
+              _showSnack(result.error ?? 'تم إرسال طلب استعادة كلمة المرور بنجاح ✓', result.success ? AppColors.accent : AppColors.error);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              minimumSize: const Size(120, 44),
+            ),
+            child: const Text('إرسال طلب الاستعادة'),
           ),
         ],
       ),

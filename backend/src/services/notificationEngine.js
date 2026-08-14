@@ -105,7 +105,9 @@ async function emailProvider(recipients, payload) {
  * WhatsApp / SMS Delivery Provider Stub
  */
 async function whatsappProvider(recipients, payload) {
-  console.log(`[NotificationEngine -> WhatsAppProvider] Dispatched message to ${recipients.length} target(s): "${payload.title}"`);
+  const targetCount = Array.isArray(recipients) ? recipients.length : 1;
+  console.log(`[NotificationEngine -> WhatsAppProvider] Dispatched message to ${targetCount} target(s): "${payload.title || ''}"`);
+  console.log('[WHATSAPP INTEGRATION LIMITATION] Physical WhatsApp gateway not connected. Request recorded in system log.');
 }
 
 // ── 3. AUDIENCE RESOLVER ────────────────────────────────────────────────────
