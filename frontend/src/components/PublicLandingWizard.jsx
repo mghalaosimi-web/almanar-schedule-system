@@ -446,7 +446,7 @@ export default function PublicLandingWizard() {
                   <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--accent)] via-cyan-500 to-[var(--accent-dim)]" />
 
                   {/* Institution Shield / Brand Header */}
-                  <div className="flex flex-col items-center text-center mb-5 pt-2">
+                  <div className="flex flex-col items-center text-center mb-4 pt-2">
                     <div onClick={handleLogoTap} className="w-16 h-16 rounded-2xl bg-[var(--accent-dim)] border border-[var(--accent-glow)] p-2 flex items-center justify-center mb-3 shadow-lg cursor-pointer">
                       <Logo size="md" customLogoUrl="/almanar-logo.png" />
                     </div>
@@ -455,6 +455,44 @@ export default function PublicLandingWizard() {
                     </h1>
                     <p className="text-xs text-[var(--text-muted)] font-bold mt-0.5">
                       {isAr ? 'تسجيل الدخول المباشر إلى النظام' : 'Direct System Access Portal'}
+                    </p>
+                  </div>
+
+                  {/* 📲 Direct Mobile App Download Banner */}
+                  <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-cyan-500/15 to-blue-500/15 border border-emerald-500/30 text-right">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📲</span>
+                        <div>
+                          <p className="text-xs font-black text-white">تطبيق جداول المنار للأندرويد</p>
+                          <p className="text-[10px] text-emerald-400 font-bold">الإصدار الرسمى v2.0.0 (53.8 MB)</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30">
+                        APK مباشر
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      <a
+                        href="/Manar_Schedule.apk"
+                        download="Manar_Schedule.apk"
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 no-underline text-center cursor-pointer"
+                      >
+                        <span>📥</span>
+                        <span>تحميل وتثبيت التطبيق الآن (APK)</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={(e) => triggerApkDownload(e, 'apk')}
+                        className="py-2.5 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs transition-all cursor-pointer"
+                        title="خيارات إضافية"
+                      >
+                        <span>⚙️ خيارات</span>
+                      </button>
+                    </div>
+                    <p className="text-[9.5px] text-white/60 font-bold text-center mt-2 leading-relaxed">
+                      💡 في حال ظهور تنبيه حماية من أندرويد عند الفتح: اختر <span className="text-emerald-400 font-black">"التثبيت على أي حال" (Install Anyway)</span>.
                     </p>
                   </div>
 

@@ -178,6 +178,10 @@ export default function PWAInstallModal({ isOpen, onClose, deferredPrompt, onIns
               <p className="text-[10px] text-white/40 text-center font-bold">
                 الإصدار v2.0.0 (Build 2) • حجم الملف: 53.8 ميجابايت • متوافق مع جميع أجهزة أندرويد
               </p>
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-300 font-bold space-y-1">
+                <p className="font-black">💡 تلميح التثبيت لأجهزة أندرويد:</p>
+                <p>إذا ظهرت لك رسالة حماية من أندرويد عند فتح الملف: اضغط على <span className="underline">"التفاصيل" (Details)</span> ثم اختر <span className="underline">"التثبيت على أي حال" (Install Anyway)</span>.</p>
+              </div>
             </div>
           )}
 
