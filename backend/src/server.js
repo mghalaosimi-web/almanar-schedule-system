@@ -259,64 +259,6 @@ async function runStartupMigrations() {
   }
 }
 
-// Database startup, migrations, seeding, and port binding sequencing
-async function boot() {
-  try {
-    console.log('[DATABASE] Connecting to PostgreSQL via Prisma Client...');
-    await prisma.$connect();
-    console.log('[DATABASE] Connected to PostgreSQL via Prisma Client.');
-
-    // Commented out to prevent database lock contention across multi-tenant instances on boot
-    // await runStartupMigrations();
-
-    // Check if seeding is needed (e.g. if university table is empty)
-    try {
-      const studentCount = await prisma.student.count();
-      if (studentCount === 0) {
-        console.log('[DATABASE] Warning: Student table is empty. If this is a fresh setup, please run the seed script manually: node backend/prisma/seed.js');
-      } else {
-        console.log(`[DATABASE] System populated with ${studentCount} students for Al-Manar University College.`);
-      }
-    } catch (dbErr) {
-      console.warn('[DATABASE] Connection check warning:', dbErr.message);
-    }
-
-    // Initialize cron summary engine and ERP Event Bus
-    initializeCronJobs();
-    const { initializeDefaultListeners } = require('./services/eventBus');
-    initializeDefaultListeners();
-
-    const PORT = process.env.PORT || 5000;
-    const server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log('Smart Notification Engine (Cron) is initialized.');
-    });
-
-    // ── Graceful Shutdown ────────────────────────────────────────────────
-    const shutdown = async (signal) => {
-      console.log(`\n[SERVER] ${signal} received. Starting graceful shutdown...`);
-      server.close(async () => {
-        console.log('[SERVER] HTTP server closed.');
-        await prisma.$disconnect();
-        console.log('[DATABASE] Prisma client disconnected cleanly.');
-        process.exit(0);
-      });
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error('[SERVER] Forced shutdown after timeout.');
-        process.exit(1);
-      }, 10000);
-    };
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT',  () => shutdown('SIGINT'));
-    // ────────────────────────────────────────────────────────────────────
-
-  } catch (err) {
-    console.error('[DATABASE] Critical database connection error:', err.message);
-    process.exit(1);
-  }
-}
-
 // Direct version metadata endpoint (Single Source of Truth)
 app.get(['/api/app/version', '/api/version'], (req, res) => {
   const fs = require('fs');
@@ -338,6 +280,58 @@ app.get(['/api/app/version', '/api/version'], (req, res) => {
     releaseDate: '2026-08-15'
   });
 });
+
+// Bind HTTP server immediately to process.env.PORT so Render port scan succeeds instantly
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`[SERVER] HTTP Server is running on port ${PORT}`);
+});
+
+// ── Graceful Shutdown ────────────────────────────────────────────────
+const shutdown = async (signal) => {
+  console.log(`\n[SERVER] ${signal} received. Starting graceful shutdown...`);
+  server.close(async () => {
+    console.log('[SERVER] HTTP server closed.');
+    await prisma.$disconnect();
+    console.log('[DATABASE] Prisma client disconnected cleanly.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('[SERVER] Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+// ────────────────────────────────────────────────────────────────────
+
+// Database startup, background services, and telemetry initialization
+async function boot() {
+  try {
+    console.log('[DATABASE] Connecting to PostgreSQL via Prisma Client...');
+    await prisma.$connect();
+    console.log('[DATABASE] Connected to PostgreSQL via Prisma Client.');
+
+    try {
+      const studentCount = await prisma.student.count();
+      if (studentCount === 0) {
+        console.log('[DATABASE] Warning: Student table is empty.');
+      } else {
+        console.log(`[DATABASE] System populated with ${studentCount} students for Al-Manar University College.`);
+      }
+    } catch (dbErr) {
+      console.warn('[DATABASE] Connection check warning:', dbErr.message);
+    }
+
+    initializeCronJobs();
+    const { initializeDefaultListeners } = require('./services/eventBus');
+    initializeDefaultListeners();
+  } catch (err) {
+    console.error('[DATABASE] Database connection issue during boot:', err.message);
+  }
+}
+
+boot();
 
 // Direct APK file download endpoint with proper MIME headers
 app.get(['/Manar_Schedule.apk', '/download/apk', '/api/public/download-apk'], (req, res) => {
