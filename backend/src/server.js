@@ -1,4 +1,6 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+// Allow self-signed certificates (required for Supabase Session Pooler)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 // Environment Validation Check
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {

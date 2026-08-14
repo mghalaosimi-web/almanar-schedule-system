@@ -1,9 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:manar_schedule/main.dart';
+import 'package:manar_schedule/app.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const ManarScheduleApp());
-    expect(find.byType(ManarScheduleApp), findsOneWidget);
+    await tester.pumpWidget(ManarApp());
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
