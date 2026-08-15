@@ -10,6 +10,7 @@ const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const authenticateToken = verifyToken;
 const systemSettings = require('../services/systemSettings');
+const { resolveGoogleIdentity } = require('../services/googleResolver');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -422,47 +423,28 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     const { email, name, googleId } = verification;
+    const resolution = await resolveGoogleIdentity({ email, googleId, name });
 
-    let user = null;
-    if (googleId) {
-      user = await prisma.student.findUnique({
-        where: { googleId },
-        include: { group: true }
-      });
-    }
-    if (!user) {
-      user = await prisma.student.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
-        include: { group: true }
-      });
-      if (user && googleId && !user.googleId) {
-        // Auto-link Google ID on successful email match
-        user = await prisma.student.update({
-          where: { id: user.id },
-          data: { googleId },
-          include: { group: true }
-        });
-      }
-    }
-    let role = 'STUDENT';
-
-    if (!user) {
-      user = await prisma.lecturer.findUnique({ where: { email } });
-      if (user) role = 'LECTURER';
-    }
-
-    if (!user) {
-      user = await prisma.admin.findUnique({ where: { email } });
-      if (user) role = user.role;
-    }
-
-    if (!user) {
-      return res.status(403).json({
+    if (resolution.status === 'AMBIGUOUS_ACCOUNT') {
+      return res.status(200).json({
         success: false,
-        code: 'GOOGLE_NOT_LINKED',
-        error: 'حساب جوجل هذا غير مربوط بأي حساب جامعي. يرجى تسجيل الدخول بالبريد الجامعي أولاً لربط الحساب.'
+        status: 'AMBIGUOUS_ACCOUNT',
+        error: resolution.error
       });
     }
+
+    if (resolution.status === 'NEW_ACCOUNT') {
+      return res.status(200).json({
+        success: true,
+        status: 'NEW_ACCOUNT',
+        code: 'ACCOUNT_NOT_FOUND',
+        error: 'لا يوجد لديك حساب حتى الآن',
+        googleData: resolution.googleData
+      });
+    }
+
+    const user = resolution.user;
+    const role = resolution.role;
 
     if (collegeId && user.collegeId && user.collegeId !== parseInt(collegeId)) {
       return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
@@ -514,6 +496,8 @@ router.post('/google', authLimiter, async (req, res) => {
 
     res.status(200).json({
       success: true,
+      status: resolution.status,
+      missingFields: resolution.missingFields || [],
       token: systemToken,
       user: {
         id: user.id,
@@ -553,35 +537,31 @@ router.post('/google-login', authLimiter, async (req, res) => {
     }
 
     const { email, name, googleId } = verification;
+    const resolution = await resolveGoogleIdentity({ email, googleId, name });
 
-    let student = null;
-    if (googleId) {
-      student = await prisma.student.findUnique({
-        where: { googleId }
-      });
-    }
-    if (!student) {
-      student = await prisma.student.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } }
-      });
-      if (student && googleId && !student.googleId) {
-        student = await prisma.student.update({
-          where: { id: student.id },
-          data: { googleId }
-        });
-      }
-    }
-
-    if (!student) {
-      return res.status(403).json({
+    if (resolution.status === 'AMBIGUOUS_ACCOUNT') {
+      return res.status(200).json({
         success: false,
-        code: 'GOOGLE_NOT_LINKED',
-        error: 'حساب جوجل هذا غير مربوط بأي حساب جامعي. يرجى تسجيل الدخول بالبريد الجامعي أولاً لربط الحساب.'
+        status: 'AMBIGUOUS_ACCOUNT',
+        error: resolution.error
       });
     }
 
-    if (collegeId && student.collegeId !== parseInt(collegeId)) {
-      return res.status(401).json({ success: false, error: 'Student does not belong to the selected college' });
+    if (resolution.status === 'NEW_ACCOUNT') {
+      return res.status(200).json({
+        success: true,
+        status: 'NEW_ACCOUNT',
+        code: 'ACCOUNT_NOT_FOUND',
+        error: 'لا يوجد لديك حساب حتى الآن',
+        googleData: resolution.googleData
+      });
+    }
+
+    const user = resolution.user;
+    const role = resolution.role;
+
+    if (collegeId && user.collegeId && user.collegeId !== parseInt(collegeId)) {
+      return res.status(401).json({ success: false, error: 'User does not belong to the selected college' });
     }
 
     let collegeName = null;
@@ -589,9 +569,9 @@ router.post('/google-login', authLimiter, async (req, res) => {
     let universityLogo = null;
     let themeColor = null;
 
-    if (student.collegeId) {
+    if (user.collegeId) {
       const college = await prisma.college.findUnique({
-        where: { id: student.collegeId },
+        where: { id: user.collegeId },
         include: { university: true }
       });
       if (college) {
@@ -607,14 +587,16 @@ router.post('/google-login', authLimiter, async (req, res) => {
 
     const token = jwt.sign(
       { 
-        id: student.id, 
-        name: student.name, 
-        email: student.email,
-        role: 'STUDENT', 
-        majorId: student.majorId, 
-        levelId: student.levelId, 
-        isRepresentative: student.isRepresentative, 
-        collegeId: student.collegeId 
+        id: user.id, 
+        name: user.name, 
+        email: user.email,
+        role, 
+        majorId: role === 'STUDENT' ? user.majorId : undefined,
+        levelId: role === 'STUDENT' ? user.levelId : undefined,
+        isRepresentative: role === 'STUDENT' ? user.isRepresentative : undefined,
+        groupId: role === 'STUDENT' ? user.groupId : undefined,
+        collegeId: user.collegeId,
+        universityId: user.universityId || undefined
       },
       JWT_SECRET,
       { expiresIn: '90d' }
@@ -623,22 +605,25 @@ router.post('/google-login', authLimiter, async (req, res) => {
     // Call session activity tracker
     try {
       const { recordLogin } = require('../services/sessionTracker');
-      recordLogin(student, 'STUDENT');
+      recordLogin(user, role);
     } catch (e) {}
 
     res.status(200).json({
       success: true,
+      status: resolution.status,
+      missingFields: resolution.missingFields || [],
       token,
       user: {
-        id: student.id,
-        name: student.name,
-        email: student.email,
-        role: 'STUDENT',
-        googleId: student.googleId,
-        majorId: student.majorId,
-        levelId: student.levelId,
-        isRepresentative: student.isRepresentative,
-        collegeId: student.collegeId,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role,
+        googleId: role === 'STUDENT' ? user.googleId : undefined,
+        majorId: role === 'STUDENT' ? user.majorId : undefined,
+        levelId: role === 'STUDENT' ? user.levelId : undefined,
+        isRepresentative: role === 'STUDENT' ? user.isRepresentative : undefined,
+        groupId: role === 'STUDENT' ? user.groupId : undefined,
+        collegeId: user.collegeId,
         collegeName,
         universityName,
         universityLogo,
@@ -1048,19 +1033,23 @@ router.post('/register', authLimiter, async (req, res) => {
     let isGoogleVerified = false;
     let verifiedEmail = email;
     let verification = null;
+    let resolvedGoogleId = req.body.googleId || null;
 
     if (googleIdToken) {
       verification = await verifyGoogleToken(googleIdToken);
       if (verification.verified) {
         isGoogleVerified = true;
         verifiedEmail = verification.email;
+        resolvedGoogleId = verification.googleId;
       } else {
         return res.status(401).json({ success: false, error: verification.error || 'Google token verification failed' });
       }
+    } else if (resolvedGoogleId) {
+      isGoogleVerified = true;
     }
 
-    if (!isGoogleVerified) {
-      return res.status(400).json({ success: false, error: 'Registration via email and password is disabled. Students must link their official university Google account to proceed.' });
+    if (!isGoogleVerified && (!password || password.trim().length < 6)) {
+      return res.status(400).json({ success: false, error: 'يرجى إدخال كلمة مرور (6 أحرف على الأقل) أو التسجيل عبر Google.' });
     }
 
     let resolvedCollegeId = parseInt(collegeId);
@@ -1127,7 +1116,7 @@ router.post('/register', authLimiter, async (req, res) => {
         name: fullName,
         email: verifiedEmail,
         password: hashedPassword,
-        googleId: isGoogleVerified ? verification.googleId : null,
+        googleId: isGoogleVerified ? (resolvedGoogleId || (verification ? verification.googleId : null)) : null,
         phone,
         idNumber: resolvedId,
         idPhotoUrl: idPhotoUrl || null,

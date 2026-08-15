@@ -42,7 +42,7 @@ class ManarApp extends StatelessWidget {
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      GoRoute(path: '/register', builder: (_, state) => RegisterScreen(googleData: state.extra as Map<String, dynamic>?)),
       ShellRoute(
         builder: (context, state, child) => _MainShell(child: child),
         routes: [

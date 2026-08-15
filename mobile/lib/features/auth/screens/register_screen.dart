@@ -11,9 +11,11 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../data/remote/api_client.dart';
 import '../../../core/constants/api_endpoints.dart';
 
-/// شاشة طلب الانضمام والتسجيل — متصلة بالـ Backend
+/// شاشة طلب الانضمام والتسجيل — تدعم Mode A (Google) و Mode B (تقليدي)
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final Map<String, dynamic>? googleData;
+
+  const RegisterScreen({super.key, this.googleData});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -44,6 +46,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   static const _levels = ['1', '2', '3', '4'];
 
+  bool get _isGoogleMode => widget.googleData != null && widget.googleData!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isGoogleMode) {
+      _emailCtrl.text = widget.googleData!['email']?.toString() ?? '';
+      _nameCtrl.text = widget.googleData!['name']?.toString() ?? '';
+    }
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -65,18 +78,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final api = ApiClient();
+      final payload = <String, dynamic>{
+        'fullName': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'idNumber': _studentIdCtrl.text.trim(),
+        'majorId': _selectedMajor,
+        'levelId': _selectedLevel,
+        'collegeId': 1,
+      };
+
+      if (_passwordCtrl.text.trim().isNotEmpty) {
+        payload['password'] = _passwordCtrl.text.trim();
+      }
+
+      if (_isGoogleMode) {
+        payload['googleId'] = widget.googleData!['googleId'];
+      }
+
       final response = await api.post(
         ApiEndpoints.register,
-        data: {
-          'fullName': _nameCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
-          'password': _passwordCtrl.text.trim(),
-          'phone': _phoneCtrl.text.trim(),
-          'idNumber': _studentIdCtrl.text.trim(),
-          'majorId': _selectedMajor,
-          'levelId': _selectedLevel,
-          'collegeId': 1,
-        },
+        data: payload,
       );
 
       final data = response.data as Map<String, dynamic>?;
@@ -92,7 +114,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'تم إنشاء الحساب بنجاح! ✓',
+              _isGoogleMode
+                  ? 'تم إنشاء الحساب وربط Google بنجاح! ✓'
+                  : 'تم إنشاء الحساب بنجاح! ✓',
               style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
             ),
             backgroundColor: AppColors.success,
@@ -138,7 +162,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
           onPressed: () => context.go('/login'),
         ),
-        title: Text('إنشاء حساب جديد', style: AppTextStyles.headlineSmall),
+        title: Text(
+          _isGoogleMode ? 'إنشاء حساب عبر Google' : 'إنشاء حساب جديد',
+          style: AppTextStyles.headlineSmall,
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -158,17 +185,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: AppColors.accentSubtle,
                         border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                       ),
-                      child: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.accent, size: 28),
+                      child: Icon(
+                        _isGoogleMode ? Icons.g_mobiledata_rounded : Icons.person_add_alt_1_rounded,
+                        color: AppColors.accent,
+                        size: 32,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('انضم لكلية المنار', style: AppTextStyles.headlineSmall),
+                          Text(
+                            _isGoogleMode ? 'حساب Google موثق' : 'انضم لكلية المنار',
+                            style: AppTextStyles.headlineSmall,
+                          ),
                           const SizedBox(height: 4),
                           Text(
-                            'سجّل حسابك الجديد للدخول التلقائي للجداول',
+                            _isGoogleMode
+                                ? 'أكمل البيانات الأكاديمية للدخول المباشر'
+                                : 'سجّل حسابك الجديد للدخول التلقائي للجداول',
                             style: AppTextStyles.bodySmall,
                           ),
                         ],
@@ -205,16 +241,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Email
+                      // Email (Read-only if Google mode)
                       TextFormField(
                         controller: _emailCtrl,
+                        readOnly: _isGoogleMode,
                         keyboardType: TextInputType.emailAddress,
                         textDirection: TextDirection.ltr,
                         style: AppTextStyles.inputText,
-                        decoration: const InputDecoration(
-                          labelText: 'البريد الإلكتروني',
+                        decoration: InputDecoration(
+                          labelText: _isGoogleMode ? 'البريد الإلكتروني (Google موثق)' : 'البريد الإلكتروني',
                           hintText: 'student@almanar.edu.ye',
-                          prefixIcon: Icon(Icons.email_outlined, color: AppColors.accent, size: 20),
+                          prefixIcon: Icon(
+                            _isGoogleMode ? Icons.verified_user_rounded : Icons.email_outlined,
+                            color: _isGoogleMode ? AppColors.success : AppColors.accent,
+                            size: 20,
+                          ),
                         ),
                         validator: (v) => (v == null || !v.contains('@')) ? 'أدخل بريد إلكتروني صحيح' : null,
                       ),
@@ -235,7 +276,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Major Selector Dropdown
                       DropdownButtonFormField<String>(
-                        value: _selectedMajor,
+                        initialValue: _selectedMajor,
                         dropdownColor: AppColors.cardBg,
                         style: AppTextStyles.inputText,
                         decoration: const InputDecoration(
@@ -249,7 +290,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Level Selector
                       DropdownButtonFormField<String>(
-                        value: _selectedLevel,
+                        initialValue: _selectedLevel,
                         dropdownColor: AppColors.cardBg,
                         style: AppTextStyles.inputText,
                         decoration: const InputDecoration(
@@ -279,15 +320,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Password
+                      // Password Field (Optional in Google Mode, Required in Traditional Mode)
                       TextFormField(
                         controller: _passwordCtrl,
                         obscureText: _obscurePassword,
                         textDirection: TextDirection.ltr,
                         style: AppTextStyles.inputText,
                         decoration: InputDecoration(
-                          labelText: AppStrings.password,
-                          hintText: '••••••••',
+                          labelText: _isGoogleMode ? 'كلمة المرور (اختيارية لحساب Google)' : AppStrings.password,
+                          hintText: _isGoogleMode ? 'اتركها فارغة للتسجيل بـ Google فقط' : '••••••••',
                           prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.accent, size: 20),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -298,7 +339,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
                         ),
-                        validator: (v) => (v == null || v.length < 6) ? 'كلمة المرور 6 أحرف على الأقل' : null,
+                        validator: (v) {
+                          if (_isGoogleMode) {
+                            if (v != null && v.isNotEmpty && v.length < 6) {
+                              return 'كلمة المرور 6 أحرف على الأقل إن رغبت بتحديدها';
+                            }
+                            return null;
+                          }
+                          return (v == null || v.length < 6) ? 'كلمة المرور 6 أحرف على الأقل' : null;
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -307,9 +356,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.12),
+                            color: AppColors.error.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -324,7 +373,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Submit Button
                       GradientButton(
-                        label: 'إنشاء الحساب والمتابعة',
+                        label: _isGoogleMode ? 'ربط Google وإنشاء الحساب' : 'إنشاء الحساب والمتابعة',
                         icon: Icons.check_circle_rounded,
                         isLoading: _isLoading,
                         onPressed: _handleRegister,

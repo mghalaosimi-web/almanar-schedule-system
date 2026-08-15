@@ -319,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.go('/register');
+              context.go('/register', extra: googleData);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,

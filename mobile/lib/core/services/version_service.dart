@@ -301,7 +301,10 @@ class VersionService {
     }
 
     // 6. تشغيل أداة تثبيت حزم أندرويد الرسمية
-    final result = await OpenFile.open(savePath);
+    final result = await OpenFile.open(
+      savePath,
+      type: 'application/vnd.android.package-archive',
+    );
     if (result.type != ResultType.done) {
       debugPrint('[VersionService] OpenFile status: ${result.message}');
     }
