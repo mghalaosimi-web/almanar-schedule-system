@@ -143,10 +143,16 @@ class _LoginScreenState extends State<LoginScreen>
       final idToken = authentication.idToken ?? authentication.accessToken;
 
       if (idToken != null) {
+        if (!mounted) return;
         final auth = context.read<AuthService>();
         final result = await auth.handleGoogleSignIn(idToken);
 
         if (!mounted) return;
+
+        if (result.status == 'AMBIGUOUS_ACCOUNT') {
+          setState(() => _errorMessage = result.error ?? 'تم العثور على أكثر من حساب مرتبط بهذا البريد الإلكتروني. يرجى التواصل مع إدارة الجامعة.');
+          return;
+        }
 
         if (result.status == 'PROFILE_COMPLETE') {
           HapticFeedback.mediumImpact();
@@ -572,7 +578,7 @@ class _LoginScreenState extends State<LoginScreen>
                 errorBuilder: (ctx, err, stack) => Image.asset(
                   'assets/images/logo.png',
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorBuilder: (c, e, s) => Icon(
                     Icons.school_rounded,
                     color: isDark ? AppColors.accent : AppColors.accentDark,
                     size: 52,
@@ -634,9 +640,27 @@ class _LoginScreenState extends State<LoginScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Role Selector Segmented Tabs
-            _buildRoleSelector(isDark),
-            const SizedBox(height: 24),
+            // PRIMARY: Google Sign-In Button
+            _buildGoogleSignInButton(isDark),
+            const SizedBox(height: 20),
+
+            // Separator Divider
+            Row(
+              children: [
+                Expanded(child: Divider(color: isDark ? AppColors.glassBorder : AppColors.lightBorder)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'أو الدخول ببيانات الحساب',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: isDark ? AppColors.glassBorder : AppColors.lightBorder)),
+              ],
+            ),
+            const SizedBox(height: 20),
 
             // Identifier Input Field
             _buildIdentifierField(),
@@ -654,18 +678,13 @@ class _LoginScreenState extends State<LoginScreen>
             if (_errorMessage != null) _buildErrorMessage(),
             const SizedBox(height: 8),
 
-            // Login Primary Button
+            // Login Password Button
             GradientButton(
               label: AppStrings.loginButton,
               isLoading: _isLoading,
               icon: Icons.login_rounded,
               onPressed: _isLoading ? null : _handleLogin,
             ),
-
-            const SizedBox(height: 14),
-
-            // Google OAuth Button
-            _buildGoogleSignInButton(isDark),
 
             // Offline Notification Banner
             _buildOfflineHint(),
@@ -682,22 +701,31 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildGoogleSignInButton(bool isDark) {
     return GestureDetector(
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
-      child: Container(
-        height: 52,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 54,
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? AppColors.glassBorder : AppColors.lightBorder,
+            color: (isDark ? AppColors.accent : AppColors.accentDark).withValues(alpha: 0.5),
+            width: 1.5,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? AppColors.accent : AppColors.accentDark).withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Center(
           child: _isGoogleLoading
               ? SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 22,
+                  height: 22,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2,
+                    strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation(
                       isDark ? AppColors.accent : AppColors.accentDark,
                     ),
@@ -706,14 +734,21 @@ class _LoginScreenState extends State<LoginScreen>
               : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.g_mobiledata_rounded, color: Colors.redAccent, size: 28),
-                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.g_mobiledata_rounded, color: Color(0xFF4285F4), size: 26),
+                    ),
+                    const SizedBox(width: 10),
                     Text(
-                      'المتابعة عبر جوجل',
+                      'متابعة باستخدام Google',
                       style: AppTextStyles.labelLarge.copyWith(
                         color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -723,76 +758,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Role Selector ─────────────────────────────────────────────
-  Widget _buildRoleSelector(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'نوع الحساب',
-          style: AppTextStyles.labelMedium.copyWith(
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkBg.withValues(alpha: 0.6) : AppColors.lightSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? AppColors.glassBorder : AppColors.lightBorder),
-          ),
-          child: Row(
-            children: _roles.map((r) {
-              final isSelected = _selectedRole == r.role;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedRole = r.role;
-                      _errorMessage = null;
-                      _identifierCtrl.clear();
-                    });
-                    HapticFeedback.selectionClick();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? r.color.withValues(alpha: 0.18) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isSelected
-                          ? Border.all(color: r.color.withValues(alpha: 0.6))
-                          : null,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          r.icon,
-                          color: isSelected ? r.color : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                          size: 22,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          r.label,
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: isSelected ? r.color : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
 
   // ── Identifier Field ──────────────────────────────────────────
   Widget _buildIdentifierField() {

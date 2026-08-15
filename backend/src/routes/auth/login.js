@@ -236,6 +236,8 @@ ${requestTime}
 
     res.status(200).json({
       success: true,
+      status: 'RESET_REQUEST_CREATED',
+      whatsappProviderStatus: 'WHATSAPP_LIMITATION_NOT_CONNECTED',
       message: 'تم إرسال طلب استعادة كلمة المرور إلى إدارة الجامعة بنجاح ✓'
     });
 

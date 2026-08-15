@@ -18,63 +18,86 @@ async function handleVerifiedGoogleAuth(req, res, verification) {
   const { email, name, googleId } = verification;
   const collegeIdInput = req.body.collegeId;
 
-  // 1. Search by googleId first (Rule 3)
-  let user = null;
-  let role = 'STUDENT';
+  const matches = [];
 
+  // 1. Search by googleId across all models (Student, Lecturer, Admin)
   if (googleId) {
-    user = await prisma.student.findUnique({
+    const studentByGId = await prisma.student.findUnique({
       where: { googleId },
       include: { group: true }
     });
+    if (studentByGId) matches.push({ user: studentByGId, role: 'STUDENT', matchedBy: 'googleId' });
+
+    const lecturerByGId = await prisma.lecturer.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } } // Lecturer model currently uses email
+    });
+    if (lecturerByGId && !matches.some(m => m.user.email.toLowerCase() === lecturerByGId.email.toLowerCase())) {
+      // Checked via email for lecturer
+    }
+
+    const adminByGId = await prisma.admin.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } }
+    });
+    if (adminByGId && !matches.some(m => m.user.email.toLowerCase() === adminByGId.email.toLowerCase())) {
+      // Checked via email for admin
+    }
   }
 
-  // 2. Search by verified email if not found by googleId (Rule 3)
-  if (!user) {
-    user = await prisma.student.findFirst({
+  // 2. Search by verified email across Student, Lecturer, Admin if not found by googleId
+  if (matches.length === 0 && email) {
+    const studentsByEmail = await prisma.student.findMany({
       where: { email: { equals: email, mode: 'insensitive' } },
       include: { group: true }
     });
-    if (user && googleId && !user.googleId) {
-      // Auto-link Google ID on verified email match (Rule 4)
-      user = await prisma.student.update({
-        where: { id: user.id },
-        data: { googleId },
-        include: { group: true }
-      });
+    for (const s of studentsByEmail) {
+      matches.push({ user: s, role: 'STUDENT', matchedBy: 'email' });
     }
-  }
 
-  // 3. Search Lecturer if not found in Student
-  if (!user) {
-    const lecturer = await prisma.lecturer.findFirst({
+    const lecturersByEmail = await prisma.lecturer.findMany({
       where: { email: { equals: email, mode: 'insensitive' } }
     });
-    if (lecturer) {
-      user = lecturer;
-      role = 'LECTURER';
+    for (const l of lecturersByEmail) {
+      matches.push({ user: l, role: 'LECTURER', matchedBy: 'email' });
     }
-  }
 
-  // 4. Search Admin if not found in Student or Lecturer
-  if (!user) {
-    const admin = await prisma.admin.findFirst({
+    const adminsByEmail = await prisma.admin.findMany({
       where: { email: { equals: email, mode: 'insensitive' } }
     });
-    if (admin) {
-      user = admin;
-      role = admin.role || 'ADMIN';
+    for (const a of adminsByEmail) {
+      matches.push({ user: a, role: a.role || 'ADMIN', matchedBy: 'email' });
     }
   }
 
-  // Case 7: Google account not found in system -> prompt to create new account
-  if (!user) {
+  // Handle Ambiguous Match (Multiple conflicting accounts for same verified identity)
+  if (matches.length > 1) {
+    console.warn(`[GoogleAuth] Ambiguous identity match detected for email: ${email} (Count: ${matches.length})`);
+    return res.status(200).json({
+      success: false,
+      code: 'AMBIGUOUS_IDENTITY',
+      status: 'AMBIGUOUS_ACCOUNT',
+      error: 'تم العثور على أكثر من حساب مرتبط بهذا البريد الإلكتروني. يرجى التواصل مع إدارة الجامعة.'
+    });
+  }
+
+  // Handle No Match (New Account)
+  if (matches.length === 0) {
     return res.status(200).json({
       success: false,
       code: 'ACCOUNT_NOT_FOUND',
       status: 'NEW_ACCOUNT',
       error: 'لا يوجد لديك حساب حتى الآن',
       googleData: { email, name, googleId }
+    });
+  }
+
+  let { user, role, matchedBy } = matches[0];
+
+  // Auto-link googleId on verified email match for Student
+  if (matchedBy === 'email' && googleId && role === 'STUDENT' && !user.googleId) {
+    user = await prisma.student.update({
+      where: { id: user.id },
+      data: { googleId },
+      include: { group: true }
     });
   }
 

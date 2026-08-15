@@ -1,13 +1,13 @@
 {
   "success": true,
-  "latestVersion": "2.0.0",
-  "latestBuild": 2,
+  "latestVersion": "2.1.0",
+  "latestBuild": 3,
   "minimumSupportedVersion": "2.0.0",
   "minimumSupportedBuild": 2,
   "downloadUrl": "/Manar_Schedule.apk",
   "fullDownloadUrl": "https://almanar-schedule-system.onrender.com/Manar_Schedule.apk",
-  "apkSizeBytes": 56414653,
-  "apkHashSha256": "5DF7989DC8E6EF4197577ED9D79FF82106130F653E70E63EF82A04B49DD2D1A0",
+  "apkSizeBytes": 60833086,
+  "apkHashSha256": "61D3E770A08BB1EBE6C3516ECE23E36E1497DDA587E1A0B1654D369909796650",
   "releaseNotes": [
     "الإصدار الرسمي التنافسي لتطبيق جداول المنار (Offline-First)",
     "عرض الجداول الدراسية والتعديلات الاستثنائية فورياً",

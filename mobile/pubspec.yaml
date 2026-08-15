@@ -1,7 +1,7 @@
 name: manar_schedule
 description: "تطبيق جداول كلية المنار الجامعية — Offline-First"
 publish_to: 'none'
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: ^3.11.0
@@ -43,6 +43,12 @@ dependencies:
   shared_preferences: ^2.2.2
   flutter_local_notifications: ^17.2.2
   google_sign_in: ^6.2.1
+
+  # ── In-App APK Update (§18-20) ─────────────────────────────────
+  path_provider: ^2.1.2
+  open_file: ^3.3.2
+  crypto: ^3.0.3
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:

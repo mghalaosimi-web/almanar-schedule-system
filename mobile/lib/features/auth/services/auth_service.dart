@@ -117,6 +117,14 @@ class AuthService extends ChangeNotifier {
       final isSuccess = data['success'] == true;
       final status = data['status'] as String? ?? (isSuccess ? 'PROFILE_COMPLETE' : 'ERROR');
 
+      if (status == 'AMBIGUOUS_ACCOUNT' || data['code'] == 'AMBIGUOUS_IDENTITY') {
+        return AuthResult(
+          success: false,
+          status: 'AMBIGUOUS_ACCOUNT',
+          error: data['error'] as String? ?? 'تم العثور على أكثر من حساب مرتبط بهذا البريد الإلكتروني. يرجى التواصل مع إدارة الجامعة.',
+        );
+      }
+
       if (status == 'NEW_ACCOUNT' || data['code'] == 'ACCOUNT_NOT_FOUND') {
         final googleData = (data['googleData'] as Map<String, dynamic>?) ?? {};
         return AuthResult(
