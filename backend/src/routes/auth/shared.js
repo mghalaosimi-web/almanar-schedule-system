@@ -74,11 +74,16 @@ async function verifyGoogleToken(token) {
     return { googleId: 'mock_google_id_' + email, email, name, verified: true };
   }
 
+  if (!GOOGLE_CLIENT_ID) {
+    return { verified: false, code: 'GOOGLE_CONFIGURATION_ERROR', error: 'Google sign-in is not configured' };
+  }
+
   try {
     const ticket  = await googleOAuthClient.verifyIdToken({ idToken: token, audience: GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
-    if (payload.email_verified === false) {
-      return { verified: false, error: 'Google email is not verified' };
+    const validIssuer = payload.iss === 'https://accounts.google.com' || payload.iss === 'accounts.google.com';
+    if (!validIssuer || !payload.sub || !payload.email || payload.email_verified !== true) {
+      return { verified: false, code: 'GOOGLE_INVALID_TOKEN', error: 'Google identity claims are invalid' };
     }
     return {
       googleId: payload.sub,
@@ -89,37 +94,10 @@ async function verifyGoogleToken(token) {
       verified: true,
     };
   } catch (err) {
-    console.warn('[GOOGLE VERIFY] JWT verification failed, attempting fallback userinfo:', err.message);
-    return new Promise((resolve) => {
-      const https   = require('https');
-      const options = {
-        hostname: 'www.googleapis.com',
-        path:     '/oauth2/v3/userinfo',
-        method:   'GET',
-        headers:  { Authorization: `Bearer ${token}` },
-      };
-      https.get(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.email && (parsed.email_verified === true || parsed.email_verified === 'true' || parsed.email_verified === undefined)) {
-              resolve({ googleId: parsed.sub, email: parsed.email, name: parsed.name || parsed.email.split('@')[0], picture: parsed.picture, email_verified: true, verified: true });
-            } else if (parsed.email && parsed.email_verified === false) {
-              resolve({ verified: false, error: 'Google email is not verified' });
-            } else {
-              resolve({ verified: false, error: parsed.error_description || 'Invalid token' });
-            }
-          } catch (e) {
-            resolve({ verified: false, error: 'Failed to parse Google verification response' });
-          }
-        });
-      }).on('error', (netErr) => {
-        console.error('[GOOGLE VERIFY] Fallback network error:', netErr);
-        resolve({ verified: false, error: 'Google verification network error' });
-      });
-    });
+    // An ID token must never be reinterpreted as an OAuth access token.  The
+    // caller receives a classified authentication failure instead.
+    console.warn('[GOOGLE VERIFY] ID token verification failed:', err.message);
+    return { verified: false, code: 'GOOGLE_INVALID_TOKEN', error: 'Google ID token verification failed' };
   }
 }
 

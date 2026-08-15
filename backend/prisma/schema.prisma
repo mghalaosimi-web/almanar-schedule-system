@@ -194,6 +194,113 @@ model Group {
 // USERS
 // ──────────────────────────────────────────────
 
+/// Canonical authentication identity. Existing profile tables remain intact and
+/// are linked additively during backfill.
+model User {
+  id                 String               @id @default(uuid())
+  email              String               @unique
+  emailNormalized    String               @unique
+  displayName        String
+  isActive           Boolean              @default(true)
+  student            Student?
+  lecturer           Lecturer?
+  admin              Admin?
+  passwordCredential PasswordCredential?
+  authIdentities     AuthIdentity[]
+  sessions           UserSession[]
+  roles              UserRole[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+model PasswordCredential {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AuthIdentity {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String
+  providerAccountId String
+  email             String?
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider, email])
+}
+
+model UserSession {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime  @default(now())
+  metadata   Json      @default("{}")
+
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model Portal {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  name      String
+  route     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Student {
   id                Int                     @id @default(autoincrement())
   name              String
@@ -206,6 +313,8 @@ model Student {
   isRepresentative  Boolean                 @default(false)
   password          String?
   googleId          String?                 @unique
+  userId            String?                 @unique
+  user              User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   collegeId         Int
   college           College                 @relation(fields: [collegeId], references: [id], onDelete: Restrict)
   majorId           Int
@@ -243,6 +352,8 @@ model Lecturer {
   name               String
   email              String              @unique
   password           String
+  userId             String?             @unique
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   phone              String?
   collegeId          Int
   college            College             @relation(fields: [collegeId], references: [id], onDelete: Restrict)
@@ -259,6 +370,8 @@ model Admin {
   name              String
   email             String             @unique
   password          String
+  userId            String?             @unique
+  user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   role              AdminRole          @default(ADMIN)
   collegeId         Int?
   college           College?           @relation(fields: [collegeId], references: [id], onDelete: SetNull)

@@ -14,8 +14,11 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('--- SAFELY ENSURING DEVELOPER SUPER_ADMIN ACCOUNT ---');
-  const email = 'm.gh.alosimi@gmail.com';
-  const rawPassword = '708090';
+  const email = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  const rawPassword = process.env.OWNER_BOOTSTRAP_SECRET;
+  if (!email || !rawPassword) {
+    throw new Error('OWNER_EMAIL and OWNER_BOOTSTRAP_SECRET must be configured for an explicit owner bootstrap.');
+  }
   
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(rawPassword, salt);
@@ -25,7 +28,7 @@ async function main() {
   });
 
   if (existingAdmin) {
-    console.log(`Admin "${email}" already exists. Updating password and forcing SUPER_ADMIN role...`);
+    console.log(`Admin "${email}" already exists. Updating configured owner state...`);
     await prisma.admin.update({
       where: { id: existingAdmin.id },
       data: {

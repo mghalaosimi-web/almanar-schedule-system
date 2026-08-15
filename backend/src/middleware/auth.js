@@ -27,24 +27,34 @@ async function verifyToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    req.user.permissions = getUserPermissions(req.user);
-    
-    // Check Force Logout / Revoked Session
-    if (decoded.sessionId) {
-      try {
-        const { prisma } = require('../db');
-        const session = await prisma.sessionLog.findUnique({
-          where: { id: decoded.sessionId }
-        });
-        if (!session || session.isRevoked || session.logoutTime) {
-          return res.status(401).json({ success: false, error: 'SESSION_REVOKED', message: 'Your session has been terminated by administrator.' });
-        }
-      } catch (dbErr) {
-        console.warn('[verifyToken] Session check warning:', dbErr.message);
-      }
+    const SessionManager = require('../services/sessionManager');
+    const valResult = await SessionManager.validateSession(token);
+
+    if (!valResult.valid) {
+      return res.status(401).json({
+        success: false,
+        error: valResult.error || 'SESSION_INVALID',
+        message: 'Your session is invalid, expired, or terminated.'
+      });
     }
+
+    const { user, decoded } = valResult;
+    const userRoleKeys = (user.roles || []).map(r => r.role?.key || r.role);
+    const primaryRole = userRoleKeys[0] || (user.student ? 'STUDENT' : user.lecturer ? 'LECTURER' : 'ADMIN');
+
+    req.user = {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: primaryRole,
+      roles: userRoleKeys,
+      sessionId: decoded.sessionId,
+      studentId: user.student?.id,
+      lecturerId: user.lecturer?.id,
+      adminId: user.admin?.id,
+      collegeId: user.student?.collegeId || user.lecturer?.collegeId || user.admin?.collegeId,
+      permissions: getUserPermissions({ role: primaryRole, roles: userRoleKeys })
+    };
 
     // Check if college is deactivated (exclude Admin roles, developer emails, and Admin/Dev routes)
     const isDevOrAdminRoute = req.originalUrl && (
