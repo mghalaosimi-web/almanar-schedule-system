@@ -1,10 +1,17 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { broadcastSSE } = require('../services/notifications');
 
 const router = express.Router();
+
+function getLecturerId(req) {
+  if (req.user.lecturerId !== undefined && req.user.lecturerId !== null) return parseInt(req.user.lecturerId);
+  const parsed = parseInt(req.user.id);
+  return isNaN(parsed) ? req.user.id : parsed;
+}
+
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // 1. GET Lecturer's assigned schedule
@@ -14,7 +21,7 @@ router.get('/lecturer/schedule', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Lecturer access required' });
     }
     const schedules = await prisma.schedule.findMany({
-      where: { lecturerId: req.user.id },
+      where: { lecturerId: getLecturerId(req) },
       include: {
         subject: true,
         room: true,
@@ -96,7 +103,7 @@ router.post('/lecturer/requests', verifyToken, async (req, res) => {
     }
 
     const schedule = await prisma.schedule.findFirst({
-      where: { id: parseInt(scheduleId), lecturerId: req.user.id }
+      where: { id: parseInt(scheduleId), lecturerId: getLecturerId(req) }
     });
     if (!schedule) {
       return res.status(404).json({ success: false, error: 'Lecturer schedule not found' });
@@ -125,7 +132,7 @@ router.post('/lecturer/requests', verifyToken, async (req, res) => {
     const request = await prisma.rescheduleRequest.create({
       data: {
         scheduleId: parseInt(scheduleId),
-        lecturerId: req.user.id,
+        lecturerId: getLecturerId(req),
         requestType,
         newDayOfWeek: requestType === 'RESCHEDULE' ? newDayOfWeek : null,
         newStartTime: requestType === 'RESCHEDULE' ? newStartTime : null,
@@ -150,7 +157,7 @@ router.get('/lecturer/requests', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Lecturer access required' });
     }
     const requests = await prisma.rescheduleRequest.findMany({
-      where: { lecturerId: req.user.id },
+      where: { lecturerId: getLecturerId(req) },
       include: {
         schedule: {
           include: { subject: true, room: true, group: true }
@@ -178,7 +185,7 @@ router.get('/lecturer/attendance/token', verifyToken, async (req, res) => {
     }
 
     const schedule = await prisma.schedule.findFirst({
-      where: { id: parseInt(scheduleId), lecturerId: req.user.id }
+      where: { id: parseInt(scheduleId), lecturerId: getLecturerId(req) }
     });
 
     if (!schedule) {
@@ -215,7 +222,7 @@ router.get('/lecturer/attendance/report', verifyToken, async (req, res) => {
     targetDate.setHours(0, 0, 0, 0);
 
     const schedule = await prisma.schedule.findFirst({
-      where: { id: parseInt(scheduleId), lecturerId: req.user.id },
+      where: { id: parseInt(scheduleId), lecturerId: getLecturerId(req) },
       include: {
         group: {
           include: {
@@ -268,7 +275,7 @@ router.get('/lecturer/attendance/export/:scheduleId', verifyToken, async (req, r
     const scheduleId = parseInt(req.params.scheduleId);
 
     const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, lecturerId: req.user.id },
+      where: { id: scheduleId, lecturerId: getLecturerId(req) },
       include: {
         group: {
           include: {
@@ -325,3 +332,4 @@ router.get('/lecturer/:id', verifyToken, lecturerController.getLecturerById);
 router.put('/lecturer/:id', verifyToken, lecturerController.updateLecturerById);
 
 module.exports = router;
+

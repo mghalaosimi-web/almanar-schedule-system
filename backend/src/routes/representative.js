@@ -1,10 +1,17 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification, sendStudentPushNotification } = require('../services/notifications');
 
 const router = express.Router();
+
+function getStudentId(req) {
+  if (req.user.studentId !== undefined && req.user.studentId !== null) return parseInt(req.user.studentId);
+  const parsed = parseInt(req.user.id);
+  return isNaN(parsed) ? req.user.id : parsed;
+}
+
 
 // Middleware to authorize student representatives
 async function isRep(req, res, next) {
@@ -22,7 +29,7 @@ async function isRep(req, res, next) {
     try {
       if (req.user.role === 'STUDENT') {
         const student = await prisma.student.findUnique({
-          where: { id: req.user.id }
+          where: { id: getStudentId(req) }
         });
         if (student && student.groupId) {
           req.user.groupId = student.groupId;
@@ -169,7 +176,7 @@ router.post('/attendance', verifyToken, isRep, async (req, res) => {
       if (existing) {
         return prisma.attendance.update({
           where: { id: existing.id },
-          data: { status: record.status, recordedById: req.user.id }
+          data: { status: record.status, recordedById: getStudentId(req) }
         });
       } else {
         return prisma.attendance.create({
@@ -178,7 +185,7 @@ router.post('/attendance', verifyToken, isRep, async (req, res) => {
             scheduleId: parseInt(scheduleId),
             date: targetDate,
             status: record.status,
-            recordedById: req.user.id
+            recordedById: getStudentId(req)
           }
         });
       }
@@ -367,7 +374,7 @@ router.post('/resources', verifyToken, isRep, async (req, res) => {
         title,
         url,
         groupId: req.user.groupId,
-        postedById: req.user.id
+        postedById: getStudentId(req)
       }
     });
 
@@ -553,7 +560,7 @@ router.get('/reschedule/history', verifyToken, isRep, async (req, res) => {
 router.post('/students/:id/approve', verifyToken, isRep, async (req, res) => {
   try {
     const studentId = parseInt(req.params.id);
-    const repInfo = await prisma.student.findUnique({ where: { id: req.user.id } });
+    const repInfo = await prisma.student.findUnique({ where: { id: getStudentId(req) } });
     if (!repInfo) {
       return res.status(404).json({ success: false, error: 'Representative not found.' });
     }
@@ -591,7 +598,7 @@ router.post('/students/:id/approve', verifyToken, isRep, async (req, res) => {
 router.post('/students/:id/reject', verifyToken, isRep, async (req, res) => {
   try {
     const studentId = parseInt(req.params.id);
-    const repInfo = await prisma.student.findUnique({ where: { id: req.user.id } });
+    const repInfo = await prisma.student.findUnique({ where: { id: getStudentId(req) } });
     if (!repInfo) {
       return res.status(404).json({ success: false, error: 'Representative not found.' });
     }
@@ -677,3 +684,4 @@ router.post('/attendance/qr-token', verifyToken, isRep, async (req, res) => {
 });
 
 module.exports = router;
+

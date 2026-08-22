@@ -7,5 +7,9 @@
   "disableLibrary": false,
   "disableMap": false,
   "disableSchedules": false,
-  "deactivatedColleges": []
+  "deactivatedColleges": [],
+  "requireGoogleLink": false,
+  "otaThemeColor": null,
+  "otaHiddenButtons": [],
+  "otaWarningBanner": null
 }

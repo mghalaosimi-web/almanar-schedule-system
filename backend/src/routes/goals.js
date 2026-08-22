@@ -1,9 +1,16 @@
-const express = require('express');
+﻿const express = require('express');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { broadcastSSE, sendPushNotification } = require('../services/notifications');
 
 const router = express.Router();
+
+function getStudentId(req) {
+  if (req.user.studentId !== undefined && req.user.studentId !== null) return parseInt(req.user.studentId);
+  const parsed = parseInt(req.user.id);
+  return isNaN(parsed) ? req.user.id : parsed;
+}
+
 
 // Helper to check if user is a representative of their group
 async function isRep(req, res, next) {
@@ -15,7 +22,7 @@ async function isRep(req, res, next) {
   if (!req.user.groupId) {
     try {
       const student = await prisma.student.findUnique({
-        where: { id: req.user.id }
+        where: { id: getStudentId(req) }
       });
       if (student && student.groupId) {
         req.user.groupId = student.groupId;
@@ -80,7 +87,7 @@ router.get('/', verifyToken, async (req, res) => {
 
     // Fetch completions by this student
     const completions = await prisma.studentGoalCompletion.findMany({
-      where: { studentId: req.user.id }
+      where: { studentId: getStudentId(req) }
     });
     const completedGoalIds = new Set(completions.map(c => c.academicGoalId));
 
@@ -105,7 +112,7 @@ router.post('/:id/toggle', verifyToken, async (req, res) => {
     }
 
     const goalId = parseInt(req.params.id);
-    const studentId = req.user.id;
+    const studentId = getStudentId(req);
 
     // Check if goal exists and belongs to the student's group
     const goal = await prisma.academicGoal.findFirst({
@@ -166,7 +173,7 @@ router.get('/reminders', verifyToken, async (req, res) => {
       where: {
         groupId,
         completions: {
-          none: { studentId: req.user.id }
+          none: { studentId: getStudentId(req) }
         }
       },
       include: {
@@ -362,3 +369,4 @@ router.delete('/rep/:id', verifyToken, isRep, async (req, res) => {
 });
 
 module.exports = router;
+

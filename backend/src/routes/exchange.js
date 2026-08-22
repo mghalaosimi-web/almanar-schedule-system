@@ -1,8 +1,20 @@
-const express = require('express');
+﻿const express = require('express');
 const { prisma } = require('../db');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+/**
+ * Resolves integer Student/Lecturer/Admin ID from req.user (dual JWT format support).
+ */
+function getEntityId(req) {
+  if (req.user.studentId !== undefined && req.user.studentId !== null) return parseInt(req.user.studentId);
+  if (req.user.lecturerId !== undefined && req.user.lecturerId !== null) return parseInt(req.user.lecturerId);
+  if (req.user.adminId !== undefined && req.user.adminId !== null) return parseInt(req.user.adminId);
+  const parsed = parseInt(req.user.id);
+  return isNaN(parsed) ? req.user.id : parsed;
+}
+
 
 // 1. Fetch all posts in the student's group
 router.get('/posts', verifyToken, async (req, res) => {
@@ -13,7 +25,7 @@ router.get('/posts', verifyToken, async (req, res) => {
 
     // Always fetch fresh group details to avoid stale token states
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getEntityId(req) }
     });
 
     if (!student || !student.groupId) {
@@ -54,7 +66,7 @@ router.get('/posts', verifyToken, async (req, res) => {
     });
 
     const mappedPosts = posts.map(post => {
-      const isMine = post.studentId === req.user.id;
+      const isMine = post.studentId === getEntityId(req);
       return {
         id: post.id,
         title: post.title,
@@ -82,7 +94,7 @@ router.get('/posts', verifyToken, async (req, res) => {
             studentId: v.studentId,
             optionIdx: v.optionIdx
           })),
-          votedOptionIdx: post.poll.votes.find(v => v.studentId === req.user.id)?.optionIdx
+          votedOptionIdx: post.poll.votes.find(v => v.studentId === getEntityId(req))?.optionIdx
         } : null
       };
     });
@@ -107,7 +119,7 @@ router.post('/posts', verifyToken, async (req, res) => {
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getEntityId(req) }
     });
 
     if (!student || !student.groupId) {
@@ -214,7 +226,7 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
     const { postId } = req.params;
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getEntityId(req) }
     });
 
     if (!student || !student.groupId) {
@@ -262,7 +274,7 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden. This post belongs to another group.' });
     }
 
-    const isPostMine = post.studentId === req.user.id;
+    const isPostMine = post.studentId === getEntityId(req);
     const mappedPost = {
       id: post.id,
       title: post.title,
@@ -289,10 +301,10 @@ router.get('/posts/:postId', verifyToken, async (req, res) => {
           studentId: v.studentId,
           optionIdx: v.optionIdx
         })),
-        votedOptionIdx: post.poll.votes.find(v => v.studentId === req.user.id)?.optionIdx
+        votedOptionIdx: post.poll.votes.find(v => v.studentId === getEntityId(req))?.optionIdx
       } : null,
       comments: (post.comments || []).map(comment => {
-        const isCommentMine = comment.studentId === req.user.id;
+        const isCommentMine = comment.studentId === getEntityId(req);
         return {
           id: comment.id,
           postId: comment.postId,
@@ -335,7 +347,7 @@ router.post('/posts/:postId/comments', verifyToken, async (req, res) => {
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getEntityId(req) }
     });
 
     if (!student || !student.groupId) {
@@ -424,7 +436,7 @@ router.delete('/posts/:postId', verifyToken, async (req, res) => {
     }
 
     // Author authorization check
-    if (post.studentId !== req.user.id) {
+    if (post.studentId !== getEntityId(req)) {
       return res.status(403).json({ success: false, error: 'Access denied. You can only delete your own posts.' });
     }
 
@@ -466,7 +478,7 @@ router.delete('/comments/:commentId', verifyToken, async (req, res) => {
     }
 
     // Author authorization check
-    if (comment.studentId !== req.user.id) {
+    if (comment.studentId !== getEntityId(req)) {
       return res.status(403).json({ success: false, error: 'Access denied. You can only delete your own comments.' });
     }
 
@@ -513,7 +525,7 @@ router.post('/posts/:postId/poll/vote', verifyToken, async (req, res) => {
     }
 
     // Check if user already voted
-    const alreadyVoted = post.poll.votes.some(v => v.studentId === req.user.id);
+    const alreadyVoted = post.poll.votes.some(v => v.studentId === getEntityId(req));
     if (alreadyVoted) {
       return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
     }
@@ -527,7 +539,7 @@ router.post('/posts/:postId/poll/vote', verifyToken, async (req, res) => {
     const vote = await prisma.pollVote.create({
       data: {
         pollId: post.poll.id,
-        studentId: req.user.id,
+        studentId: getEntityId(req),
         optionIdx: parseInt(optionIdx)
       }
     });
@@ -592,7 +604,7 @@ router.put('/comments/:commentId/verify', verifyToken, async (req, res) => {
 
     // Verify requester is a representative or admin
     if (req.user.role === 'STUDENT') {
-      const student = await prisma.student.findUnique({ where: { id: req.user.id } });
+      const student = await prisma.student.findUnique({ where: { id: getEntityId(req) } });
       if (!student || !student.isRepresentative) {
         return res.status(403).json({ success: false, error: 'Access denied. Representative privileges required.' });
       }
@@ -638,7 +650,7 @@ router.post('/posts/summarize', verifyToken, async (req, res) => {
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getEntityId(req) }
     });
 
     if (!student || !student.groupId) {
@@ -697,3 +709,4 @@ router.post('/posts/summarize', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+

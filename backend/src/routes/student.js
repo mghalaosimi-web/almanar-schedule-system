@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
@@ -15,6 +15,24 @@ const scheduleService = require('../services/scheduleService');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
+
+/**
+ * Resolves the integer Student ID from req.user regardless of JWT format.
+ *
+ * OLD tokens (legacy): req.user.id = integer Student PK, req.user.studentId = undefined
+ * NEW tokens (SessionManager): req.user.id = UUID string, req.user.studentId = integer Student PK
+ *
+ * Usage:  const studentId = getStudentId(req);
+ */
+function getStudentId(req) {
+  // New-format tokens set studentId explicitly
+  if (req.user.studentId !== undefined && req.user.studentId !== null) {
+    return parseInt(req.user.studentId);
+  }
+  // Old-format tokens: id is already the integer student PK
+  const parsed = parseInt(req.user.id);
+  return isNaN(parsed) ? req.user.id : parsed;
+}
 
 // Helper for distance calculation (Haversine formula)
 function getCoordinateDistance(lat1, lon1, lat2, lon2) {
@@ -55,7 +73,7 @@ router.get('/student/daily-greeting', verifyToken, async (req, res) => {
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id },
+      where: { id: getStudentId(req) },
       include: { group: true }
     });
 
@@ -181,17 +199,17 @@ router.post('/notifications/subscribe', verifyToken, async (req, res) => {
     await prisma.pushSubscription.upsert({
       where: { endpoint: subscription.endpoint },
       update: {
-        studentId: req.user.role === 'STUDENT' ? req.user.id : null,
-        adminId: req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN' ? req.user.id : null,
-        lecturerId: req.user.role === 'LECTURER' ? req.user.id : null,
+        studentId: req.user.role === 'STUDENT' ? getStudentId(req) : null,
+        adminId: req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN' ? (req.user.adminId || req.user.id) : null,
+        lecturerId: req.user.role === 'LECTURER' ? (req.user.lecturerId || req.user.id) : null,
       },
       create: {
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
-        studentId: req.user.role === 'STUDENT' ? req.user.id : null,
-        adminId: req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN' ? req.user.id : null,
-        lecturerId: req.user.role === 'LECTURER' ? req.user.id : null,
+        studentId: req.user.role === 'STUDENT' ? getStudentId(req) : null,
+        adminId: req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN' ? (req.user.adminId || req.user.id) : null,
+        lecturerId: req.user.role === 'LECTURER' ? (req.user.lecturerId || req.user.id) : null,
       }
     });
 
@@ -420,7 +438,7 @@ router.get('/schedules', verifyToken, async (req, res) => {
 // 12. GET representative students
 router.get('/representative/students', verifyToken, async (req, res) => {
   try {
-    const studentInfo = await prisma.student.findUnique({ where: { id: req.user.id } });
+    const studentInfo = await prisma.student.findUnique({ where: { id: getStudentId(req) } });
     if (!studentInfo || !studentInfo.isRepresentative) {
       return res.status(403).json({ success: false, error: 'Access denied. Representative role required.' });
     }
@@ -454,7 +472,7 @@ router.post('/representative/assign', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid payload' });
     }
 
-    const studentInfo = await prisma.student.findUnique({ where: { id: req.user.id } });
+    const studentInfo = await prisma.student.findUnique({ where: { id: getStudentId(req) } });
     if (!studentInfo || !studentInfo.isRepresentative) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
@@ -494,7 +512,7 @@ router.get('/notifications/student', verifyToken, async (req, res) => {
     const logs = await prisma.notificationLog.findMany({
       where: {
         OR: [
-          { studentId: req.user.id },
+          { studentId: getStudentId(req) },
           {
             groupId: req.user.groupId,
             studentId: null
@@ -525,7 +543,7 @@ router.post('/notifications/mark-delivered', verifyToken, async (req, res) => {
     const { logIds, broadcastId } = req.body;
     
     let whereClause = {
-      studentId: req.user.id,
+      studentId: getStudentId(req),
       deliveredAt: null
     };
 
@@ -558,7 +576,7 @@ router.post('/notifications/mark-read', verifyToken, async (req, res) => {
     const { logIds, broadcastId } = req.body;
     
     let whereClause = {
-      studentId: req.user.id,
+      studentId: getStudentId(req),
       readAt: null
     };
 
@@ -591,7 +609,7 @@ router.put('/student/settings', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
     const { name, password, groupId, departmentName, levelName, phone, email, idPhotoUrl } = req.body;
-    const studentId = req.user.id;
+    const studentId = getStudentId(req);
 
     const updateData = {};
     if (name) updateData.name = name;
@@ -693,7 +711,7 @@ router.get('/student/settings', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id },
+      where: { id: getStudentId(req) },
       include: {
         major: {
           include: { department: true }
@@ -798,7 +816,7 @@ router.get('/student/attendance/stats', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
     }
 
-    const stats = await attendanceService.getAttendanceStatsSummary(req.user.id);
+    const stats = await attendanceService.getAttendanceStatsSummary(getStudentId(req));
     res.status(200).json({ success: true, data: stats });
   } catch (error) {
     console.error('[API] Error fetching student attendance stats:', error);
@@ -830,7 +848,7 @@ router.post('/attendance/scan', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing QR code token' });
     }
 
-    const record = await attendanceService.scanCheckIn(req.user.id, token);
+    const record = await attendanceService.scanCheckIn(getStudentId(req), token);
     
     res.status(200).json({
       success: true,
@@ -902,7 +920,7 @@ router.post('/student/attendance/checkin', verifyToken, async (req, res) => {
 
     const existing = await prisma.attendance.findFirst({
       where: {
-        studentId: req.user.id,
+        studentId: getStudentId(req),
         scheduleId: parseInt(scheduleId),
         date: today
       }
@@ -914,7 +932,7 @@ router.post('/student/attendance/checkin', verifyToken, async (req, res) => {
         where: { id: existing.id },
         data: {
           status,
-          recordedById: req.user.id
+          recordedById: getStudentId(req)
         },
         include: {
           student: true
@@ -923,11 +941,11 @@ router.post('/student/attendance/checkin', verifyToken, async (req, res) => {
     } else {
       record = await prisma.attendance.create({
         data: {
-          studentId: req.user.id,
+          studentId: getStudentId(req),
           scheduleId: parseInt(scheduleId),
           date: today,
           status,
-          recordedById: req.user.id
+          recordedById: getStudentId(req)
         },
         include: {
           student: true
@@ -938,7 +956,7 @@ router.post('/student/attendance/checkin', verifyToken, async (req, res) => {
     // Broadcast update via SSE
     broadcastSSE('ATTENDANCE_MARKED', {
       scheduleId: parseInt(scheduleId),
-      studentId: req.user.id,
+      studentId: getStudentId(req),
       studentName: record.student.name,
       status: record.status,
       scannedAt: record.date
@@ -1039,13 +1057,13 @@ router.post('/feedback', verifyToken, async (req, res) => {
 
     let userDetails = { name: req.user.name, role: req.user.role, email: 'unknown@manar.edu' };
     if (req.user.role === 'STUDENT') {
-      const student = await prisma.student.findUnique({ where: { id: req.user.id } });
+      const student = await prisma.student.findUnique({ where: { id: getStudentId(req) } });
       if (student) userDetails.email = student.email;
     } else if (req.user.role === 'LECTURER') {
-      const lecturer = await prisma.lecturer.findUnique({ where: { id: req.user.id } });
+      const lecturer = await prisma.lecturer.findUnique({ where: { id: getStudentId(req) } });
       if (lecturer) userDetails.email = lecturer.email;
     } else if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
-      const admin = await prisma.admin.findUnique({ where: { id: req.user.id } });
+      const admin = await prisma.admin.findUnique({ where: { id: getStudentId(req) } });
       if (admin) userDetails.email = admin.email;
     }
 
@@ -1058,7 +1076,7 @@ router.post('/feedback', verifyToken, async (req, res) => {
       rating: rating !== undefined ? parseInt(rating) : null
     };
     if (req.user.role === 'STUDENT') {
-      feedbackData.studentId = req.user.id;
+      feedbackData.studentId = getStudentId(req);
     } else {
       // For non-students: create a synthetic student-less record using a sentinel student row
       // OR simply log to DB via a nullable studentId extension.
@@ -1138,7 +1156,7 @@ router.get('/student/attendance-stats', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
     }
 
-    const statsList = await attendanceService.getAttendanceStatsBySubject(req.user.id);
+    const statsList = await attendanceService.getAttendanceStatsBySubject(getStudentId(req));
     res.status(200).json({ success: true, data: statsList });
   } catch (error) {
     console.error('[API] Error fetching student attendance stats:', error);
@@ -1163,7 +1181,7 @@ router.get('/student/export-schedule', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Student access required' });
     }
     
-    const icsContent = await scheduleService.exportScheduleToICS(req.user.id);
+    const icsContent = await scheduleService.exportScheduleToICS(getStudentId(req));
 
     res.setHeader('Content-Type', 'text/calendar');
     res.setHeader('Content-Disposition', 'attachment; filename="schedule.ics"');
@@ -1192,7 +1210,7 @@ router.get('/student/tasks/all', verifyToken, async (req, res) => {
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: req.user.id }
+      where: { id: getStudentId(req) }
     });
 
     if (!student) {
@@ -1201,7 +1219,7 @@ router.get('/student/tasks/all', verifyToken, async (req, res) => {
 
     // Fetch personal tasks
     const personalTasks = await prisma.studentTask.findMany({
-      where: { studentId: req.user.id },
+      where: { studentId: getStudentId(req) },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -1212,7 +1230,7 @@ router.get('/student/tasks/all', verifyToken, async (req, res) => {
         where: { groupId: student.groupId },
         include: {
           completions: {
-            where: { studentId: req.user.id }
+            where: { studentId: getStudentId(req) }
           },
           subject: true
         },
@@ -1259,7 +1277,7 @@ router.post('/student/tasks', verifyToken, async (req, res) => {
 
     const task = await prisma.studentTask.create({
       data: {
-        studentId: req.user.id,
+        studentId: getStudentId(req),
         title: title.trim(),
         dueDate: dueDate ? new Date(dueDate) : null,
         category: category || 'PERSONAL',
@@ -1293,13 +1311,13 @@ router.put('/student/tasks/:id', verifyToken, async (req, res) => {
         const completion = await prisma.studentGoalCompletion.upsert({
           where: {
             studentId_academicGoalId: {
-              studentId: req.user.id,
+              studentId: getStudentId(req),
               academicGoalId: goalId
             }
           },
           update: {},
           create: {
-            studentId: req.user.id,
+            studentId: getStudentId(req),
             academicGoalId: goalId,
             status: 'COMPLETED'
           }
@@ -1307,7 +1325,7 @@ router.put('/student/tasks/:id', verifyToken, async (req, res) => {
 
         // Award +50 XP
         await prisma.student.update({
-          where: { id: req.user.id },
+          where: { id: getStudentId(req) },
           data: { xp: { increment: 50 } }
         });
 
@@ -1316,7 +1334,7 @@ router.put('/student/tasks/:id', verifyToken, async (req, res) => {
         // Delete completion
         await prisma.studentGoalCompletion.deleteMany({
           where: {
-            studentId: req.user.id,
+            studentId: getStudentId(req),
             academicGoalId: goalId
           }
         });
@@ -1327,7 +1345,7 @@ router.put('/student/tasks/:id', verifyToken, async (req, res) => {
 
     // Handle personal tasks
     const task = await prisma.studentTask.findFirst({
-      where: { id: taskId, studentId: req.user.id }
+      where: { id: taskId, studentId: getStudentId(req) }
     });
 
     if (!task) {
@@ -1342,7 +1360,7 @@ router.put('/student/tasks/:id', verifyToken, async (req, res) => {
     if (isNowCompleted && !task.completed) {
       xpAwarded = 50;
       await prisma.student.update({
-        where: { id: req.user.id },
+        where: { id: getStudentId(req) },
         data: { xp: { increment: 50 } }
       });
     }
@@ -1377,7 +1395,7 @@ router.delete('/student/tasks/:id', verifyToken, async (req, res) => {
     }
 
     const task = await prisma.studentTask.findFirst({
-      where: { id: taskId, studentId: req.user.id }
+      where: { id: taskId, studentId: getStudentId(req) }
     });
 
     if (!task) {
@@ -1405,7 +1423,7 @@ router.put('/student/focus', verifyToken, async (req, res) => {
     const { isFocusing } = req.body;
 
     const student = await prisma.student.update({
-      where: { id: req.user.id },
+      where: { id: getStudentId(req) },
       data: { isFocusing: !!isFocusing }
     });
 
@@ -1470,3 +1488,5 @@ router.post('/student/tasks/split', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+
+

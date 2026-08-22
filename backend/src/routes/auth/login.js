@@ -2,6 +2,7 @@ const express   = require('express');
 const { strictAuthLimiter } = require('./shared');
 const IdentityResolver = require('../../services/identityResolver');
 const SessionManager  = require('../../services/sessionManager');
+const { prisma }      = require('../../db');
 
 const router     = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
