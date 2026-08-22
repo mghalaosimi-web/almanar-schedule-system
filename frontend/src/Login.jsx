@@ -350,6 +350,25 @@ export default function Login() {
         }
       }
     } catch (err) {
+      // 🌟 Offline Fallback for Web App
+      const cachedUserJson = localStorage.getItem('manar_user');
+      if (!navigator.onLine || err.code === 'ERR_NETWORK' || !err.response || err.message?.includes('Network Error')) {
+        if (cachedUserJson) {
+          try {
+            const cachedUser = JSON.parse(cachedUserJson);
+            toast.success(isAr ? 'تم الدخول بنجاح عبر البيانات المحفوظة أوفلاين 📦' : 'Signed in via cached offline profile');
+            if (cachedUser.role === 'ADMIN' || cachedUser.role === 'SUPER_ADMIN' || cachedUser.role === 'COLLEGE_ADMIN' || cachedUser.role === 'UNI_ADMIN') {
+              navigate('/admin/overview');
+            } else if (cachedUser.role === 'LECTURER') {
+              navigate('/lecturer/home');
+            } else {
+              navigate('/student/home');
+            }
+            return;
+          } catch (_) {}
+        }
+      }
+
       const msg = getFriendlyErrorMessage(err, isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials', isAr);
       setError(msg);
       toast.error(msg);

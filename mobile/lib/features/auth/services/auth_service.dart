@@ -54,15 +54,16 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// تسجيل الدخول بالحساب وكلمة المرور دون إجبار تحديد Role
+  /// تسجيل الدخول بالحساب وكلمة المرور دون إجبار تحديد Role (مع الدعم الكامل لـ Offline First)
   Future<AuthResult> login({
     required String identifier,
     required String password,
     UserRole? role,
     bool isConnected = true,
   }) async {
+    // 1. إذا كان لا يوجد إنترنت، جرب الدخول الأوفلاين فوراً من الكاش المحلي
     if (!isConnected) {
-      return _tryOfflineLogin();
+      return _tryOfflineLogin(identifier: identifier);
     }
 
     _isLoading = true;
@@ -92,15 +93,31 @@ class AuthService extends ChangeNotifier {
       _currentUser = user;
       return AuthResult(success: true, user: user, status: 'PROFILE_COMPLETE');
     } on DioException catch (e) {
+      // 2. إذا فشل الاتصال بالسيرفر أو انقطعت الشبكة، افحص الكاش المحلي قبل إظهار أي خطأ!
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null ||
+          (e.response?.statusCode != null && e.response!.statusCode! >= 500)) {
+        final offlineResult = _tryOfflineLogin(identifier: identifier);
+        if (offlineResult.success) {
+          return offlineResult;
+        }
+      }
       final msg = _parseDioError(e);
       return AuthResult(success: false, error: msg, status: 'ERROR');
     } catch (e) {
+      final offlineResult = _tryOfflineLogin(identifier: identifier);
+      if (offlineResult.success) {
+        return offlineResult;
+      }
       return const AuthResult(success: false, error: 'حدث خطأ غير متوقع', status: 'ERROR');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+
 
   /// معالجة استجابة تسجيل الدخول عبر Google
   Future<AuthResult> handleGoogleSignIn(String idToken) async {
@@ -255,27 +272,42 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// محاولة الدخول من الكاش المحلي (بدون إنترنت)
-  AuthResult _tryOfflineLogin() {
+  /// محاولة الدخول من الكاش المحلي (بدون إنترنت أو عند تعذر الوصول للسيرفر)
+  AuthResult _tryOfflineLogin({String? identifier}) {
     try {
       final box = Hive.box<UserModel>(HiveBoxes.currentUser);
       if (box.isNotEmpty) {
-        _currentUser = box.values.first;
-        notifyListeners();
-        return AuthResult(
-          success: true,
-          user: _currentUser,
-          isOfflineLogin: true,
-          status: 'PROFILE_COMPLETE',
-        );
+        final cachedUser = box.values.first;
+        
+        // إذا كان معرّف الدخول فارغاً أو يطابق إحدى خانات الحساب المحفوظ
+        final idTrim = identifier?.trim().toLowerCase() ?? '';
+        final matches = idTrim.isEmpty ||
+            cachedUser.email.toLowerCase() == idTrim ||
+            (cachedUser.phone != null && cachedUser.phone!.toLowerCase() == idTrim) ||
+            (cachedUser.idNumber != null && cachedUser.idNumber!.toLowerCase() == idTrim) ||
+            cachedUser.name.toLowerCase().contains(idTrim);
+
+        if (matches) {
+          _currentUser = cachedUser;
+          notifyListeners();
+          return AuthResult(
+            success: true,
+            user: _currentUser,
+            isOfflineLogin: true,
+            status: 'PROFILE_COMPLETE',
+          );
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[AuthService] Offline login error: $e');
+    }
     return const AuthResult(
       success: false,
-      error: 'لا توجد بيانات محفوظة. اتصل بالإنترنت أولاً',
+      error: 'لا توجد بيانات دخول محفوظة لهذا الحساب محلياً. يرجى الاتصال بالإنترنت أول مرة.',
       status: 'ERROR',
     );
   }
+
 
   /// تسجيل الخروج
   Future<void> logout() async {
