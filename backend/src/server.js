@@ -336,11 +336,17 @@ boot();
 // Direct APK file download endpoint with proper MIME headers
 app.get(['/Manar_Schedule.apk', '/download/apk', '/api/public/download-apk'], (req, res) => {
   const fs = require('fs');
-  const apkPath = path.join(__dirname, '../../frontend/dist/Manar_Schedule.apk');
-  const fallbackPath = path.join(__dirname, '../../frontend/public/Manar_Schedule.apk');
-  const targetPath = fs.existsSync(apkPath) ? apkPath : fallbackPath;
+  const candidatePaths = [
+    path.join(__dirname, '../../frontend/dist/Manar_Schedule.apk'),
+    path.join(__dirname, '../../frontend/public/Manar_Schedule.apk'),
+    path.join(__dirname, '../../mobile/build/app/outputs/flutter-apk/app-release.apk'),
+    path.join(__dirname, '../../mobile/build/app/outputs/apk/release/app-release.apk'),
+    path.join(__dirname, '../public/Manar_Schedule.apk')
+  ];
 
-  if (fs.existsSync(targetPath)) {
+  const targetPath = candidatePaths.find(p => fs.existsSync(p));
+
+  if (targetPath) {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', 'attachment; filename="Manar_Schedule.apk"');
     return res.sendFile(targetPath);
@@ -348,6 +354,7 @@ app.get(['/Manar_Schedule.apk', '/download/apk', '/api/public/download-apk'], (r
     return res.status(404).json({ success: false, error: 'APK file not found on server' });
   }
 });
+
 
 // Serve static files from the React frontend app build directory
 app.use(express.static(path.join(__dirname, '../../frontend/dist')));
