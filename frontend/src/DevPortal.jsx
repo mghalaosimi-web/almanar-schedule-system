@@ -22,6 +22,8 @@ import AIPredictiveInsights from './components/dev-portal/AIPredictiveInsights';
 import SqlTerminal          from './components/dev-portal/SqlTerminal';
 import DbIntegrationMap     from './components/dev-portal/DbIntegrationMap';
 import SelfHealingPatcher   from './components/dev-portal/SelfHealingPatcher';
+import ReleaseManager       from './components/dev-portal/ReleaseManager';
+
 
 // ── Mini Stat Card ────────────────────────────────────────────────────────────
 function StatCard({ label, value, icon, color = 'text-white', pulse = false }) {
@@ -242,6 +244,7 @@ export default function DevPortal() {
     { id: 'insights',      labelAr: 'مستشار التنبؤ الذكي',    labelEn: 'AI Operations Insights', icon: '🤖' },
     { id: 'patcher',       labelAr: 'الشفاء الذاتي بـ AI',     labelEn: 'AI Self-Healing Patcher', icon: '🩺' },
     { id: 'terminal',      labelAr: 'غرفة استعلام SQL',       labelEn: 'SQL Query Terminal',     icon: '💻' },
+    { id: 'releasemanager', labelAr: 'مُدير التحديثات والإصدارات', labelEn: 'In-App Release Manager', icon: '🚀' },
     { id: 'backup',        labelAr: 'النسخ الاحتياطي',        labelEn: 'Backup Manager',         icon: '💾' },
     { id: 'engine',        labelAr: 'غرفة المحرك والتعدين',   labelEn: 'System Engine Room',    icon: '🔒' },
   ];
@@ -709,6 +712,12 @@ export default function DevPortal() {
               {activeTab === 'patcher' && (
                 <SelfHealingPatcher API_URL={API_URL} token={token} isAr={isAr} />
               )}
+
+              {/* ── Tab: In-App Release Manager ── */}
+              {activeTab === 'releasemanager' && (
+                <ReleaseManager API_URL={API_URL} token={token} isAr={isAr} />
+              )}
+
 
             </motion.div>
           </AnimatePresence>

@@ -17,6 +17,8 @@ import ThemeSwitcher from './ThemeSwitcher';
 import DevSignature from './DevSignature';
 import CommandPalette from './CommandPalette';
 import ErrorBoundary from './ErrorBoundary';
+import UpdateNotificationModal from './components/UpdateNotificationModal';
+
 
 // Dynamic lazy loaded route page components
 const PublicLandingWizard = React.lazy(() => import('./components/PublicLandingWizard'));
@@ -467,6 +469,15 @@ function AppLayout() {
           window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_COMMENT_CREATED', { detail: payload.data }));
         } else if (payload.type === 'EXCHANGE_COMMENT_DELETED') {
           window.dispatchEvent(new CustomEvent('MANAR_EXCHANGE_COMMENT_DELETED', { detail: payload.data }));
+        } else if (payload.type === 'SYSTEM_RELEASE_UPDATE') {
+          if (payload.data && payload.data.release) {
+            toast(i18n.language === 'ar' ? '🚀 تم إطلاق تحديث جديد للنظام!' : '🚀 New release update published!', {
+              icon: '🔔',
+              duration: 6000,
+              style: { border: '1px solid #06b6d4' }
+            });
+            window.dispatchEvent(new CustomEvent('MANAR_SYSTEM_RELEASE_UPDATE', { detail: payload.data.release }));
+          }
         }
       } catch (err) {
         console.error('[SSE] Error processing incoming event:', err);
@@ -1182,10 +1193,46 @@ function AppLayout() {
 }
 
 export default function App() {
+  const [updateReleaseInfo, setUpdateReleaseInfo] = React.useState(null);
+  const [showUpdateModal, setShowUpdateModal] = React.useState(false);
+
+  React.useEffect(() => {
+    // Initial version check against public version endpoint
+    axios.get(`${API_URL}/api/public/version`)
+      .then(res => {
+        if (res.data) {
+          const latestVer = res.data.latestVersion || '2.1.0';
+          const latestBld = res.data.latestBuild || 3;
+          // Baseline version for web is 2.1.0 (build 3)
+          if (latestVer > '2.1.0' || latestBld > 3) {
+            setUpdateReleaseInfo(res.data);
+            setShowUpdateModal(true);
+          }
+        }
+      })
+      .catch(err => console.warn('[Version check] Error fetching version:', err.message));
+
+    // Listen to realtime live update event from SSE broadcast
+    const handleReleaseUpdate = (e) => {
+      if (e.detail) {
+        setUpdateReleaseInfo(e.detail);
+        setShowUpdateModal(true);
+      }
+    };
+    window.addEventListener('MANAR_SYSTEM_RELEASE_UPDATE', handleReleaseUpdate);
+    return () => window.removeEventListener('MANAR_SYSTEM_RELEASE_UPDATE', handleReleaseUpdate);
+  }, []);
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
         <OfflineBanner />
+        <UpdateNotificationModal
+          show={showUpdateModal}
+          releaseInfo={updateReleaseInfo}
+          onDismiss={() => setShowUpdateModal(false)}
+          isAr={document.dir === 'rtl' || navigator.language.startsWith('ar')}
+        />
         <ErrorBoundary>
           <React.Suspense fallback={<PageLoader />}>
             <AppLayout />
@@ -1211,3 +1258,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+

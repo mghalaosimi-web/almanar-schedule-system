@@ -3015,6 +3015,101 @@ router.post('/admin/dev/tenant-configs/colleges/:id', verifyToken, isSuperAdmin,
   }
 });
 
+// ── RELEASE & UPDATE MANAGER ENDPOINTS ───────────────────────────────────────
+
+// GET /api/admin/dev/release-metadata — Read release_metadata.json
+router.get('/admin/dev/release-metadata', verifyToken, isSuperAdmin, (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '../../data/release_metadata.json');
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return res.status(200).json({ success: true, data });
+    }
+  } catch (err) {
+    console.error('[DevPortal] Read release metadata error:', err);
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      latestVersion: '2.1.0',
+      latestBuild: 3,
+      minimumSupportedVersion: '2.1.0',
+      minimumSupportedBuild: 3,
+      downloadUrl: '/Manar_Schedule.apk',
+      fullDownloadUrl: 'https://almanar-schedule-system.onrender.com/Manar_Schedule.apk',
+      apkSizeBytes: 62288630,
+      apkHashSha256: '2FD3611E0CA467528FC921BA7BBFE2A0B7AFB7A8294428568045B4AFC945AAA3',
+      releaseNotes: ['تطبيق جداول كلية المنار الجامعية الرسمية'],
+      releaseDate: new Date().toISOString().split('T')[0]
+    }
+  });
+});
+
+// POST /api/admin/dev/release-metadata — Update release_metadata.json & broadcast SSE
+router.post('/admin/dev/release-metadata', verifyToken, isSuperAdmin, async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const { broadcastSSE } = require('../services/notifications');
+
+    const {
+      latestVersion,
+      latestBuild,
+      minimumSupportedVersion,
+      minimumSupportedBuild,
+      downloadUrl,
+      fullDownloadUrl,
+      apkSizeBytes,
+      apkHashSha256,
+      releaseNotes,
+      releaseDate
+    } = req.body;
+
+    if (!latestVersion || !latestBuild) {
+      return res.status(400).json({ success: false, error: 'latestVersion and latestBuild are required' });
+    }
+
+    const metadata = {
+      success: true,
+      latestVersion: String(latestVersion).trim(),
+      latestBuild: parseInt(latestBuild) || 1,
+      minimumSupportedVersion: String(minimumSupportedVersion || latestVersion).trim(),
+      minimumSupportedBuild: parseInt(minimumSupportedBuild || latestBuild) || 1,
+      downloadUrl: downloadUrl || '/Manar_Schedule.apk',
+      fullDownloadUrl: fullDownloadUrl || 'https://almanar-schedule-system.onrender.com/Manar_Schedule.apk',
+      apkSizeBytes: apkSizeBytes ? parseInt(apkSizeBytes) : 62288630,
+      apkHashSha256: apkHashSha256 || '',
+      releaseNotes: Array.isArray(releaseNotes) ? releaseNotes : (releaseNotes ? [releaseNotes] : []),
+      releaseDate: releaseDate || new Date().toISOString().split('T')[0]
+    };
+
+    const filePath = path.join(__dirname, '../../data/release_metadata.json');
+    const dataDir = path.dirname(filePath);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(metadata, null, 2), 'utf8');
+
+    // Broadcast realtime event to ALL connected clients (Web + Mobile)
+    broadcastSSE('SYSTEM_RELEASE_UPDATE', { release: metadata });
+
+    console.log(`[RELEASE MANAGER] New release published: v${metadata.latestVersion} (Build ${metadata.latestBuild})`);
+
+    res.status(200).json({
+      success: true,
+      message: `تم نشر وتعميم التحديث v${metadata.latestVersion} (Build ${metadata.latestBuild}) بنجاح على كافة الأجهزة.`,
+      data: metadata
+    });
+  } catch (error) {
+    console.error('[DevPortal] Publish release error:', error);
+    res.status(500).json({ success: false, error: 'Failed to publish release: ' + error.message });
+  }
+});
+
 module.exports = router;
+
 
 
